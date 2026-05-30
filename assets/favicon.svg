@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Fundo escuro -->
+  <rect width="100" height="100" fill="#131313"/>
+
+  <!-- X branco bold -->
+  <path d="M4,2 L24,2 L50,36 L76,2 L96,2 L64,50 L96,98 L76,98 L50,64 L24,98 L4,98 L36,50 Z"
+        fill="white"/>
+
+  <!-- Shape teal superior: cobre braço direito superior do X -->
+  <path d="M49,6
+           Q64,1 81,1
+           Q97,1 97,16
+           L97,44
+           Q97,54 86,56
+           L67,56
+           Q56,56 50,47
+           L44,34 Z"
+        fill="#36c7bd"/>
+
+  <!-- Shape teal inferior: barra diagonal menor abaixo -->
+  <path d="M57,60
+           L91,74
+           Q97,80 94,86
+           L76,88
+           Q67,88 62,81
+           L48,70 Z"
+        fill="#36c7bd"/>
+</svg>
