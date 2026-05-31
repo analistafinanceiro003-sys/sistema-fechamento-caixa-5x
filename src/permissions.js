@@ -393,12 +393,16 @@ function draftModules() {
   applyModuleAccess();
 }
 
-function saveModules() {
+async function saveModules() {
   draftModules();
   const cid = val('moduleCompany');
   const profile = val('moduleProfile') || 'admin';
   if (window.saveModulePermissions && cid && window.state?.modules?.[cid]?.[profile]) {
-    saveModulePermissions(cid, profile, state.modules[cid][profile]).catch((e) => alert(`Erro ao salvar permissões no Supabase: ${e.message}`));
+    try {
+      await saveModulePermissions(cid, profile, state.modules[cid][profile]);
+    } catch (e) {
+      return alert(`Erro ao salvar permissões no Supabase: ${e.message}`);
+    }
   }
   if (window.save) save();
   if (window.renderAll) renderAll();

@@ -293,7 +293,7 @@ function createDivergenceReviews(closing) {
   });
 }
 
-function saveOpeningAdjustment() {
+async function saveOpeningAdjustment() {
   const storeId = val('openingAdjustmentStore');
   const store = state.stores.find((s) => s.id === storeId);
   if (!store) return alert('Selecione a loja para o saldo inicial autorizado.');
@@ -316,10 +316,17 @@ function saveOpeningAdjustment() {
     notes: val('openingAdjustmentNotes'),
     createdAt: new Date().toISOString(),
   };
-  state.cashOpeningAdjustments.push(adjustment);
   if (sb && !USE_LOCAL_FALLBACK && currentUser?.authId) {
-    createCashOpeningAdjustment(adjustment).catch((e) => alert(`Erro ao salvar ajuste no Supabase: ${e.message}`));
+    try {
+      const row = await createCashOpeningAdjustment(adjustment);
+      if (row?.id) adjustment.id = row.id;
+    } catch (e) {
+      return alert(`Erro ao salvar ajuste no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para salvar ajuste.');
   }
+  state.cashOpeningAdjustments.push(adjustment);
   addAudit('Saldo inicial autorizado', `${companyName(store.companyId)} / ${store.name} - ${money(amount)}`);
   ['openingAdjustmentAmount','openingAdjustmentNotes'].forEach((id) => setVal(id, ''));
   save();
@@ -327,28 +334,38 @@ function saveOpeningAdjustment() {
   alert('Saldo inicial autorizado registrado.');
 }
 
-function reviewDivergence(id, status) {
+async function reviewDivergence(id, status) {
   const review = (state.divergenceReviews || []).find((r) => r.id === id);
   if (!review) return;
   if (role === 'operator') return alert('Operador não pode revisar divergências.');
   if (role === 'admin' && review.companyId !== currentUser?.companyId) return alert('Esta divergência não pertence ao seu acesso.');
   const comment = prompt(`Parecer do Admin para marcar como ${status}:`);
   if (!comment || !comment.trim()) return alert('A revisão exige parecer/comentário.');
-  review.reviewStatus = status;
-  review.adminComment = comment.trim();
-  review.reviewedBy = currentUser?.name || 'Master';
-  review.reviewedAt = new Date().toISOString();
-  review.updatedAt = review.reviewedAt;
+  const updatedReview = {
+    ...review,
+    reviewStatus: status,
+    adminComment: comment.trim(),
+    reviewedBy: currentUser?.name || 'Master',
+    reviewedAt: new Date().toISOString(),
+  };
+  updatedReview.updatedAt = updatedReview.reviewedAt;
   if (sb && !USE_LOCAL_FALLBACK && currentUser?.authId) {
-    updateDivergenceReview(review.id, review).catch((e) => alert(`Erro ao revisar divergência no Supabase: ${e.message}`));
+    try {
+      await updateDivergenceReview(review.id, updatedReview);
+    } catch (e) {
+      return alert(`Erro ao revisar divergência no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para revisar divergências.');
   }
+  Object.assign(review, updatedReview);
   addAudit('Revisão de divergência', `${storeName(review.storeId)} / ${review.divergenceType} / ${status}`);
   save();
   renderAll();
 }
 
 /* --- Salvar fechamento --- */
-function saveClosing() {
+async function saveClosing() {
   const store = selectedStore();
   if (!store) return alert('Selecione uma loja cadastrada.');
   if (role === 'operator' && currentUser?.storeId && store.id !== currentUser.storeId) {
@@ -487,7 +504,17 @@ function saveClosing() {
   state.closings.push(closing);
   createDivergenceReviews(closing);
   if (sb && !USE_LOCAL_FALLBACK && currentUser?.authId) {
-    createClosing(closing).catch((e) => alert(`Erro ao salvar fechamento no Supabase: ${e.message}`));
+    try {
+      await createClosing(closing);
+    } catch (e) {
+      state.closings = state.closings.filter((c) => c.id !== closing.id);
+      state.divergenceReviews = (state.divergenceReviews || []).filter((r) => r.closingId !== closing.id);
+      return alert(`Erro ao salvar fechamento no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    state.closings = state.closings.filter((c) => c.id !== closing.id);
+    state.divergenceReviews = (state.divergenceReviews || []).filter((r) => r.closingId !== closing.id);
+    return alert('Supabase Auth/Sessão obrigatório em produção para salvar fechamento.');
   }
 
   addAudit(

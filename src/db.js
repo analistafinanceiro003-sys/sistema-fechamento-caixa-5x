@@ -426,6 +426,10 @@ async function inactivateCompany(id) {
   return updateCompany(id, { status: 'Inativa' });
 }
 
+async function deleteCompanyRecord(id) {
+  return supabaseWrite('companies', 'delete', {}, { id });
+}
+
 async function getStores(companyId = null) {
   if (!sb || !hasSupabaseSession()) return state.stores.filter((s) => !companyId || s.companyId === companyId);
   let query = sb.from('stores').select('*');
@@ -457,6 +461,10 @@ async function updateStore(id, store) {
     status: store.status,
   }), { id });
   return row ? mapStore(row) : store;
+}
+
+async function deleteStoreRecord(id) {
+  return supabaseWrite('stores', 'delete', {}, { id });
 }
 
 async function getProfiles(companyId = null) {
@@ -588,6 +596,10 @@ async function updateOperationRule(id, rule) {
   }), { id });
 }
 
+async function deleteOperationRule(id) {
+  return supabaseWrite('operation_rules', 'delete', {}, { id });
+}
+
 async function getOperationConfig(companyId) {
   if (!sb || !hasSupabaseSession()) return cfg(companyId);
   const { data, error } = await sb.from('operation_configs').select('*').eq('company_id', companyId).maybeSingle();
@@ -609,6 +621,27 @@ async function saveOperationConfigToSupabase(companyId, config) {
   if (error) throw error;
   lastOwnSave = Date.now();
   return data;
+}
+
+async function saveSelectOptionsToSupabase() {
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return state.selectOptions;
+  const rows = [];
+  Object.entries(state.selectOptions || {}).forEach(([category, values]) => {
+    (values || []).forEach((value) => rows.push({
+      company_id: null,
+      category,
+      value,
+      is_global: true,
+    }));
+  });
+  const { error: deleteError } = await sb.from('select_options').delete().eq('is_global', true);
+  if (deleteError) throw deleteError;
+  if (rows.length) {
+    const { error: insertError } = await sb.from('select_options').insert(rows);
+    if (insertError) throw insertError;
+  }
+  lastOwnSave = Date.now();
+  return state.selectOptions;
 }
 
 async function getClosingsByScope({ companyId = null, storeId = null, startDate = null, endDate = null } = {}) {
@@ -892,17 +925,35 @@ function clearClientSetup() {
   setVal('setupStoreFund', 100);
 }
 
-function toggleCompany(id) {
+async function toggleCompany(id) {
   const c = state.companies.find((x) => x.id === id);
   if (!c) return;
   c.status = c.status === 'Inativa' ? 'Ativa' : 'Inativa';
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await updateCompany(c.id, c);
+    } catch (e) {
+      return alert(`Erro ao atualizar empresa no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para atualizar empresas.');
+  }
   addAudit(`Empresa ${c.status === 'Inativa' ? 'inativada' : 'ativada'}`, c.name);
   save();
   renderAll();
 }
 
-function deleteCompany(id) {
+async function deleteCompany(id) {
   if (!confirm('Excluir empresa e todos os dados vinculados?')) return;
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await deleteCompanyRecord(id);
+    } catch (e) {
+      return alert(`Erro ao excluir empresa no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para excluir empresas.');
+  }
   state.companies = state.companies.filter((c) => c.id !== id);
   state.stores = state.stores.filter((s) => s.companyId !== id);
   state.users = state.users.filter((u) => u.companyId !== id);
@@ -951,21 +1002,38 @@ async function createStore() {
   renderAll();
 }
 
-function updateStoreFund(id, value) {
+async function updateStoreFund(id, value) {
   const s = state.stores.find((x) => x.id === id);
   if (!s) return;
   const old = s.standardFund;
   s.standardFund = Number(value) || 0;
-  addAudit('Alteração de fundo padrão', `${s.name}: ${money(old)} → ${money(s.standardFund)}`);
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
-    updateStore(s.id, s).catch((e) => alert(`Erro ao atualizar fundo no Supabase: ${e.message}`));
+    try {
+      await updateStore(s.id, s);
+    } catch (e) {
+      s.standardFund = old;
+      return alert(`Erro ao atualizar fundo no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    s.standardFund = old;
+    return alert('Supabase Auth/Sessão obrigatório em produção para atualizar fundo padrão.');
   }
+  addAudit('Alteração de fundo padrão', `${s.name}: ${money(old)} → ${money(s.standardFund)}`);
   save();
   renderAll();
 }
 
-function deleteStore(id) {
+async function deleteStore(id) {
   if (!confirm('Excluir loja e fechamentos vinculados?')) return;
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await deleteStoreRecord(id);
+    } catch (e) {
+      return alert(`Erro ao excluir loja no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para excluir lojas.');
+  }
   state.stores = state.stores.filter((s) => s.id !== id);
   state.closings = state.closings.filter((c) => c.storeId !== id);
   state.users.forEach((u) => { if (u.storeId === id) u.storeId = null; });
@@ -1129,22 +1197,38 @@ function deleteUser(id) {
 }
 
 /* --- CRUD — Regras --- */
-function createRule() {
+async function createRule() {
   const cid = val('ruleCompany');
   if (!cid || !val('ruleText')) return alert('Selecione a empresa e informe a regra.');
   const rule = { id: uid('r'), companyId: cid, type: val('ruleType'), text: val('ruleText') };
-  state.rules.push(rule);
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
-    createOperationRule(rule).then((row) => { if (row?.id) rule.id = row.id; }).catch((e) => alert(`Erro ao salvar regra no Supabase: ${e.message}`));
+    try {
+      const row = await createOperationRule(rule);
+      if (row?.id) rule.id = row.id;
+    } catch (e) {
+      return alert(`Erro ao salvar regra no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para salvar regras.');
   }
+  state.rules.push(rule);
   clear('ruleText');
   addAudit('Cadastro de regra', companyName(cid));
   save();
   renderAll();
 }
 
-function deleteRule(id) {
+async function deleteRule(id) {
   if (!confirm('Excluir regra?')) return;
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await deleteOperationRule(id);
+    } catch (e) {
+      return alert(`Erro ao excluir regra no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para excluir regras.');
+  }
   state.rules = state.rules.filter((r) => r.id !== id);
   save();
   renderAll();
@@ -1165,10 +1249,10 @@ function saveImplantStep() {
 }
 
 /* --- Configuração operacional --- */
-function saveOperationConfig() {
+async function saveOperationConfig() {
   const cid = val('operationCompany');
   if (!cid) return alert('Selecione a empresa.');
-  state.operationConfigs[cid] = {
+  const config = {
     tolerance: Number(val('operationTolerance')) || 5,
     criticalDivergence: Number(val('operationCriticalDivergence')) || 20,
     mode: val('operationMode') || 'Diário',
@@ -1177,34 +1261,68 @@ function saveOperationConfig() {
     message: val('operationMessage'),
   };
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
-    saveOperationConfigToSupabase(cid, state.operationConfigs[cid]).catch((e) => alert(`Erro ao salvar configuração no Supabase: ${e.message}`));
+    try {
+      await saveOperationConfigToSupabase(cid, config);
+    } catch (e) {
+      return alert(`Erro ao salvar configuração no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para salvar configuração.');
   }
+  state.operationConfigs[cid] = config;
   addAudit('Configuração operacional', companyName(cid));
   save();
   renderAll();
 }
 
 /* --- Opções de seleção --- */
-function addSelectOption() {
+async function addSelectOption() {
   const key = val('optionCategory');
   const value = val('optionNewValue').trim();
   if (!key || !value) return alert('Selecione o campo e informe a opção.');
   state.selectOptions[key] = state.selectOptions[key] || [];
   if (!state.selectOptions[key].includes(value)) state.selectOptions[key].push(value);
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await saveSelectOptionsToSupabase();
+    } catch (e) {
+      return alert(`Erro ao salvar opções no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para salvar opções.');
+  }
   clear('optionNewValue');
   save();
   renderAll();
 }
 
-function removeSelectOption(key, value) {
+async function removeSelectOption(key, value) {
   state.selectOptions[key] = (state.selectOptions[key] || []).filter((v) => v !== value);
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await saveSelectOptionsToSupabase();
+    } catch (e) {
+      return alert(`Erro ao salvar opções no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para salvar opções.');
+  }
   save();
   renderAll();
 }
 
-function resetSelectOptions() {
+async function resetSelectOptions() {
   if (!confirm('Restaurar opções padrão?')) return;
   state.selectOptions = defaultSelectOptions();
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await saveSelectOptionsToSupabase();
+    } catch (e) {
+      return alert(`Erro ao salvar opções no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para salvar opções.');
+  }
   save();
   renderAll();
 }
@@ -1325,12 +1443,12 @@ Object.assign(window, {
   DEV_LOCAL_MODE, USE_LOCAL_FALLBACK, NORMALIZED_TABLES,
   defaultSelectOptions, defaultState, normalizeState, load, save, autosave, addAudit,
   setupRealtimeSync, stopRealtimeSync, manualRefresh,
-  getCompanies, createCompany, updateCompany, inactivateCompany,
-  getStores, createStoreRecord, updateStore,
+  getCompanies, createCompany, updateCompany, inactivateCompany, deleteCompanyRecord,
+  getStores, createStoreRecord, updateStore, deleteStoreRecord,
   getProfiles, getCurrentProfile, updateProfile, createUserViaEdgeFunction, deleteUserViaEdgeFunction,
   getModulePermissions, saveModulePermissions,
-  getOperationRules, createOperationRule, updateOperationRule,
-  getOperationConfig, saveOperationConfigToSupabase,
+  getOperationRules, createOperationRule, updateOperationRule, deleteOperationRule,
+  getOperationConfig, saveOperationConfigToSupabase, saveSelectOptionsToSupabase,
   getClosingsByScope, createClosing, updateClosing, getPreviousClosing, checkDuplicateClosing,
   createClosingEntries, createClosingExpenses, getClosingEntries, getClosingExpenses,
   createCashOpeningAdjustment, getCashOpeningAdjustment,
