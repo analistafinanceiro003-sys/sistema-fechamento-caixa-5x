@@ -490,6 +490,25 @@ async function updateProfile(id, profile) {
   return row ? mapProfile(row) : profile;
 }
 
+async function createUserViaEdgeFunction(payload) {
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) throw new Error('Supabase Auth/Sessão obrigatório em produção.');
+  const { data, error } = await sb.functions.invoke('create-user', {
+    body: payload,
+  });
+  if (error) {
+    let message = error.message || 'Erro ao criar usuário.';
+    if (error.context?.json) {
+      try {
+        const body = await error.context.json();
+        if (body?.error) message = body.error;
+      } catch {}
+    }
+    throw new Error(message);
+  }
+  if (!data?.ok) throw new Error(data?.error || 'Erro ao criar usuário.');
+  return data.profile ? mapProfile(data.profile) : null;
+}
+
 async function getModulePermissions(companyId, profileRole) {
   if (!sb || !hasSupabaseSession()) return getModuleConfig(companyId, profileRole);
   const { data, error } = await sb.from('module_permissions').select('*').eq('company_id', companyId).eq('role', profileRole);
@@ -929,23 +948,47 @@ function deleteStore(id) {
 }
 
 /* --- CRUD — Usuários --- */
-function createUserFromMaster() {
+async function createUserFromMaster() {
   const cid = val('opCompany');
   const roleNew = val('newUserRole') || 'operator';
+  const nameNew = val('opName');
+  const loginNew = val('opLogin');
   if (!cid) return alert('Selecione a empresa.');
-  if (!val('opName') || !val('opLogin')) return alert('Informe nome e login.');
-  if (!DEV_LOCAL_MODE) {
-    return alert('Em produção, crie usuários pelo Supabase Auth e vincule-os na tabela profiles.');
-  }
-  if (state.users.some((u) => String(u.login).toLowerCase() === val('opLogin').toLowerCase())) {
+  if (!nameNew || !loginNew) return alert('Informe nome e login.');
+  if (state.users.some((u) => String(u.login).toLowerCase() === loginNew.toLowerCase())) {
     return alert('Já existe usuário com este login.');
   }
   const storeId = roleNew === 'operator' ? val('opStore') : null;
   if (roleNew === 'operator' && !storeId) return alert('Selecione a loja do operador.');
+  const password = val('opPass');
+  if (!password || password.length < 6) return alert('Informe uma senha com pelo menos 6 caracteres.');
+
+  if (!DEV_LOCAL_MODE) {
+    try {
+      const profile = await createUserViaEdgeFunction({
+        name: nameNew,
+        email: loginNew,
+        password,
+        role: roleNew,
+        company_id: cid,
+        store_id: storeId,
+      });
+      if (profile) state.users.push(profile);
+      ['opName','opLogin'].forEach(clear);
+      setVal('opPass', '');
+      addAudit('Cadastro de usuário', loginNew);
+      save();
+      renderAll();
+      return alert('Usuário criado no Supabase Authentication e vinculado em profiles.');
+    } catch (e) {
+      return alert(e.message || 'Erro ao criar usuário.');
+    }
+  }
+
   state.users.push({
     id: uid('u'), companyId: cid, storeId,
-    name: val('opName'), login: val('opLogin'),
-    pass: val('opPass'),
+    name: nameNew, login: loginNew,
+    pass: password,
     role: roleNew, status: 'Ativo',
   });
   ['opName','opLogin'].forEach(clear);
@@ -1219,7 +1262,7 @@ Object.assign(window, {
   setupRealtimeSync, stopRealtimeSync, manualRefresh,
   getCompanies, createCompany, updateCompany, inactivateCompany,
   getStores, createStoreRecord, updateStore,
-  getProfiles, getCurrentProfile, updateProfile,
+  getProfiles, getCurrentProfile, updateProfile, createUserViaEdgeFunction,
   getModulePermissions, saveModulePermissions,
   getOperationRules, createOperationRule, updateOperationRule,
   getOperationConfig, saveOperationConfigToSupabase,

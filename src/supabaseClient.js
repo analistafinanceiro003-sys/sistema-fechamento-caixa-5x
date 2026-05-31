@@ -2,7 +2,7 @@
 /* ============================================================
    CLIENTE SUPABASE — Caixa 5X
    Produção: usar somente Project URL + publishable/anon key.
-   Nunca usar service_role no frontend.
+   Nunca usar chave administrativa no frontend.
 ============================================================ */
 
 const SUPABASE_URL = 'https://feopuubmozroxavuxcly.supabase.co';

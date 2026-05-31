@@ -22,8 +22,8 @@ button,input,select,textarea{font-family:var(--font)}
 .login{min-height:100vh;background:radial-gradient(circle at 10% 20%,rgba(54,199,189,.23),transparent 25%),linear-gradient(135deg,#020405,#08151d 55%,#020405);display:grid;grid-template-columns:1.15fr .85fr;overflow:hidden}
 .login-left{padding:56px 70px;display:flex;flex-direction:column;justify-content:space-between;gap:34px;position:relative}
 .login-left:after{content:"";position:absolute;inset:0;background:linear-gradient(130deg,transparent 18%,rgba(255,255,255,.08) 28%,transparent 38%);pointer-events:none}
-.login-logo-wrap{position:relative;z-index:2;display:flex;align-items:center}
-.logo{max-height:120px;object-fit:contain;filter:drop-shadow(0 8px 20px rgba(0,0,0,.4))}
+.login-logo-wrap{position:relative;z-index:2;display:flex;align-items:center;max-width:620px}
+.logo{display:block;width:min(100%,520px);height:auto;object-fit:contain;filter:drop-shadow(0 8px 20px rgba(0,0,0,.34))}
 .hero{position:relative;z-index:1;border-left:3px solid var(--brand);padding-left:24px;max-width:720px}
 .hero h1{font-size:clamp(30px,3.5vw,48px);line-height:1.04;color:#fff;letter-spacing:-1.2px;margin-bottom:12px;font-weight:650}
 .hero p{color:#d7e0eb;font-size:16px;line-height:1.6;max-width:600px}
@@ -395,6 +395,8 @@ tr:hover td{background:#fafbfc}
   .wizard{grid-template-columns:1fr 1fr}
   .login{grid-template-columns:1fr}
   .login-left{min-height:auto!important;padding:28px 24px!important}
+  .login-logo-wrap{justify-content:center;max-width:100%}
+  .logo{width:min(86vw,420px)}
   .login-right{padding:16px}
   .login-card{padding:24px 18px}
   .summary-line{flex-direction:column;gap:4px;align-items:flex-start}
@@ -404,6 +406,7 @@ tr:hover td{background:#fafbfc}
 @media(max-width:480px){
   .hero p,.hero-badges{display:none}
   .login-left{gap:20px}
+  .logo{width:min(88vw,340px)}
   .exec-stats{grid-template-columns:1fr}
 }
 

@@ -23,6 +23,7 @@ src/
   style.css             Estilos Gestão 5X
 supabase/
   schema.sql            Schema SQL completo com RLS
+  functions/create-user Edge Function para criação segura de usuários
 .env.example            Template de variáveis de ambiente
 docs/
   AUDITORIA_E_SEGURANCA.md  Auditoria técnica e decisões de arquitetura
@@ -84,15 +85,39 @@ values (
 
 ## Como criar usuários Admin e Operador
 
-```sql
--- Admin de cliente
-insert into public.profiles (user_id, name, email, role, company_id, status)
-values ('UUID','Nome Admin','admin@empresa.com','admin','UUID_EMPRESA','Ativo');
+Depois que o usuário Master existir em Supabase Auth + `public.profiles`, a criação de Admin e Operador deve ser feita pela tela **Usuários e Acessos** do sistema.
 
--- Operador
-insert into public.profiles (user_id, name, email, role, company_id, store_id, status)
-values ('UUID','Nome Operador','op@empresa.com','operator','UUID_EMPRESA','UUID_LOJA','Ativo');
+O frontend chama a Edge Function `create-user`. A senha vai apenas na requisição segura para a função, não é salva no frontend nem no `localStorage`. A função cria o usuário em **Authentication > Users** e, em seguida, cria o registro correspondente em `public.profiles`.
+
+### Deploy da Edge Function
+
+Com a Supabase CLI autenticada no projeto:
+
+```bash
+supabase functions deploy create-user
 ```
+
+### Secrets obrigatórios
+
+Configure os secrets no projeto Supabase:
+
+```bash
+supabase secrets set SUPABASE_URL="https://SEU_PROJETO.supabase.co"
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY="SUA_SERVICE_ROLE_KEY"
+```
+
+> A `SUPABASE_SERVICE_ROLE_KEY` fica somente no ambiente seguro da Edge Function. Nunca coloque essa chave no frontend.
+
+### Como testar
+
+1. Faça login no sistema com um usuário `master`.
+2. Acesse **Usuários e Acessos**.
+3. Crie um Admin informando empresa, nome, e-mail e senha.
+4. Crie um Operador informando empresa, loja, nome, e-mail e senha.
+5. No painel Supabase, verifique:
+   - **Authentication > Users** contém os e-mails criados.
+   - **Table Editor > public.profiles** contém os registros com `role`, `company_id` e, para operador, `store_id`.
+6. Saia do sistema e teste login com o novo Admin/Operador.
 
 ---
 
@@ -125,7 +150,10 @@ physicalDivergence = physicalCount - finalAfterTransfer
 ## Checklist pós-deploy
 
 - [ ] `supabase/schema.sql` executado
+- [ ] Edge Function `create-user` publicada
+- [ ] Secrets `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` configurados
 - [ ] Usuário Master criado em Auth + profiles
+- [ ] Criação de Admin/Operador testada pela tela Usuários e Acessos
 - [ ] Login de Admin e Operador testado
 - [ ] `showPage('relatorios')` via console bloqueado para Admin/Operator
 - [ ] Fechamento duplicado oferece retificação
