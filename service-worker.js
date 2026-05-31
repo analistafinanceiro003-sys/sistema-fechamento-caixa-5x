@@ -1,103 +1,66 @@
 'use strict';
 /* ============================================================
    SERVICE WORKER — Caixa 5X PWA
-   Estratégia: cache-first para arquivos estáticos.
-   NUNCA cacheia: Supabase, Auth, Edge Functions, API ou dados financeiros.
-   Apenas arquivos estáticos da mesma origem são cacheados.
+   v3 — network-first para JS/HTML/CSS, garante sempre código atualizado.
+   NÃO cacheia Supabase, Auth, APIs ou dados financeiros.
 ============================================================ */
 
-const CACHE_NAME = 'caixa5x-static-v1';
+const CACHE_VERSION = 'caixa5x-v3';
 
-/* Lista de arquivos estáticos a pré-cachear na instalação */
-const STATIC_FILES = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/src/style.css',
-  '/src/utils.js',
-  '/src/supabaseClient.js',
-  '/src/auth.js',
-  '/src/permissions.js',
-  '/src/db.js',
-  '/src/closing.js',
-  '/src/reports.js',
-  '/src/render.js',
-  '/src/app.js',
+/* Arquivos de shell (ícones, manifesto) — raramente mudam */
+const SHELL_FILES = [
   '/assets/favicon.png',
   '/assets/favicon.svg',
   '/assets/logo-gestao5x-transparente.png',
   '/assets/icons/icon.svg',
+  '/manifest.json',
 ];
 
-/* --- INSTALL: pré-cacheia arquivos estáticos --- */
+/* --- INSTALL: pré-cacheia apenas o shell estático --- */
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      /* allSettled: não falha se algum arquivo estiver indisponível */
-      await Promise.allSettled(
-        STATIC_FILES.map((url) => cache.add(url).catch(() => {}))
-      );
-      await self.skipWaiting();
-    })()
+    caches.open(CACHE_VERSION).then((cache) =>
+      Promise.allSettled(SHELL_FILES.map((url) => cache.add(url).catch(() => {})))
+    ).then(() => self.skipWaiting())
   );
 });
 
-/* --- ACTIVATE: remove caches de versões anteriores --- */
+/* --- ACTIVATE: remove TODOS os caches antigos --- */
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    (async () => {
-      const keys = await caches.keys();
-      await Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      );
-      await self.clients.claim();
-    })()
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
-/* --- FETCH: cache-first para estáticos, rede para todo o resto --- */
+/* --- FETCH: network-first para tudo da mesma origem ---
+   JS, HTML, CSS sempre vêm da rede para garantir código atualizado.
+   Fallback para cache apenas quando offline. */
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  /* ✗ Nunca intercepta requisições cross-origin
-     (Supabase API, CDN do Supabase JS, Edge Functions, Auth) */
+  /* Ignora cross-origin (Supabase, CDN, Auth) */
   if (url.origin !== self.location.origin) return;
 
-  /* ✗ Nunca intercepta métodos que alteram dados (POST, PUT, DELETE, PATCH) */
+  /* Ignora POST/PUT/DELETE */
   if (request.method !== 'GET') return;
 
-  /* ✗ Nunca cacheia o próprio service worker */
+  /* Ignora o próprio SW */
   if (url.pathname === '/service-worker.js') return;
 
-  /* ✓ Cache-first para arquivos estáticos da mesma origem */
+  /* Network-first: tenta rede, usa cache apenas se offline */
   event.respondWith(
-    caches.match(request).then((cached) => {
-      /* Cache hit: retorna imediatamente */
-      if (cached) return cached;
-
-      /* Cache miss: busca da rede e armazena para próxima vez */
-      return fetch(request)
-        .then((response) => {
-          if (
-            response &&
-            response.status === 200 &&
-            response.type === 'basic'
-          ) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => {
-          /* Offline e sem cache: retorna fallback para navegação */
-          if (request.mode === 'navigate') {
-            return caches.match('/index.html');
-          }
-        });
-    })
+    fetch(request)
+      .then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          /* Atualiza cache com versão mais recente */
+          const clone = response.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(request))
   );
 });
