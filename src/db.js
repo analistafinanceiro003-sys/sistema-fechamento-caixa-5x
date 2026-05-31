@@ -167,7 +167,7 @@ function mapClosing(row, entries = [], expenses = [], attachments = []) {
     physicalCount: Number(row.physical_count || 0),
     physicalDivergence: Number(row.physical_divergence || 0),
     notes: row.notes || '',
-    attachments: attachments.map((a) => ({ id: a.id, name: a.file_name, url: a.file_url, type: a.file_type, size: a.file_size })),
+    attachments: attachments.map((a) => ({ id: a.id, name: a.file_name, url: a.file_url, type: a.file_type, size: a.file_size, uploadedBy: a.uploaded_by })),
     reviewStatus: row.review_status || 'Pendente',
     status: row.status || '',
     type: row.type || 'Original',
@@ -706,6 +706,35 @@ async function createClosingExpenses(closingId, expenses = []) {
   return expenses;
 }
 
+async function createClosingAttachments(closingId, attachments = []) {
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession() || !attachments.length) return [];
+  const rows = [];
+  for (const attachment of attachments) {
+    const file = attachment.file;
+    if (!file) continue;
+    const safeName = String(file.name || attachment.name || 'anexo').replace(/[^\w.\-]+/g, '_');
+    const path = `${closingId}/${Date.now()}_${safeName}`;
+    const { error: uploadError } = await sb.storage
+      .from('closing-attachments')
+      .upload(path, file, { upsert: false, contentType: file.type || attachment.type || 'application/octet-stream' });
+    if (uploadError) throw uploadError;
+    const { data: publicData } = sb.storage.from('closing-attachments').getPublicUrl(path);
+    rows.push({
+      closing_id: closingId,
+      file_name: file.name || attachment.name,
+      file_url: publicData?.publicUrl || path,
+      file_type: file.type || attachment.type || '',
+      file_size: file.size || attachment.size || 0,
+      uploaded_by: currentUser?.authId || null,
+    });
+  }
+  if (!rows.length) return [];
+  const { data, error } = await sb.from('closing_attachments').insert(rows).select('*');
+  if (error) throw error;
+  lastOwnSave = Date.now();
+  return data || [];
+}
+
 async function getClosingEntries(closingId) {
   if (!sb || !hasSupabaseSession()) return [];
   const { data, error } = await sb.from('closing_entries').select('*').eq('closing_id', closingId);
@@ -762,6 +791,17 @@ async function createClosing(closing) {
   /* Entradas e saídas são registros de detalhe — erros são fatais para manter integridade */
   await createClosingEntries(closing.id, closing.entryItems || []);
   await createClosingExpenses(closing.id, closing.expenseItems || []);
+  const attachmentRows = await createClosingAttachments(closing.id, closing.attachments || []);
+  if (attachmentRows.length) {
+    closing.attachments = attachmentRows.map((a) => ({
+      id: a.id,
+      name: a.file_name,
+      url: a.file_url,
+      type: a.file_type,
+      size: a.file_size,
+      uploadedBy: a.uploaded_by,
+    }));
+  }
   /* Divergence reviews são registros secundários: falha de RLS não deve bloquear o fechamento.
      Usar allSettled para não derrubar toda a operação por falha de permissão nessa tabela. */
   const reviewResults = await Promise.allSettled(
@@ -1491,7 +1531,7 @@ Object.assign(window, {
   getOperationRules, createOperationRule, updateOperationRule, deleteOperationRule,
   getOperationConfig, saveOperationConfigToSupabase, saveSelectOptionsToSupabase,
   getClosingsByScope, createClosing, updateClosing, getPreviousClosing, checkDuplicateClosing,
-  createClosingEntries, createClosingExpenses, getClosingEntries, getClosingExpenses,
+  createClosingEntries, createClosingExpenses, createClosingAttachments, getClosingEntries, getClosingExpenses,
   createCashOpeningAdjustment, getCashOpeningAdjustment,
   createDivergenceReview, getPendingDivergenceReviews, updateDivergenceReview,
   logAudit,

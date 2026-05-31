@@ -311,6 +311,7 @@ create table if not exists public.closing_attachments (
   file_url    text,
   file_type   text,
   file_size   bigint,
+  uploaded_by uuid references auth.users(id) on delete set null,
   created_at  timestamptz not null default now()
 );
 
@@ -688,6 +689,7 @@ create policy "expenses_scoped_write" on public.closing_expenses
 
 drop policy if exists "attachments_master_all"  on public.closing_attachments;
 drop policy if exists "attachments_scoped_read" on public.closing_attachments;
+drop policy if exists "attachments_scoped_write" on public.closing_attachments;
 
 create policy "attachments_master_all" on public.closing_attachments
   for all to authenticated
@@ -697,6 +699,31 @@ create policy "attachments_master_all" on public.closing_attachments
 create policy "attachments_scoped_read" on public.closing_attachments
   for select to authenticated
   using (
+    exists(
+      select 1 from public.closings c
+      where c.id = closing_id
+        and (
+          (current_user_role() = 'admin' and c.company_id = current_company_id())
+          or
+          (current_user_role() = 'operator' and c.store_id = current_store_id())
+        )
+    )
+  );
+
+create policy "attachments_scoped_write" on public.closing_attachments
+  for all to authenticated
+  using (
+    exists(
+      select 1 from public.closings c
+      where c.id = closing_id
+        and (
+          (current_user_role() = 'admin' and c.company_id = current_company_id())
+          or
+          (current_user_role() = 'operator' and c.store_id = current_store_id())
+        )
+    )
+  )
+  with check (
     exists(
       select 1 from public.closings c
       where c.id = closing_id

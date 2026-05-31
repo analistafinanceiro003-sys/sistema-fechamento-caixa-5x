@@ -148,6 +148,7 @@ function closingRows(rows) {
     Repasse: c.transfer,
     'Saldo Final Após Repasse': c.cashBalance ?? c.finalAfterTransfer,
     'Fundo Padrão': c.standardFund,
+    Tolerância: c.toleranceSnapshot ?? cfg(c.companyId).tolerance,
     'Divergência Fundo': c.fundDivergence ?? c.diff,
     'Total Físico': c.physicalCount || (c.cashCounterTotal + c.coinsTotal) || '',
     'Divergência Física': c.physicalDivergence || '',
@@ -155,6 +156,7 @@ function closingRows(rows) {
     'Status Revisao': c.reviewStatus,
     'Parecer Admin': (state.divergenceReviews || []).filter((r) => r.closingId === c.id).map((r) => `${r.divergenceType}: ${r.reviewStatus}${r.adminComment ? ' - ' + r.adminComment : ''}`).join(' | '),
     'Observações': c.notes,
+    'ID Fechamento': c.id,
   }));
 }
 
@@ -162,6 +164,7 @@ function allMovementRows(rows = []) {
   return rows.flatMap((c) => {
     const base = {
       companyId: c.companyId, storeId: c.storeId,
+      closingId: c.id,
       Empresa: companyName(c.companyId), Data: c.date,
       Loja: storeName(c.storeId), 'Responsável': c.responsible || c.operator || '',
     };
@@ -172,9 +175,13 @@ function allMovementRows(rows = []) {
       .filter((i) => Number(i.value))
       .map((i) => ({ ...base, Tipo: 'Saída', 'Descrição': i.description, Categoria: i.category || '', Valor: -Math.abs(Number(i.value)) }));
     const transfer = Number(c.transfer)
-      ? [{ ...base, Tipo: 'Repasse / Transferência', 'Descrição': 'Repasse ao caixa central', Categoria: '', Valor: -Math.abs(Number(c.transfer)) }]
+      ? [{ ...base, Tipo: 'Repasse / Transferência', 'Descrição': 'Repasse ao caixa central', Categoria: '', Destino: 'Caixa Central', Valor: -Math.abs(Number(c.transfer)) }]
       : [];
-    return [...entries, ...exits, ...transfer];
+    return [...entries, ...exits, ...transfer].map((row) => ({
+      ...row,
+      Destino: row.Destino || '',
+      'ID Fechamento': row.closingId,
+    }));
   });
 }
 
@@ -187,7 +194,7 @@ function diffRead(c) {
 function diffAction(c) {
   const abs = Math.abs(Number(c.diff || 0));
   const c_ = cfg(c.companyId);
-  if (c_.criticalDivergence && abs >= Math.abs(Number(c_.criticalDivergence))) {
+  if (c_.criticalDivergence && abs > Math.abs(Number(c_.criticalDivergence))) {
     return 'Tratar como divergência crítica: revisar contagem, saídas, repasse e fundo.';
   }
   if (abs > Math.abs(Number(c_.tolerance || 0))) {
@@ -199,10 +206,11 @@ function diffAction(c) {
 /* --- Exportações --- */
 const CLOSING_HEADERS = [
   'Empresa','Loja','Data','Turno','Tipo','Responsável','Saldo Inicial','Ultimo Saldo Fechado','Divergencia Abertura','Origem Abertura','Entradas','Saídas',
-  'Saldo Esperado','Repasse','Saldo Final Após Repasse','Fundo Padrão',
+  'Saldo Esperado','Repasse','Saldo Final Após Repasse','Fundo Padrão','Tolerância',
   'Divergência Fundo','Total Físico','Divergência Física','Status','Status Revisao','Parecer Admin','Observações',
+  'ID Fechamento',
 ];
-const MOVEMENT_HEADERS = ['Empresa','Data','Loja','Tipo','Descrição','Categoria','Valor','Responsável'];
+const MOVEMENT_HEADERS = ['Empresa','Data','Loja','Tipo','Descrição','Categoria','Destino','Valor','Responsável','ID Fechamento'];
 
 function exportCSV() {
   exportGenericCSV('fechamentos_5x.csv', CLOSING_HEADERS, closingRows(reportFilteredClosings()));
@@ -258,7 +266,7 @@ function exportContaAzulCSV() {
     'Cliente/Fornecedor': '',
     'CNPJ/CPF': '',
     'Centro de Custo': r.Loja,
-    'Observações': `Importado Central de Caixa 5X - ${r.Empresa}`,
+    'Observações': `Importado Central de Caixa 5X - ${r.Empresa} - ${r['ID Fechamento'] || ''}`,
   }));
   exportGenericCSV('modelo_conta_azul_5x.csv', headers, rows);
 }

@@ -869,22 +869,18 @@
             </div>
           </div>
 
-          <!-- Bloco 4: Conferência física -->
+          <!-- Bloco 4: Auxiliar de Contagem -->
           <div class="conf-block">
-            <div class="conf-block-title">Conferência física</div>
-            <div class="field" style="margin-bottom:10px">
-              <label>Total de moedas contadas (R$)</label>
-              <input id="coinsTotal" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*" value="0"
-                oninput="syncCoinCountTotal();calc()" onblur="formatCurrencyInput(this)" onfocus="selectOnFocus(this)"/>
-            </div>
+            <div class="conf-block-title">Auxiliar de Contagem</div>
             <div class="box">
-              <h4>Simulador de cédulas e moedas</h4>
+              <h4>Cédulas e moedas</h4>
               <div class="cash-counter-grid" id="cashCounterGrid"></div>
-              <div class="summary-line" style="margin-top:12px"><span>Total contado no simulador</span><strong id="cashCounterTotal">R$ 0,00</strong></div>
             </div>
             <div class="summary" style="margin-top:12px">
-              <div class="summary-line"><span>Total físico contado</span><strong id="physicalCountView">R$ 0,00</strong></div>
-              <div class="summary-line"><span>Divergência física</span><strong id="physicalDivergenceView">R$ 0,00</strong></div>
+              <div class="summary-line"><span>Total em cédulas</span><strong id="auxBillsView">R$ 0,00</strong></div>
+              <div class="summary-line"><span>Total em moedas</span><strong id="auxCoinsView">R$ 0,00</strong></div>
+              <div class="summary-line"><span>Total contado</span><strong id="auxTotalView">R$ 0,00</strong></div>
+              <div class="summary-line"><span>Divergência física informativa</span><strong id="physicalDivergenceView">R$ 0,00</strong></div>
               <div class="summary-line"><span>Status físico</span><strong class="status info" id="physicalDivergenceStatus">-</strong></div>
             </div>
           </div>
