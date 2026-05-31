@@ -75,7 +75,7 @@ function normalizeState() {
 }
 
 function hasSupabaseSession() {
-  return !!window.currentUser?.authId || !!window.currentUser?.id && window.currentUser?.authId !== null;
+  return !!window.currentUser?.authId;
 }
 
 function toMaybeDateBR(date) {
@@ -199,10 +199,20 @@ function applyModuleRows(rows = []) {
 }
 
 function applySelectOptionRows(rows = []) {
-  const options = defaultSelectOptions();
+  const defaults = defaultSelectOptions();
+  const categoriesInDB = new Set();
+  const options = {};
   rows.forEach((row) => {
+    if (!row.category || !row.value) return;
+    categoriesInDB.add(row.category);
     options[row.category] = options[row.category] || [];
     if (!options[row.category].includes(row.value)) options[row.category].push(row.value);
+  });
+  /* Usa defaults apenas para categorias sem nenhum dado no Supabase.
+     Categorias com dados no Supabase usam exclusivamente o que está no DB,
+     evitando que opções deletadas voltem ao recarregar. */
+  Object.keys(defaults).forEach((cat) => {
+    if (!categoriesInDB.has(cat)) options[cat] = defaults[cat];
   });
   state.selectOptions = options;
 }
@@ -384,9 +394,14 @@ async function supabaseWrite(table, action, payload, match = null) {
   if (action === 'insert') query = sb.from(table).insert(payload).select().single();
   if (action === 'upsert') query = sb.from(table).upsert(payload).select().single();
   if (action === 'update') query = sb.from(table).update(payload).match(match).select().single();
-  if (action === 'delete') query = sb.from(table).delete().match(match);
+  /* .select() no delete retorna as linhas excluídas, permitindo detectar
+     falhas silenciosas de RLS (0 linhas excluídas sem erro). */
+  if (action === 'delete') query = sb.from(table).delete().match(match).select();
   const { data, error } = await query;
   if (error) throw error;
+  if (action === 'delete' && Array.isArray(data) && data.length === 0) {
+    throw new Error(`Registro não encontrado ou sem permissão para excluir na tabela "${table}".`);
+  }
   lastOwnSave = Date.now();
   return data || null;
 }
@@ -458,6 +473,8 @@ async function updateStore(id, store) {
     code: store.code,
     cash_type: store.cashType,
     standard_fund: store.standardFund,
+    tolerance: store.tolerance ?? null,
+    critical_divergence: store.criticalDivergence ?? null,
     status: store.status,
   }), { id });
   return row ? mapStore(row) : store;
@@ -830,9 +847,9 @@ async function saveClientSetup() {
       id: companyId, name,
       legal: val('setupCompanyLegal'), cnpj: val('setupCompanyCnpj'),
       segment: val('setupSegment'), plan: val('setupPlan'),
-      status: val('setupStatus') || 'ImplantaÃ§Ã£o', notes: val('setupNotes'),
+      status: val('setupStatus') || 'Implantação', notes: val('setupNotes'),
     };
-    const operationConfig = { tolerance: 5, criticalDivergence: 20, mode: 'DiÃ¡rio', receiver: '', allowed: '', message: '' };
+    const operationConfig = { tolerance: 5, criticalDivergence: 20, mode: 'Diário', receiver: '', allowed: '', message: '' };
     const moduleConfig = {
       admin: { ...defaultModuleConfig('admin'), adminClosing: false },
       operator: defaultModuleConfig('operator'),
@@ -843,7 +860,7 @@ async function saveClientSetup() {
         id: storeId, companyId: companyRow.id,
         name: val('setupStoreName') || 'Loja 01',
         code: val('setupStoreCode') || 'LJ01',
-        cashType: val('setupCashType') || 'Caixa diÃ¡rio',
+        cashType: val('setupCashType') || 'Caixa diário',
         standardFund: Number(val('setupStoreFund')) || 100,
         status: 'Ativa',
       });
@@ -1281,14 +1298,19 @@ async function addSelectOption() {
   const value = val('optionNewValue').trim();
   if (!key || !value) return alert('Selecione o campo e informe a opção.');
   state.selectOptions[key] = state.selectOptions[key] || [];
-  if (!state.selectOptions[key].includes(value)) state.selectOptions[key].push(value);
+  if (state.selectOptions[key].includes(value)) return;
+  state.selectOptions[key].push(value);
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
     try {
       await saveSelectOptionsToSupabase();
     } catch (e) {
-      return alert(`Erro ao salvar opções no Supabase: ${e.message}`);
+      /* Reverte a adição em memória para não mentir ao usuário */
+      state.selectOptions[key] = state.selectOptions[key].filter((v) => v !== value);
+      renderAll();
+      return alert(`Não foi possível salvar a alteração. Tente novamente.\n(${e.message})`);
     }
   } else if (!DEV_LOCAL_MODE) {
+    state.selectOptions[key] = state.selectOptions[key].filter((v) => v !== value);
     return alert('Supabase Auth/Sessão obrigatório em produção para salvar opções.');
   }
   clear('optionNewValue');
@@ -1297,14 +1319,19 @@ async function addSelectOption() {
 }
 
 async function removeSelectOption(key, value) {
-  state.selectOptions[key] = (state.selectOptions[key] || []).filter((v) => v !== value);
+  const backup = [...(state.selectOptions[key] || [])];
+  state.selectOptions[key] = backup.filter((v) => v !== value);
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
     try {
       await saveSelectOptionsToSupabase();
     } catch (e) {
-      return alert(`Erro ao salvar opções no Supabase: ${e.message}`);
+      /* Reverte a remoção em memória para não mentir ao usuário */
+      state.selectOptions[key] = backup;
+      renderAll();
+      return alert(`Não foi possível salvar a alteração. Tente novamente.\n(${e.message})`);
     }
   } else if (!DEV_LOCAL_MODE) {
+    state.selectOptions[key] = backup;
     return alert('Supabase Auth/Sessão obrigatório em produção para salvar opções.');
   }
   save();
