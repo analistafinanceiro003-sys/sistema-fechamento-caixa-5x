@@ -211,7 +211,26 @@ const CLOSING_HEADERS = [
 const MOVEMENT_HEADERS = ['Empresa','Data','Loja','Tipo','Descrição','Categoria','Destino','Valor','Responsável','ID Fechamento'];
 
 function exportCSV() {
-  exportGenericCSV('fechamentos_5x.csv', CLOSING_HEADERS, closingRows(reportFilteredClosings()));
+  const headers = [
+    'Data de Competência','Data de Vencimento','Data de Pagamento',
+    'Descrição','Categoria','Valor','Cliente/Fornecedor','CNPJ/CPF',
+    'Centro de Custo','Observações',
+  ];
+  const rows = allMovementRows(reportFilteredClosings()).map((r) => ({
+    'Data de Competência': r.Data,
+    'Data de Vencimento': r.Data,
+    'Data de Pagamento': r.Data,
+    Descrição: r['Descrição'],
+    Categoria: r.Tipo === 'Entrada' ? 'Receita de Venda - Dinheiro'
+      : r.Tipo === 'Saída' ? (r.Categoria || 'Saída de Caixa')
+      : 'Transferência entre contas',
+    Valor: r.Valor,
+    'Cliente/Fornecedor': '',
+    'CNPJ/CPF': '',
+    'Centro de Custo': r.Loja,
+    Observações: `Fechamento de caixa 5X - ${r.Empresa} - ID ${r['ID Fechamento'] || ''}`,
+  }));
+  exportGenericCSV('fechamento_por_loja_conta_azul_5x.csv', headers, rows);
 }
 function exportDivergencesCSV() {
   const rows = closingRows(reportFilteredClosings().filter((c) => Math.abs(Number(c.diff || 0)) > 0));
