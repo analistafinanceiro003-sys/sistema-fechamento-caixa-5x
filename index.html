@@ -799,7 +799,7 @@
           </div>
 
           <div class="btn-row" style="margin-top:16px">
-            <button class="btn btn-brand" onclick="saveClosing()">✓ Finalizar fechamento</button>
+            <button class="btn btn-brand" id="saveClosingBtn" disabled onclick="saveClosing()">✓ Realizar fechamento</button>
           </div>
         </div>
 
@@ -826,6 +826,12 @@
                   oninput="calc()" onblur="formatCurrencyInput(this)" onfocus="selectOnFocus(this)"
                   style="max-width:150px;text-align:right"/>
               </strong></div>
+            </div>
+            <div class="btn-row" style="margin-top:10px;gap:10px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-primary" id="confirmTransferBtn" onclick="confirmTransfer()">Confirmar repasse</button>
+              <span id="transferConfirmedBadge" class="status success" style="display:none;padding:4px 10px;font-size:13px">✓ Repasse confirmado</span>
+            </div>
+            <div class="summary" style="margin-top:10px">
               <div class="summary-line summary-line-highlight"><span>Saldo final após repasse</span><strong id="cashBalance">R$ 0,00</strong></div>
             </div>
           </div>

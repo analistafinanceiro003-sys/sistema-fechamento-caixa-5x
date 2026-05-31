@@ -122,7 +122,7 @@ Object.assign(window, {
 
   /* Fechamento */
   addEntry, addExpense, removeLaunchRow, calc, syncCoinCountTotal,
-  suggestInitialBalance, saveClosing, saveOpeningAdjustment, reviewDivergence, handleAttachments,
+  suggestInitialBalance, confirmTransfer, saveClosing, saveOpeningAdjustment, reviewDivergence, handleAttachments,
   /* Formatação — usadas por onblur/onfocus inline */
   formatCurrencyInput, selectOnFocus, parseCurrencyBR, bindCurrencyInputs,
 

@@ -14,6 +14,21 @@
 ============================================================ */
 
 let closingAttachments = [];
+/* Controla se o operador confirmou o repasse antes de salvar */
+let transferConfirmed = false;
+let confirmedValues = null; // snapshot dos valores no momento da confirmação
+
+function resetTransferConfirmation() {
+  if (!transferConfirmed) return;
+  transferConfirmed = false;
+  confirmedValues = null;
+  const badge = $('transferConfirmedBadge');
+  if (badge) badge.style.display = 'none';
+  const saveBtn = $('saveClosingBtn');
+  if (saveBtn) saveBtn.disabled = true;
+  const confirmBtn = $('confirmTransferBtn');
+  if (confirmBtn) confirmBtn.textContent = 'Confirmar repasse';
+}
 
 /* --- Helpers --- */
 function selectedStore() {
@@ -206,6 +221,22 @@ function calc() {
     `${odMsg}\n${fdMsg}\n${pdMsg}\n` +
     `Cálculo: saldo final após repasse (${money(finalAfterTransfer())}) − fundo padrão (${money(store?.standardFund || 0)}) = ${money(fd)}.`
   );
+
+  /* Se valores mudaram após confirmar repasse, exige nova confirmação */
+  if (transferConfirmed && confirmedValues) {
+    if (
+      Math.abs(num('initial') - confirmedValues.initial) > 0.001 ||
+      Math.abs(totalEntries() - confirmedValues.entries) > 0.001 ||
+      Math.abs(totalExpenses() - confirmedValues.expenses) > 0.001 ||
+      Math.abs(num('transfer') - confirmedValues.transfer) > 0.001
+    ) {
+      resetTransferConfirmation();
+    }
+  }
+  /* Mantém o botão "Realizar fechamento" sincronizado com o estado de confirmação */
+  const saveClosingBtn = $('saveClosingBtn');
+  if (saveClosingBtn) saveClosingBtn.disabled = !transferConfirmed;
+
   bindCurrencyInputs();
 }
 
@@ -364,6 +395,36 @@ async function reviewDivergence(id, status) {
   renderAll();
 }
 
+/* --- Confirmar repasse --- */
+async function confirmTransfer() {
+  const store = selectedStore();
+  if (!store) return alert('Selecione uma loja antes de confirmar o repasse.');
+  const transfer = num('transfer');
+  const expCash = expectedCash();
+  if (transfer < 0) return alert('O valor do repasse não pode ser negativo.');
+  if (transfer > expCash + 0.001) {
+    const ok = confirm(
+      `O repasse informado (${money(transfer)}) é maior que o saldo em caixa (${money(expCash)}).\n` +
+      'Verifique antes de confirmar.\n\nDeseja confirmar assim mesmo?'
+    );
+    if (!ok) return;
+  }
+  transferConfirmed = true;
+  confirmedValues = {
+    initial: num('initial'),
+    entries: totalEntries(),
+    expenses: totalExpenses(),
+    transfer,
+  };
+  const badge = $('transferConfirmedBadge');
+  if (badge) badge.style.display = '';
+  const saveBtn = $('saveClosingBtn');
+  if (saveBtn) saveBtn.disabled = false;
+  const confirmBtn = $('confirmTransferBtn');
+  if (confirmBtn) confirmBtn.textContent = '✓ Repasse confirmado';
+  calc();
+}
+
 /* --- Salvar fechamento --- */
 async function saveClosing() {
   const store = selectedStore();
@@ -374,6 +435,8 @@ async function saveClosing() {
   if (role === 'admin' && store.companyId !== currentUser?.companyId) {
     return alert('Esta loja não pertence ao seu acesso.');
   }
+
+  if (!transferConfirmed) return alert('Confirme o repasse antes de realizar o fechamento.');
 
   const closingDate = val('closingDate') || todayISO();
   const dateISO = parseBR(closingDate);
@@ -531,6 +594,15 @@ async function saveClosing() {
   all('.cash-count').forEach((e) => { e.value = 0; });
   const hint = $('initialBalanceHint');
   if (hint) hint.style.display = 'none';
+  /* Resetar estado de confirmação do repasse */
+  transferConfirmed = false;
+  confirmedValues = null;
+  const confirmBadge = $('transferConfirmedBadge');
+  if (confirmBadge) confirmBadge.style.display = 'none';
+  const saveBtnEl = $('saveClosingBtn');
+  if (saveBtnEl) saveBtnEl.disabled = true;
+  const confirmBtnEl = $('confirmTransferBtn');
+  if (confirmBtnEl) confirmBtnEl.textContent = 'Confirmar repasse';
 
   save();
   renderAll();
@@ -571,6 +643,6 @@ Object.assign(window, {
   syncCoinCountTotal, suggestInitialBalance, calc,
   addEntry, addExpense, removeLaunchRow,
   ensureExpenseCategories, renderCashCounter,
-  saveClosing, saveOpeningAdjustment, reviewDivergence, createDivergenceReviews,
+  confirmTransfer, saveClosing, saveOpeningAdjustment, reviewDivergence, createDivergenceReviews,
   handleAttachments, renderAttachments, clearAttachmentsUI,
 });
