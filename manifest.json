@@ -1,12 +1,12 @@
 {
-  "name": "Caixa 5X",
+  "name": "Central de Caixa 5X",
   "short_name": "Caixa 5X",
   "description": "Sistema de Fechamento de Caixa da Gestão 5X",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#050b12",
+  "background_color": "#0d1720",
   "theme_color": "#00d6b4",
   "lang": "pt-BR",
   "icons": [
@@ -14,7 +14,13 @@
       "src": "/assets/icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     },
     {
       "src": "/assets/favicon.png",

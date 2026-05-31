@@ -79,8 +79,8 @@ button,input,select,textarea{font-family:var(--font)}
   pointer-events:none;
   opacity:0;
 }
-.brand{display:flex;align-items:center;justify-content:flex-start;margin-bottom:18px;flex-shrink:0}
-.side-logo{display:block;width:150px;max-width:100%;height:auto;object-fit:contain}
+.brand{display:flex;align-items:center;justify-content:center;padding:4px 8px 16px;margin-bottom:14px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.07)}
+.side-logo{display:block;width:140px;max-width:82%;height:auto;object-fit:contain}
 .nav{display:flex;flex-direction:column;gap:4px;overflow-y:auto;overflow-x:hidden;padding-right:2px;flex:1;min-height:0}
 .nav-title{font-size:10px;text-transform:uppercase;color:#7d8da1;font-weight:700;margin:12px 8px 4px;letter-spacing:.5px}
 .nav button{border:1px solid transparent;background:transparent;color:#b4c1d4;padding:10px 12px;border-radius:11px;text-align:left;cursor:pointer;font-weight:600;font-size:13px;transition:all .15s;white-space:nowrap}
@@ -313,7 +313,9 @@ tr:hover td{background:#fafbfc}
 /* ============================================================
    FILTRO BAR
 ============================================================ */
-.filter-bar-5x{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:12px;margin-bottom:14px;align-items:flex-end}
+.filter-bar-5x{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px;align-items:flex-end}
+/* Evita overflow horizontal em filhos de grid */
+.form-grid>*,.form-grid.three>*,.filter-bar-5x>*,.panel-grid>*{min-width:0}
 
 /* ============================================================
    USER EDIT
@@ -368,19 +370,16 @@ tr:hover td{background:#fafbfc}
   }
   .sidebar.open{transform:translateX(0)}
   #sidebarOverlay.visible{display:block}
-  /* Header fica sticky para o toggle sempre visível */
+  /* Header rola junto com o conteúdo no mobile */
   .top{
-    position:sticky;
-    top:env(safe-area-inset-top,0px);
-    z-index:100;
-    background:var(--bg);
-    padding:10px 14px;
+    position:static;
+    padding:max(12px,calc(10px + env(safe-area-inset-top,0px))) 14px 10px;
     margin-bottom:10px;
     border-bottom:1px solid var(--line);
   }
   .main{
     padding:14px!important;
-    padding-top:env(safe-area-inset-top,0px)!important;
+    padding-top:0!important;
     padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))!important;
   }
   .cards{grid-template-columns:repeat(2,1fr)}
@@ -435,6 +434,12 @@ tr:hover td{background:#fafbfc}
   .box{padding:11px;border-radius:13px}
   .attachment-box{padding:10px;border-radius:13px}
   .form-grid.three{grid-template-columns:repeat(2,1fr)}
+  /* Tabelas: fonte e padding menores no mobile */
+  th,td{padding:9px 10px;font-size:12px}
+  th{font-size:10px}
+  /* Inputs/selects não estouram a margem */
+  input,select,textarea{max-width:100%}
+  input[type="date"]{min-width:0}
 }
 
 @media(max-width:700px){
@@ -442,7 +447,7 @@ tr:hover td{background:#fafbfc}
   .form-grid,.form-grid.three,.user-edit-grid,.filter-bar-5x{grid-template-columns:1fr}
   .launch-row,.launch-row.expense-row{grid-template-columns:1fr}
   .report-grid,.client-report-grid{grid-template-columns:1fr}
-  .main{padding:12px!important;padding-top:env(safe-area-inset-top,0px)!important;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))!important}
+  .main{padding:12px!important;padding-top:0!important;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))!important}
   .top{flex-direction:row;flex-wrap:nowrap}
   .top-right .chip{display:none}
   .wizard{grid-template-columns:1fr 1fr}
