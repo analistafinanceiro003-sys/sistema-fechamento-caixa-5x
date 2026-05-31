@@ -1,20 +1,29 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+function corsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') || '*';
+  const isAllowedOrigin =
+    origin === '*' ||
+    /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin) ||
+    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
 
-function json(body: Record<string, unknown>, status = 200) {
+  return {
+    'Access-Control-Allow-Origin': isAllowedOrigin ? origin : 'https://sistema-fechamento-caixa-5x.vercel.app',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
+
+function json(req: Request, body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
   });
 }
 
-function friendlyError(message: string, status = 400) {
-  return json({ ok: false, error: message }, status);
+function friendlyError(req: Request, message: string, status = 400) {
+  return json(req, { ok: false, error: message }, status);
 }
 
 function normalizeEmail(email: unknown) {
@@ -22,18 +31,18 @@ function normalizeEmail(email: unknown) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'POST') return friendlyError('Método não permitido.', 405);
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(req) });
+  if (req.method !== 'POST') return friendlyError(req, 'Método não permitido.', 405);
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseUrl = Deno.env.get('PROJECT_URL');
+  const serviceKey = Deno.env.get('SERVICE_ROLE_KEY');
   if (!supabaseUrl || !serviceKey) {
-    return friendlyError('Configuração da função incompleta. Verifique os secrets no Supabase.', 500);
+    return friendlyError(req, 'Configuração da função incompleta. Verifique os secrets no Supabase.', 500);
   }
 
   const authHeader = req.headers.get('Authorization') || '';
   const jwt = authHeader.replace(/^Bearer\s+/i, '').trim();
-  if (!jwt) return friendlyError('Sessão não encontrada. Faça login novamente.', 401);
+  if (!jwt) return friendlyError(req, 'Sessão não encontrada. Faça login novamente.', 401);
 
   const admin = createClient(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -41,7 +50,7 @@ Deno.serve(async (req) => {
 
   const { data: authUser, error: authError } = await admin.auth.getUser(jwt);
   if (authError || !authUser.user) {
-    return friendlyError('Sessão inválida ou expirada. Faça login novamente.', 401);
+    return friendlyError(req, 'Sessão inválida ou expirada. Faça login novamente.', 401);
   }
 
   const { data: requester, error: requesterError } = await admin
@@ -50,16 +59,16 @@ Deno.serve(async (req) => {
     .eq('user_id', authUser.user.id)
     .maybeSingle();
 
-  if (requesterError) return friendlyError('Não foi possível validar seu perfil.', 500);
+  if (requesterError) return friendlyError(req, 'Não foi possível validar seu perfil.', 500);
   if (!requester || requester.role !== 'master' || requester.status === 'Inativo') {
-    return friendlyError('Apenas o perfil Master pode criar usuários.', 403);
+    return friendlyError(req, 'Apenas o perfil Master pode criar usuários.', 403);
   }
 
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
-    return friendlyError('Dados inválidos para criação do usuário.');
+    return friendlyError(req, 'Dados inválidos para criação do usuário.');
   }
 
   const name = String(body.name || '').trim();
@@ -68,14 +77,16 @@ Deno.serve(async (req) => {
   const role = String(body.role || '').trim();
   const companyId = body.company_id ? String(body.company_id) : null;
   const storeId = body.store_id ? String(body.store_id) : null;
+  const status = String(body.status || 'Ativo').trim() || 'Ativo';
 
-  if (!name) return friendlyError('Informe o nome do usuário.');
-  if (!email || !email.includes('@')) return friendlyError('Informe um e-mail válido.');
-  if (!password || password.length < 6) return friendlyError('A senha precisa ter pelo menos 6 caracteres.');
-  if (!['admin', 'operator'].includes(role)) return friendlyError('Perfil inválido. Use Admin ou Operador.');
-  if (role === 'admin' && !companyId) return friendlyError('Administrador precisa estar vinculado a uma empresa.');
+  if (!name) return friendlyError(req, 'Informe o nome do usuário.');
+  if (!email || !email.includes('@')) return friendlyError(req, 'Informe um e-mail válido.');
+  if (!password || password.length < 6) return friendlyError(req, 'A senha precisa ter pelo menos 6 caracteres.');
+  if (!['admin', 'operator'].includes(role)) return friendlyError(req, 'Perfil inválido. Use Admin ou Operador.');
+  if (!['Ativo', 'Inativo'].includes(status)) return friendlyError(req, 'Status inválido para o usuário.');
+  if (role === 'admin' && !companyId) return friendlyError(req, 'Administrador precisa estar vinculado a uma empresa.');
   if (role === 'operator' && (!companyId || !storeId)) {
-    return friendlyError('Operador precisa estar vinculado a uma empresa e uma loja.');
+    return friendlyError(req, 'Operador precisa estar vinculado a uma empresa e uma loja.');
   }
 
   const { data: existingProfile } = await admin
@@ -83,14 +94,14 @@ Deno.serve(async (req) => {
     .select('id')
     .eq('email', email)
     .maybeSingle();
-  if (existingProfile) return friendlyError('Já existe um perfil cadastrado com este e-mail.');
+  if (existingProfile) return friendlyError(req, 'Já existe um perfil cadastrado com este e-mail.');
 
   const { data: company } = await admin
     .from('companies')
     .select('id')
     .eq('id', companyId)
     .maybeSingle();
-  if (!company) return friendlyError('Empresa não encontrada.');
+  if (!company) return friendlyError(req, 'Empresa não encontrada.');
 
   if (role === 'operator') {
     const { data: store } = await admin
@@ -99,7 +110,7 @@ Deno.serve(async (req) => {
       .eq('id', storeId)
       .eq('company_id', companyId)
       .maybeSingle();
-    if (!store) return friendlyError('Loja não encontrada para esta empresa.');
+    if (!store) return friendlyError(req, 'Loja não encontrada para esta empresa.');
   }
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
@@ -113,7 +124,7 @@ Deno.serve(async (req) => {
     const message = createError?.message?.includes('already')
       ? 'Já existe um usuário no Authentication com este e-mail.'
       : 'Não foi possível criar o usuário no Authentication.';
-    return friendlyError(message, 400);
+    return friendlyError(req, message, 400);
   }
 
   const profilePayload = {
@@ -123,7 +134,7 @@ Deno.serve(async (req) => {
     role,
     company_id: companyId,
     store_id: role === 'operator' ? storeId : null,
-    status: 'Ativo',
+    status,
   };
 
   const { data: profile, error: profileError } = await admin
@@ -134,8 +145,8 @@ Deno.serve(async (req) => {
 
   if (profileError) {
     await admin.auth.admin.deleteUser(created.user.id);
-    return friendlyError('Usuário criado no Auth, mas o perfil falhou. A criação foi desfeita.', 500);
+    return friendlyError(req, 'Usuário criado no Auth, mas o perfil falhou. A criação foi desfeita.', 500);
   }
 
-  return json({ ok: true, user_id: created.user.id, profile });
+  return json(req, { ok: true, user_id: created.user.id, profile });
 });

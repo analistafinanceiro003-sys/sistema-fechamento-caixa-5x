@@ -509,6 +509,32 @@ async function createUserViaEdgeFunction(payload) {
   return data.profile ? mapProfile(data.profile) : null;
 }
 
+async function deleteUserViaEdgeFunction(user) {
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) throw new Error('Supabase Auth/Sessão obrigatório em produção.');
+  const { data: sessionData } = await sb.auth.getSession();
+  const token = sessionData?.session?.access_token;
+  if (!token) throw new Error('Sessão não encontrada. Faça login novamente.');
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/delete-user`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      user_id: user.authId,
+      profile_id: user.id,
+    }),
+  });
+
+  let data = null;
+  try { data = await response.json(); } catch {}
+  if (!response.ok || !data?.ok) {
+    throw new Error(data?.error || 'Não foi possível excluir o usuário.');
+  }
+  return data;
+}
+
 async function getModulePermissions(companyId, profileRole) {
   if (!sb || !hasSupabaseSession()) return getModuleConfig(companyId, profileRole);
   const { data, error } = await sb.from('module_permissions').select('*').eq('company_id', companyId).eq('role', profileRole);
@@ -978,10 +1004,21 @@ async function createUserFromMaster() {
       setVal('opPass', '');
       addAudit('Cadastro de usuário', loginNew);
       save();
+      setVal('usersCompanyFilter', profile?.companyId || cid);
+      setVal('userManageCompany', profile?.companyId || cid);
       renderAll();
-      return alert('Usuário criado no Supabase Authentication e vinculado em profiles.');
+      fillUserManageSelect();
+      if (profile?.id) {
+        setVal('userManageSelect', profile.id);
+        loadUserToEdit();
+      }
+      return alert('Usuário cadastrado com sucesso.');
     } catch (e) {
-      return alert(e.message || 'Erro ao criar usuário.');
+      const message = String(e.message || '');
+      if (message.toLowerCase().includes('e-mail') || message.toLowerCase().includes('email') || message.toLowerCase().includes('already')) {
+        return alert('Já existe um usuário cadastrado com este e-mail.');
+      }
+      return alert('Não foi possível cadastrar o usuário. Verifique os dados e tente novamente.');
     }
   }
 
@@ -993,9 +1030,16 @@ async function createUserFromMaster() {
   });
   ['opName','opLogin'].forEach(clear);
   setVal('opPass', '');
-  addAudit('Cadastro de usuário', val('opLogin'));
+  addAudit('Cadastro de usuário', loginNew);
   save();
+  setVal('usersCompanyFilter', cid);
+  setVal('userManageCompany', cid);
   renderAll();
+  fillUserManageSelect();
+  const created = state.users[state.users.length - 1];
+  setVal('userManageSelect', created.id);
+  loadUserToEdit();
+  alert('Usuário cadastrado com sucesso.');
 }
 
 function loadUserToEdit() {
@@ -1047,20 +1091,41 @@ function resetSelectedUserPassword() {
   alert('Senha local removida. Defina uma nova senha no modo de desenvolvimento.');
 }
 
+async function removeUserById(id) {
+  const u = state.users.find((x) => x.id === id);
+  if (!u) return alert('Selecione um usuário.');
+  if (!confirm('Tem certeza que deseja excluir este usuário? Ele perderá acesso ao sistema.')) return;
+  if (currentUser?.authId && u.authId === currentUser.authId) {
+    return alert('Você não pode excluir seu próprio usuário.');
+  }
+
+  if (!DEV_LOCAL_MODE) {
+    try {
+      await deleteUserViaEdgeFunction(u);
+    } catch (e) {
+      const message = String(e.message || '');
+      if (message.includes('próprio')) return alert('Você não pode excluir seu próprio usuário.');
+      if (message.includes('Master')) return alert('Apenas o perfil Master pode excluir usuários.');
+      return alert('Não foi possível excluir o usuário.');
+    }
+  }
+
+  state.users = state.users.filter((user) => user.id !== id);
+  setVal('userManageSelect', '');
+  save();
+  renderAll();
+  fillUserManageSelect();
+  alert('Usuário excluído com sucesso.');
+}
+
 function deleteSelectedUser() {
   const id = val('userManageSelect');
   if (!id) return alert('Selecione um usuário.');
-  if (!confirm('Excluir este usuário?')) return;
-  state.users = state.users.filter((u) => u.id !== id);
-  save();
-  renderAll();
+  removeUserById(id);
 }
 
 function deleteUser(id) {
-  if (!confirm('Excluir usuário?')) return;
-  state.users = state.users.filter((u) => u.id !== id);
-  save();
-  renderAll();
+  removeUserById(id);
 }
 
 /* --- CRUD — Regras --- */
@@ -1262,7 +1327,7 @@ Object.assign(window, {
   setupRealtimeSync, stopRealtimeSync, manualRefresh,
   getCompanies, createCompany, updateCompany, inactivateCompany,
   getStores, createStoreRecord, updateStore,
-  getProfiles, getCurrentProfile, updateProfile, createUserViaEdgeFunction,
+  getProfiles, getCurrentProfile, updateProfile, createUserViaEdgeFunction, deleteUserViaEdgeFunction,
   getModulePermissions, saveModulePermissions,
   getOperationRules, createOperationRule, updateOperationRule,
   getOperationConfig, saveOperationConfigToSupabase,
@@ -1274,7 +1339,7 @@ Object.assign(window, {
   companyName, storeName, visibleCompanies, visibleStores, cfg,
   saveClientSetup, clearClientSetup, toggleCompany, deleteCompany,
   createStore, updateStoreFund, deleteStore,
-  createUserFromMaster, loadUserToEdit, saveUserEdit, resetSelectedUserPassword,
+  createUserFromMaster, loadUserToEdit, saveUserEdit, resetSelectedUserPassword, removeUserById,
   deleteSelectedUser, deleteUser,
   createRule, deleteRule, saveImplantStep, saveOperationConfig,
   addSelectOption, removeSelectOption, resetSelectOptions,

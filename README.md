@@ -95,6 +95,7 @@ Com a Supabase CLI autenticada no projeto:
 
 ```bash
 supabase functions deploy create-user
+supabase functions deploy delete-user
 ```
 
 ### Secrets obrigatórios
@@ -102,11 +103,11 @@ supabase functions deploy create-user
 Configure os secrets no projeto Supabase:
 
 ```bash
-supabase secrets set SUPABASE_URL="https://SEU_PROJETO.supabase.co"
-supabase secrets set SUPABASE_SERVICE_ROLE_KEY="SUA_SERVICE_ROLE_KEY"
+supabase.cmd secrets set PROJECT_URL=https://feopuubmozroxavuxcly.supabase.co --project-ref feopuubmozroxavuxcly
+supabase.cmd secrets set SERVICE_ROLE_KEY=SUA_SECRET_KEY --project-ref feopuubmozroxavuxcly
 ```
 
-> A `SUPABASE_SERVICE_ROLE_KEY` fica somente no ambiente seguro da Edge Function. Nunca coloque essa chave no frontend.
+> A `SERVICE_ROLE_KEY` fica somente no ambiente seguro da Edge Function. Nunca coloque essa chave no frontend.
 
 ### Como testar
 
@@ -118,6 +119,19 @@ supabase secrets set SUPABASE_SERVICE_ROLE_KEY="SUA_SERVICE_ROLE_KEY"
    - **Authentication > Users** contém os e-mails criados.
    - **Table Editor > public.profiles** contém os registros com `role`, `company_id` e, para operador, `store_id`.
 6. Saia do sistema e teste login com o novo Admin/Operador.
+
+### Deploy das Edge Functions no projeto 5X
+
+```bash
+supabase.cmd functions deploy create-user --project-ref feopuubmozroxavuxcly
+supabase.cmd functions deploy delete-user --project-ref feopuubmozroxavuxcly
+```
+
+Se a `create-user` já estiver publicada e apenas a exclusão tiver sido adicionada:
+
+```bash
+supabase.cmd functions deploy delete-user --project-ref feopuubmozroxavuxcly
+```
 
 ---
 
@@ -151,7 +165,7 @@ physicalDivergence = physicalCount - finalAfterTransfer
 
 - [ ] `supabase/schema.sql` executado
 - [ ] Edge Function `create-user` publicada
-- [ ] Secrets `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` configurados
+- [ ] Secrets `PROJECT_URL` e `SERVICE_ROLE_KEY` configurados
 - [ ] Usuário Master criado em Auth + profiles
 - [ ] Criação de Admin/Operador testada pela tela Usuários e Acessos
 - [ ] Login de Admin e Operador testado
