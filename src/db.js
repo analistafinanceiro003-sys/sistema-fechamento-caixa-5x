@@ -140,6 +140,8 @@ function mapClosing(row, entries = [], expenses = [], attachments = []) {
     companyId: row.company_id,
     storeId: row.store_id,
     operatorUserId: row.operator_user_id,
+    /* operator mantido para compatibilidade com filtro de histórico do operador */
+    operator: row.responsible_name || '',
     date: toMaybeDateBR(row.closing_date),
     shift: row.shift || 'Integral',
     responsible: row.responsible_name || '',
@@ -757,9 +759,21 @@ async function createClosing(closing) {
     state.closings.forEach((c) => { if (c.id === oldId) c.id = row.id; });
     state.divergenceReviews.forEach((r) => { if (r.closingId === oldId) r.closingId = row.id; });
   }
+  /* Entradas e saídas são registros de detalhe — erros são fatais para manter integridade */
   await createClosingEntries(closing.id, closing.entryItems || []);
   await createClosingExpenses(closing.id, closing.expenseItems || []);
-  await Promise.all((state.divergenceReviews || []).filter((r) => r.closingId === closing.id).map(createDivergenceReview));
+  /* Divergence reviews são registros secundários: falha de RLS não deve bloquear o fechamento.
+     Usar allSettled para não derrubar toda a operação por falha de permissão nessa tabela. */
+  const reviewResults = await Promise.allSettled(
+    (state.divergenceReviews || [])
+      .filter((r) => r.closingId === closing.id)
+      .map((r) => createDivergenceReview(r))
+  );
+  reviewResults.forEach((result, i) => {
+    if (result.status === 'rejected') {
+      console.warn(`[createClosing] divergence_review[${i}] falhou (não crítico):`, result.reason?.message || result.reason);
+    }
+  });
   return closing;
 }
 

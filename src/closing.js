@@ -439,7 +439,10 @@ async function saveClosing() {
   if (!transferConfirmed) return alert('Confirme o repasse antes de realizar o fechamento.');
 
   const closingDate = val('closingDate') || todayISO();
+  if (!closingDate) return alert('Informe a data do fechamento.');
   const dateISO = parseBR(closingDate);
+  if (!dateISO) return alert('Data de fechamento inválida. Verifique o formato.');
+
   const shift = selectedShift();
   const responsible = val('closingResponsible') || currentUser?.name || '';
 
@@ -462,13 +465,20 @@ async function saveClosing() {
     if (v < 0) return alert('Valores de saída não podem ser negativos.');
   }
 
-  /* Detectar fechamento duplicado */
-  const existing = state.closings.find((c) =>
-    c.storeId === store.id &&
-    parseBR(c.date) === dateISO &&
-    (c.shift || 'Integral') === shift &&
-    (c.type === 'Original' || !c.type)
-  );
+  /* Detectar fechamento duplicado — usa Supabase quando disponível para evitar falso negativo */
+  let existing = null;
+  try {
+    existing = await checkDuplicateClosing({ storeId: store.id, closingDate, shift });
+  } catch (e) {
+    /* Fallback para state local se a query Supabase falhar */
+    console.warn('[saveClosing] checkDuplicateClosing falhou, usando state local:', e.message);
+    existing = state.closings.find((c) =>
+      c.storeId === store.id &&
+      parseBR(c.date) === dateISO &&
+      (c.shift || 'Integral') === shift &&
+      (c.type === 'Original' || !c.type)
+    );
+  }
 
   let closingType = 'Original';
   let originalClosingId = null;
@@ -570,9 +580,23 @@ async function saveClosing() {
     try {
       await createClosing(closing);
     } catch (e) {
+      console.error('[saveClosing] Erro ao salvar fechamento no Supabase:', {
+        message: e.message,
+        code: e.code,
+        details: e.details,
+        hint: e.hint,
+        closingId: closing.id,
+        storeId: closing.storeId,
+        companyId: closing.companyId,
+      });
       state.closings = state.closings.filter((c) => c.id !== closing.id);
       state.divergenceReviews = (state.divergenceReviews || []).filter((r) => r.closingId !== closing.id);
-      return alert(`Erro ao salvar fechamento no Supabase: ${e.message}`);
+      renderAll();
+      return alert(
+        `Não foi possível salvar o fechamento.\n\n` +
+        `Motivo: ${e.message || 'Erro desconhecido'}\n\n` +
+        `Verifique sua conexão e as permissões da conta. Se o erro persistir, consulte o console do navegador (F12).`
+      );
     }
   } else if (!DEV_LOCAL_MODE) {
     state.closings = state.closings.filter((c) => c.id !== closing.id);

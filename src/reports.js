@@ -23,7 +23,10 @@ function getScopedClosings({
   } else if (effectiveScope === 'operator' || role === 'operator') {
     rows = rows.filter((c) =>
       c.storeId === currentUser?.storeId ||
-      c.operator === currentUser?.name
+      /* operatorUserId é o UUID do Supabase Auth — confiável após reload */
+      (currentUser?.authId && c.operatorUserId === currentUser?.authId) ||
+      /* operator é o nome — compatibilidade com dados em localStorage */
+      (currentUser?.name && c.operator === currentUser?.name)
     );
   }
 
