@@ -1,0 +1,1255 @@
+'use strict';
+/* ============================================================
+   BANCO DE DADOS / ESTADO — Caixa 5X
+   Carregamento, persistência e CRUD contra localStorage + Supabase.
+============================================================ */
+
+let state = null;
+let saveTimer = null;
+let realtimeChannel = null;
+let lastOwnSave = 0;
+let isBooting = true;
+const DEV_LOCAL_MODE = false;
+const USE_LOCAL_FALLBACK = DEV_LOCAL_MODE;
+const NORMALIZED_TABLES = [
+  'companies','stores','profiles','module_permissions','operation_rules','operation_configs',
+  'closings','closing_entries','closing_expenses','closing_attachments',
+  'cash_opening_adjustments','divergence_reviews','audit_logs','select_options',
+];
+
+/* --- Opções padrão de seleção --- */
+function defaultSelectOptions() {
+  return {
+    segments: ['Restaurante / Hamburgueria','Padaria','Varejo','Serviços','Indústria','Outro'],
+    plans: ['Operacional','Controladoria','Premium 5X'],
+    companyStatus: ['Implantação','Ativa','Pausada','Inativa'],
+    cashTypes: ['Caixa diário','Caixa por turno','Caixa central','Caixa delivery'],
+    operationModes: ['Diário','Por turno','Por operador'],
+    ruleTypes: ['Saída permitida','Repasse','Conferência','Divergência','Checklist'],
+    shifts: ['Manhã','Tarde','Noite','Integral','Outro'],
+    implantSteps: ['1. Cadastro da empresa','2. Cadastro de lojas/caixas','3. Cadastro de operadores','4. Regras de caixa','5. Treinamento','6. Início monitorado'],
+    implantStatus: ['Pendente','Em andamento','Concluído'],
+    expenseCategories: ['Ajuda de custo','Taxa de entrega','Compra de mercadoria','Outras saídas'],
+  };
+}
+
+function defaultState() {
+  return {
+    companies: [{ id: 'demo', name: 'Cliente Demonstração', legal: 'Cliente Demonstração LTDA', cnpj: '00.000.000/0001-00', segment: 'Restaurante / Hamburgueria', plan: 'Premium 5X', status: 'Ativa', notes: 'Base demonstrativa' }],
+    stores: [{ id: 'demo_store', companyId: 'demo', name: 'Loja 01', code: 'LJ01', cashType: 'Caixa diário', standardFund: 100, status: 'Ativa' }],
+    users: [
+      { id: 'u_admin', companyId: 'demo', storeId: null,         name: 'ADM Cliente',  login: 'admin@cliente.com',    pass: '', role: 'admin',    status: 'Ativo' },
+      { id: 'u_op',    companyId: 'demo', storeId: 'demo_store', name: 'Operador',     login: 'operador@cliente.com', pass: '', role: 'operator', status: 'Ativo' },
+    ],
+    rules: [],
+    closings: [],
+    cashOpeningAdjustments: [],
+    divergenceReviews: [],
+    implant: [],
+    operationConfigs: {},
+    modules: {},
+    selectOptions: defaultSelectOptions(),
+    audit: [],
+  };
+}
+
+function normalizeState() {
+  state = (state && typeof state === 'object') ? state : defaultState();
+  ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit'].forEach((k) => {
+    if (!Array.isArray(state[k])) state[k] = [];
+  });
+  state.operationConfigs = (state.operationConfigs && typeof state.operationConfigs === 'object') ? state.operationConfigs : {};
+  state.modules = (state.modules && typeof state.modules === 'object') ? state.modules : {};
+  state.selectOptions = { ...defaultSelectOptions(), ...(state.selectOptions || {}) };
+  state.stores.forEach((s) => { s.standardFund = Number(s.standardFund || 0); });
+  state.companies.forEach((c) => {
+    if (!state.operationConfigs[c.id]) {
+      state.operationConfigs[c.id] = { tolerance: 5, criticalDivergence: 20, mode: 'Diário', receiver: '', allowed: '', message: '' };
+    }
+    if (!state.modules[c.id]) state.modules[c.id] = {};
+    state.modules[c.id].admin    = { ...defaultModuleConfig('admin'),    ...(state.modules[c.id].admin    || {}) };
+    state.modules[c.id].operator = { ...defaultModuleConfig('operator'), ...(state.modules[c.id].operator || {}) };
+    syncModuleAliases(state.modules[c.id].admin);
+    syncModuleAliases(state.modules[c.id].operator);
+  });
+}
+
+function hasSupabaseSession() {
+  return !!window.currentUser?.authId || !!window.currentUser?.id && window.currentUser?.authId !== null;
+}
+
+function toMaybeDateBR(date) {
+  return date ? toBRFromISO(parseBR(date)) : '';
+}
+
+function mapCompany(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    legal: row.legal_name || '',
+    cnpj: row.cnpj || '',
+    segment: row.segment || '',
+    plan: row.plan || '',
+    status: row.status || 'Ativa',
+    notes: row.notes || '',
+  };
+}
+
+function mapStore(row) {
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    name: row.name,
+    code: row.code || '',
+    cashType: row.cash_type || '',
+    standardFund: Number(row.standard_fund || 0),
+    tolerance: row.tolerance,
+    criticalDivergence: row.critical_divergence,
+    status: row.status || 'Ativa',
+  };
+}
+
+function mapProfile(row) {
+  return {
+    id: row.id,
+    authId: row.user_id,
+    companyId: row.company_id,
+    storeId: row.store_id,
+    name: row.name,
+    login: row.email,
+    pass: '',
+    role: row.role,
+    status: row.status || 'Ativo',
+  };
+}
+
+function mapOperationConfig(row) {
+  return {
+    tolerance: Number(row.tolerance || 5),
+    criticalDivergence: Number(row.critical_divergence || 20),
+    mode: row.operation_mode || 'Diário',
+    receiver: row.transfer_receiver || '',
+    allowed: row.allowed_expenses || '',
+    message: row.operator_message || '',
+  };
+}
+
+function mapClosing(row, entries = [], expenses = [], attachments = []) {
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    storeId: row.store_id,
+    operatorUserId: row.operator_user_id,
+    date: toMaybeDateBR(row.closing_date),
+    shift: row.shift || 'Integral',
+    responsible: row.responsible_name || '',
+    initial: Number(row.initial_balance || 0),
+    coinsTotal: Number(row.coins_total || 0),
+    cashCounterTotal: Number(row.cash_counter_total || 0),
+    entries: Number(row.total_entries || 0),
+    entryItems: entries.map((e) => ({ id: e.id, description: e.description, value: Number(e.amount || 0) })),
+    expenses: Number(row.total_expenses || 0),
+    expenseItems: expenses.map((e) => ({ id: e.id, description: e.description, category: e.category || '', value: Number(e.amount || 0) })),
+    transfer: Number(row.transfer_amount || 0),
+    expected: Number(row.expected_cash || 0),
+    finalAfterTransfer: Number(row.final_after_transfer || 0),
+    cashBalance: Number(row.final_after_transfer || 0),
+    standardFund: Number(row.standard_fund_snapshot || 0),
+    toleranceSnapshot: Number(row.tolerance_snapshot || 5),
+    criticalDivergenceSnapshot: Number(row.critical_divergence_snapshot || 20),
+    previousClosingId: row.previous_closing_id,
+    previousFinalAfterTransfer: Number(row.previous_final_after_transfer || 0),
+    openingDivergence: Number(row.opening_divergence || 0),
+    diff: Number(row.fund_divergence || 0),
+    fundDivergence: Number(row.fund_divergence || 0),
+    physicalCount: Number(row.physical_count || 0),
+    physicalDivergence: Number(row.physical_divergence || 0),
+    notes: row.notes || '',
+    attachments: attachments.map((a) => ({ id: a.id, name: a.file_name, url: a.file_url, type: a.file_type, size: a.file_size })),
+    reviewStatus: row.review_status || 'Pendente',
+    status: row.status || '',
+    type: row.type || 'Original',
+    originalClosingId: row.original_closing_id,
+    createdAt: row.created_at,
+  };
+}
+
+function groupBy(items, key) {
+  return (items || []).reduce((acc, item) => {
+    const value = item[key];
+    acc[value] = acc[value] || [];
+    acc[value].push(item);
+    return acc;
+  }, {});
+}
+
+async function selectTable(table, columns = '*') {
+  const { data, error } = await sb.from(table).select(columns);
+  if (error) throw error;
+  return data || [];
+}
+
+function applyModuleRows(rows = []) {
+  state.modules = {};
+  rows.forEach((row) => {
+    state.modules[row.company_id] = state.modules[row.company_id] || {};
+    state.modules[row.company_id][row.role] = state.modules[row.company_id][row.role] || {};
+    state.modules[row.company_id][row.role][row.submodule_key || row.page_key] = !!row.is_enabled;
+  });
+}
+
+function applySelectOptionRows(rows = []) {
+  const options = defaultSelectOptions();
+  rows.forEach((row) => {
+    options[row.category] = options[row.category] || [];
+    if (!options[row.category].includes(row.value)) options[row.category].push(row.value);
+  });
+  state.selectOptions = options;
+}
+
+async function loadFromNormalizedSupabase() {
+  const [
+    companies, stores, profiles, modulePermissions, rules, operationConfigs,
+    closings, entries, expenses, attachments, openingAdjustments, reviews, audit, selectOptions,
+  ] = await Promise.all([
+    selectTable('companies'),
+    selectTable('stores'),
+    selectTable('profiles'),
+    selectTable('module_permissions'),
+    selectTable('operation_rules'),
+    selectTable('operation_configs'),
+    selectTable('closings'),
+    selectTable('closing_entries'),
+    selectTable('closing_expenses'),
+    selectTable('closing_attachments'),
+    selectTable('cash_opening_adjustments'),
+    selectTable('divergence_reviews'),
+    selectTable('audit_logs'),
+    selectTable('select_options'),
+  ]);
+
+  const entriesByClosing = groupBy(entries, 'closing_id');
+  const expensesByClosing = groupBy(expenses, 'closing_id');
+  const attachmentsByClosing = groupBy(attachments, 'closing_id');
+
+  state = {
+    companies: companies.map(mapCompany),
+    stores: stores.map(mapStore),
+    users: profiles.map(mapProfile),
+    rules: rules.map((r) => ({ id: r.id, companyId: r.company_id, storeId: r.store_id, type: r.type, text: r.rule_text, status: r.status })),
+    closings: closings.map((c) => mapClosing(c, entriesByClosing[c.id], expensesByClosing[c.id], attachmentsByClosing[c.id])),
+    cashOpeningAdjustments: openingAdjustments.map((a) => ({
+      id: a.id, companyId: a.company_id, storeId: a.store_id, authorizedBy: a.authorized_by,
+      startDate: a.start_date, shift: a.shift || 'Integral', amount: Number(a.amount || 0),
+      reason: a.reason, notes: a.notes || '', createdAt: a.created_at,
+    })),
+    divergenceReviews: reviews.map((r) => ({
+      id: r.id, closingId: r.closing_id, companyId: r.company_id, storeId: r.store_id,
+      divergenceType: r.divergence_type, divergenceAmount: Number(r.divergence_amount || 0),
+      reviewStatus: r.review_status || 'Pendente', adminComment: r.admin_comment || '',
+      reviewedBy: r.reviewed_by, reviewedAt: r.reviewed_at, createdAt: r.created_at, updatedAt: r.updated_at,
+    })),
+    implant: [],
+    operationConfigs: operationConfigs.reduce((acc, row) => ({ ...acc, [row.company_id]: mapOperationConfig(row) }), {}),
+    modules: {},
+    selectOptions: defaultSelectOptions(),
+    audit: audit.map((a) => ({
+      id: a.id, date: a.created_at, user: a.user_id || 'Sistema', role: '', action: a.action, detail: a.entity || '', metadata: a.metadata,
+    })),
+  };
+  applyModuleRows(modulePermissions);
+  applySelectOptionRows(selectOptions);
+  normalizeState();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+async function load() {
+  try {
+    if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+      await loadFromNormalizedSupabase();
+      return;
+    }
+    if (!state) {
+      state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    }
+    /* Se o estado carregado não tem usuários (ex: primeira carga com defaultState vazio),
+       tenta recuperar do localStorage antigo que pode ter usuários reais. */
+    if (!state?.users?.length) {
+      const legacy = JSON.parse(localStorage.getItem('caixa5x_refatorado_v1') || 'null');
+      if (Array.isArray(legacy?.users) && legacy.users.length) {
+        state = legacy;
+        console.info('Dados recuperados do localStorage anterior (caixa5x_refatorado_v1).');
+      }
+    }
+    if (!state) {
+      state = defaultState();
+    }
+  } catch {
+    state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultState();
+  }
+  normalizeState();
+}
+
+function save() {
+  normalizeState();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  lastOwnSave = Date.now();
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    console.info('Supabase normalizado ativo: persistência por tabelas normalizadas.');
+  }
+  flash('Salvo');
+}
+
+function autosave() {
+  if (isBooting) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(save, 600);
+}
+
+function addAudit(action, detail = '') {
+  if (!state) return;
+  const item = {
+    id: uid('audit'),
+    date: new Date().toISOString(),
+    user: currentUser?.name || 'Sistema',
+    role,
+    action,
+    detail,
+  };
+  state.audit.push(item);
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    logAudit(action, 'ui_action', null, { detail }).catch((e) => console.warn('audit_logs:', e));
+  }
+}
+
+/* --- Realtime --- */
+function setupRealtimeSync() {
+  if (!sb || realtimeChannel) return;
+  realtimeChannel = sb.channel('caixa5x-sync-v2')
+    .on('postgres_changes', { event: '*', schema: 'public' }, async (payload) => {
+      if (!NORMALIZED_TABLES.includes(payload.table)) return;
+      if (Date.now() - lastOwnSave < 2000) return;
+      await load();
+      renderAll();
+      flash('Atualizado');
+    })
+    .subscribe((status) => {
+      text('realtimeStatus', status === 'SUBSCRIBED' ? '● Ao vivo' : '○ Local');
+    });
+}
+
+function stopRealtimeSync() {
+  if (sb && realtimeChannel) sb.removeChannel(realtimeChannel);
+  realtimeChannel = null;
+}
+
+async function manualRefresh() {
+  await load();
+  renderAll();
+  flash('Dados atualizados');
+}
+
+/* --- Helpers de escopo --- */
+function companyName(id) { return state?.companies.find((c) => c.id === id)?.name || '-'; }
+function storeName(id) { return state?.stores.find((s) => s.id === id)?.name || '-'; }
+function visibleCompanies() {
+  if (role === 'master') return state.companies;
+  return state.companies.filter((c) => c.id === currentUser?.companyId);
+}
+function visibleStores() {
+  if (role === 'master') return state.stores;
+  if (role === 'admin') return state.stores.filter((s) => s.companyId === currentUser?.companyId);
+  return state.stores.filter((s) => s.id === currentUser?.storeId);
+}
+function cfg(companyId) {
+  return {
+    tolerance: 5, criticalDivergence: 20, mode: 'Diário',
+    receiver: '', allowed: '', message: '',
+    ...(state?.operationConfigs?.[companyId] || {}),
+  };
+}
+
+/* --- CRUD — Empresas --- */
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+}
+
+function cleanPayload(payload) {
+  return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+}
+
+async function supabaseWrite(table, action, payload, match = null) {
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return null;
+  let query;
+  if (action === 'insert') query = sb.from(table).insert(payload).select().single();
+  if (action === 'upsert') query = sb.from(table).upsert(payload).select().single();
+  if (action === 'update') query = sb.from(table).update(payload).match(match).select().single();
+  if (action === 'delete') query = sb.from(table).delete().match(match);
+  const { data, error } = await query;
+  if (error) throw error;
+  lastOwnSave = Date.now();
+  return data || null;
+}
+
+async function getCompanies() {
+  return sb && hasSupabaseSession() ? (await selectTable('companies')).map(mapCompany) : state.companies;
+}
+
+async function createCompany(company) {
+  const row = await supabaseWrite('companies', 'insert', cleanPayload({
+    id: isUuid(company.id) ? company.id : undefined,
+    name: company.name,
+    legal_name: company.legal,
+    cnpj: company.cnpj,
+    segment: company.segment,
+    plan: company.plan,
+    status: company.status || 'Implantação',
+    notes: company.notes,
+  }));
+  return row ? mapCompany(row) : company;
+}
+
+async function updateCompany(id, company) {
+  const row = await supabaseWrite('companies', 'update', cleanPayload({
+    name: company.name,
+    legal_name: company.legal,
+    cnpj: company.cnpj,
+    segment: company.segment,
+    plan: company.plan,
+    status: company.status,
+    notes: company.notes,
+  }), { id });
+  return row ? mapCompany(row) : company;
+}
+
+async function inactivateCompany(id) {
+  return updateCompany(id, { status: 'Inativa' });
+}
+
+async function getStores(companyId = null) {
+  if (!sb || !hasSupabaseSession()) return state.stores.filter((s) => !companyId || s.companyId === companyId);
+  let query = sb.from('stores').select('*');
+  if (companyId) query = query.eq('company_id', companyId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(mapStore);
+}
+
+async function createStoreRecord(store) {
+  const row = await supabaseWrite('stores', 'insert', cleanPayload({
+    company_id: store.companyId,
+    name: store.name,
+    code: store.code,
+    cash_type: store.cashType,
+    standard_fund: store.standardFund,
+    status: store.status,
+  }));
+  return row ? mapStore(row) : store;
+}
+
+async function updateStore(id, store) {
+  const row = await supabaseWrite('stores', 'update', cleanPayload({
+    company_id: store.companyId,
+    name: store.name,
+    code: store.code,
+    cash_type: store.cashType,
+    standard_fund: store.standardFund,
+    status: store.status,
+  }), { id });
+  return row ? mapStore(row) : store;
+}
+
+async function getProfiles(companyId = null) {
+  if (!sb || !hasSupabaseSession()) return state.users.filter((u) => !companyId || u.companyId === companyId);
+  let query = sb.from('profiles').select('*');
+  if (companyId) query = query.eq('company_id', companyId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(mapProfile);
+}
+
+async function getCurrentProfile() {
+  if (!sb) return currentUser;
+  const { data: sessionData } = await sb.auth.getSession();
+  const authId = sessionData?.session?.user?.id;
+  if (!authId) return null;
+  const { data, error } = await sb.from('profiles').select('*').eq('user_id', authId).maybeSingle();
+  if (error) throw error;
+  return data ? mapProfile(data) : null;
+}
+
+async function updateProfile(id, profile) {
+  const row = await supabaseWrite('profiles', 'update', cleanPayload({
+    name: profile.name,
+    email: profile.login || profile.email,
+    role: profile.role,
+    company_id: profile.companyId,
+    store_id: profile.storeId,
+    status: profile.status,
+  }), { id });
+  return row ? mapProfile(row) : profile;
+}
+
+async function getModulePermissions(companyId, profileRole) {
+  if (!sb || !hasSupabaseSession()) return getModuleConfig(companyId, profileRole);
+  const { data, error } = await sb.from('module_permissions').select('*').eq('company_id', companyId).eq('role', profileRole);
+  if (error) throw error;
+  const config = defaultModuleConfig(profileRole);
+  (data || []).forEach((row) => { config[row.submodule_key || row.page_key] = !!row.is_enabled; });
+  return config;
+}
+
+async function saveModulePermissions(companyId, profileRole, permissions) {
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return permissions;
+  const rows = [];
+  (MODULE_TREE[profileRole] || []).forEach((mod) => {
+    rows.push({ company_id: companyId, role: profileRole, page_key: mod.key, submodule_key: '', is_enabled: !!permissions[mod.key] });
+    (mod.submodules || []).forEach((sub) => rows.push({
+      company_id: companyId, role: profileRole, page_key: mod.key, submodule_key: sub.key, is_enabled: !!permissions[sub.key],
+    }));
+  });
+  const { error } = await sb.from('module_permissions').upsert(rows, { onConflict: 'company_id,role,page_key,submodule_key' });
+  if (error) throw error;
+  lastOwnSave = Date.now();
+  return permissions;
+}
+
+async function getOperationRules(companyId, storeId = null) {
+  if (!sb || !hasSupabaseSession()) return state.rules.filter((r) => r.companyId === companyId && (!storeId || r.storeId === storeId));
+  let query = sb.from('operation_rules').select('*').eq('company_id', companyId);
+  if (storeId) query = query.or(`store_id.eq.${storeId},store_id.is.null`);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map((r) => ({ id: r.id, companyId: r.company_id, storeId: r.store_id, type: r.type, text: r.rule_text, status: r.status }));
+}
+
+async function createOperationRule(rule) {
+  return supabaseWrite('operation_rules', 'insert', cleanPayload({
+    id: isUuid(rule.id) ? rule.id : undefined,
+    company_id: rule.companyId,
+    store_id: rule.storeId || null,
+    type: rule.type,
+    rule_text: rule.text,
+    status: rule.status || 'Ativa',
+  }));
+}
+
+async function updateOperationRule(id, rule) {
+  return supabaseWrite('operation_rules', 'update', cleanPayload({
+    store_id: rule.storeId || null,
+    type: rule.type,
+    rule_text: rule.text,
+    status: rule.status,
+  }), { id });
+}
+
+async function getOperationConfig(companyId) {
+  if (!sb || !hasSupabaseSession()) return cfg(companyId);
+  const { data, error } = await sb.from('operation_configs').select('*').eq('company_id', companyId).maybeSingle();
+  if (error) throw error;
+  return data ? mapOperationConfig(data) : cfg(companyId);
+}
+
+async function saveOperationConfigToSupabase(companyId, config) {
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return null;
+  const { data, error } = await sb.from('operation_configs').upsert({
+    company_id: companyId,
+    tolerance: Number(config.tolerance || 5),
+    critical_divergence: Number(config.criticalDivergence || 20),
+    operation_mode: config.mode || 'Diário',
+    transfer_receiver: config.receiver || '',
+    allowed_expenses: config.allowed || '',
+    operator_message: config.message || '',
+  }, { onConflict: 'company_id' }).select().single();
+  if (error) throw error;
+  lastOwnSave = Date.now();
+  return data;
+}
+
+async function getClosingsByScope({ companyId = null, storeId = null, startDate = null, endDate = null } = {}) {
+  if (!sb || !hasSupabaseSession()) return getScopedClosings({ companyId, storeId, startDate, endDate });
+  let query = sb.from('closings').select('*');
+  if (companyId) query = query.eq('company_id', companyId);
+  if (storeId) query = query.eq('store_id', storeId);
+  if (startDate) query = query.gte('closing_date', parseBR(startDate));
+  if (endDate) query = query.lte('closing_date', parseBR(endDate));
+  const { data, error } = await query.order('closing_date', { ascending: false });
+  if (error) throw error;
+  return (data || []).map((c) => mapClosing(c));
+}
+
+async function checkDuplicateClosing({ storeId, closingDate, shift }) {
+  if (!sb || !hasSupabaseSession()) {
+    return state.closings.find((c) => c.storeId === storeId && parseBR(c.date) === parseBR(closingDate) && (c.shift || 'Integral') === shift && (c.type === 'Original' || !c.type));
+  }
+  const { data, error } = await sb.from('closings').select('*')
+    .eq('store_id', storeId).eq('closing_date', parseBR(closingDate)).eq('shift', shift).eq('type', 'Original').maybeSingle();
+  if (error) throw error;
+  return data ? mapClosing(data) : null;
+}
+
+async function getPreviousClosing({ storeId, closingDate, shift }) {
+  if (!sb || !hasSupabaseSession()) return findPreviousClosing(storeId, parseBR(closingDate), shift);
+  const rows = await getClosingsByScope({ storeId, endDate: closingDate });
+  return rows.filter((c) => parseBR(c.date) < parseBR(closingDate) || (parseBR(c.date) === parseBR(closingDate) && shiftRank(c.shift || 'Integral') < shiftRank(shift)))
+    .sort((a, b) => closingSortValue(b).localeCompare(closingSortValue(a)))[0] || null;
+}
+
+async function createClosingEntries(closingId, entries = []) {
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession() || !entries.length) return entries;
+  const { error } = await sb.from('closing_entries').insert(entries.map((e) => ({ closing_id: closingId, description: e.description || 'Entrada', amount: Number(e.value || 0) })));
+  if (error) throw error;
+  return entries;
+}
+
+async function createClosingExpenses(closingId, expenses = []) {
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession() || !expenses.length) return expenses;
+  const { error } = await sb.from('closing_expenses').insert(expenses.map((e) => ({ closing_id: closingId, description: e.description || 'Saída', category: e.category || '', amount: Number(e.value || 0) })));
+  if (error) throw error;
+  return expenses;
+}
+
+async function getClosingEntries(closingId) {
+  if (!sb || !hasSupabaseSession()) return [];
+  const { data, error } = await sb.from('closing_entries').select('*').eq('closing_id', closingId);
+  if (error) throw error;
+  return data || [];
+}
+
+async function getClosingExpenses(closingId) {
+  if (!sb || !hasSupabaseSession()) return [];
+  const { data, error } = await sb.from('closing_expenses').select('*').eq('closing_id', closingId);
+  if (error) throw error;
+  return data || [];
+}
+
+async function createClosing(closing) {
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return closing;
+  const oldId = closing.id;
+  const row = await supabaseWrite('closings', 'insert', cleanPayload({
+    id: isUuid(closing.id) ? closing.id : undefined,
+    company_id: closing.companyId,
+    store_id: closing.storeId,
+    operator_user_id: currentUser?.authId || undefined,
+    responsible_name: closing.responsible,
+    closing_date: parseBR(closing.date),
+    shift: closing.shift || 'Integral',
+    initial_balance: closing.initial,
+    coins_total: closing.coinsTotal,
+    cash_counter_total: closing.cashCounterTotal,
+    total_entries: closing.entries,
+    total_expenses: closing.expenses,
+    expected_cash: closing.expected,
+    transfer_amount: closing.transfer,
+    final_after_transfer: closing.finalAfterTransfer,
+    standard_fund_snapshot: closing.standardFund,
+    tolerance_snapshot: closing.toleranceSnapshot,
+    critical_divergence_snapshot: closing.criticalDivergenceSnapshot,
+    previous_closing_id: isUuid(closing.previousClosingId) ? closing.previousClosingId : null,
+    previous_final_after_transfer: closing.previousFinalAfterTransfer,
+    opening_divergence: closing.openingDivergence,
+    fund_divergence: closing.fundDivergence ?? closing.diff,
+    physical_count: closing.physicalCount,
+    physical_divergence: closing.physicalDivergence,
+    status: closing.status,
+    review_status: closing.reviewStatus,
+    notes: closing.notes,
+    type: closing.type || 'Original',
+    original_closing_id: isUuid(closing.originalClosingId) ? closing.originalClosingId : null,
+  }));
+  if (row?.id && row.id !== oldId) {
+    closing.id = row.id;
+    state.closings.forEach((c) => { if (c.id === oldId) c.id = row.id; });
+    state.divergenceReviews.forEach((r) => { if (r.closingId === oldId) r.closingId = row.id; });
+  }
+  await createClosingEntries(closing.id, closing.entryItems || []);
+  await createClosingExpenses(closing.id, closing.expenseItems || []);
+  await Promise.all((state.divergenceReviews || []).filter((r) => r.closingId === closing.id).map(createDivergenceReview));
+  return closing;
+}
+
+async function updateClosing(id, closing) {
+  return supabaseWrite('closings', 'update', cleanPayload({
+    review_status: closing.reviewStatus,
+    notes: closing.notes,
+    status: closing.status,
+  }), { id });
+}
+
+async function createCashOpeningAdjustment(adjustment) {
+  return supabaseWrite('cash_opening_adjustments', 'insert', cleanPayload({
+    id: isUuid(adjustment.id) ? adjustment.id : undefined,
+    company_id: adjustment.companyId,
+    store_id: adjustment.storeId,
+    authorized_by: currentUser?.authId || undefined,
+    start_date: parseBR(adjustment.startDate),
+    shift: adjustment.shift || 'Integral',
+    amount: adjustment.amount,
+    reason: adjustment.reason,
+    notes: adjustment.notes,
+  }));
+}
+
+async function getCashOpeningAdjustment({ storeId, date, shift }) {
+  if (!sb || !hasSupabaseSession()) return findOpeningAdjustment(storeId, parseBR(date), shift);
+  const { data, error } = await sb.from('cash_opening_adjustments').select('*')
+    .eq('store_id', storeId).lte('start_date', parseBR(date)).in('shift', [shift, 'Integral'])
+    .order('start_date', { ascending: false }).limit(1);
+  if (error) throw error;
+  return data?.[0] || null;
+}
+
+async function createDivergenceReview(review) {
+  return supabaseWrite('divergence_reviews', 'insert', cleanPayload({
+    id: isUuid(review.id) ? review.id : undefined,
+    closing_id: review.closingId,
+    company_id: review.companyId,
+    store_id: review.storeId,
+    divergence_type: review.divergenceType,
+    divergence_amount: review.divergenceAmount,
+    review_status: review.reviewStatus || 'Pendente',
+    admin_comment: review.adminComment || null,
+    reviewed_by: isUuid(review.reviewedBy) ? review.reviewedBy : null,
+    reviewed_at: review.reviewedAt || null,
+  }));
+}
+
+async function getPendingDivergenceReviews() {
+  if (!sb || !hasSupabaseSession()) return (state.divergenceReviews || []).filter((r) => (r.reviewStatus || 'Pendente') === 'Pendente');
+  const { data, error } = await sb.from('divergence_reviews').select('*').eq('review_status', 'Pendente');
+  if (error) throw error;
+  return data || [];
+}
+
+async function updateDivergenceReview(id, review) {
+  return supabaseWrite('divergence_reviews', 'update', cleanPayload({
+    review_status: review.reviewStatus,
+    admin_comment: review.adminComment,
+    reviewed_by: currentUser?.authId || undefined,
+    reviewed_at: review.reviewedAt || new Date().toISOString(),
+  }), { id });
+}
+
+async function logAudit(action, entity = null, entityId = null, metadata = {}) {
+  return supabaseWrite('audit_logs', 'insert', cleanPayload({
+    user_id: currentUser?.authId || undefined,
+    company_id: currentUser?.companyId || metadata.companyId || undefined,
+    store_id: currentUser?.storeId || metadata.storeId || undefined,
+    action,
+    entity,
+    entity_id: isUuid(entityId) ? entityId : undefined,
+    metadata,
+  }));
+}
+
+async function saveClientSetup() {
+  const name = val('setupCompanyName').trim();
+  if (!name) return alert('Informe o nome fantasia da empresa.');
+  const companyId = uid('c');
+  const storeId = uid('s');
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    const company = {
+      id: companyId, name,
+      legal: val('setupCompanyLegal'), cnpj: val('setupCompanyCnpj'),
+      segment: val('setupSegment'), plan: val('setupPlan'),
+      status: val('setupStatus') || 'ImplantaÃ§Ã£o', notes: val('setupNotes'),
+    };
+    const operationConfig = { tolerance: 5, criticalDivergence: 20, mode: 'DiÃ¡rio', receiver: '', allowed: '', message: '' };
+    const moduleConfig = {
+      admin: { ...defaultModuleConfig('admin'), adminClosing: false },
+      operator: defaultModuleConfig('operator'),
+    };
+    try {
+      const companyRow = await createCompany(company);
+      const storeRow = await createStoreRecord({
+        id: storeId, companyId: companyRow.id,
+        name: val('setupStoreName') || 'Loja 01',
+        code: val('setupStoreCode') || 'LJ01',
+        cashType: val('setupCashType') || 'Caixa diÃ¡rio',
+        standardFund: Number(val('setupStoreFund')) || 100,
+        status: 'Ativa',
+      });
+      state.companies.push(companyRow);
+      state.stores.push(storeRow);
+      state.operationConfigs[companyRow.id] = operationConfig;
+      state.modules[companyRow.id] = moduleConfig;
+      await saveOperationConfigToSupabase(companyRow.id, operationConfig);
+      await saveModulePermissions(companyRow.id, 'admin', moduleConfig.admin);
+      await saveModulePermissions(companyRow.id, 'operator', moduleConfig.operator);
+      await logAudit('Cadastro de cliente', 'company', companyRow.id, { name });
+      clearClientSetup();
+      save();
+      renderAll();
+      alert('Cliente cadastrado. Usuários devem ser criados pelo Supabase Auth e vinculados na tabela profiles.');
+    } catch (e) {
+      alert(`Erro ao cadastrar cliente no Supabase: ${e.message}`);
+    }
+    return;
+  }
+  if (!DEV_LOCAL_MODE) return alert('Supabase Auth/Sessão obrigatório em produção. Configure o Supabase antes de cadastrar clientes.');
+  state.companies.push({
+    id: companyId, name,
+    legal: val('setupCompanyLegal'), cnpj: val('setupCompanyCnpj'),
+    segment: val('setupSegment'), plan: val('setupPlan'),
+    status: val('setupStatus') || 'Implantação', notes: val('setupNotes'),
+  });
+  const store = {
+    id: storeId, companyId,
+    name: val('setupStoreName') || 'Loja 01',
+    code: val('setupStoreCode') || 'LJ01',
+    cashType: val('setupCashType') || 'Caixa diário',
+    standardFund: Number(val('setupStoreFund')) || 100,
+    status: 'Ativa',
+  };
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      const row = await createStoreRecord(store);
+      store.id = row.id;
+    } catch (e) {
+      return alert(`Erro ao salvar loja no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção. Configure o Supabase antes de cadastrar lojas.');
+  }
+  state.stores.push(store);
+  if (val('setupAdminLogin')) {
+    state.users.push({
+      id: uid('u'), companyId, storeId: null,
+      name: val('setupAdminName') || 'ADM Cliente',
+      login: val('setupAdminLogin'), pass: val('setupAdminPass'),
+      role: 'admin', status: 'Ativo',
+    });
+  }
+  if (val('setupOperatorLogin')) {
+    state.users.push({
+      id: uid('u'), companyId, storeId,
+      name: val('setupOperatorName') || 'Operador',
+      login: val('setupOperatorLogin'), pass: val('setupAdminPass'),
+      role: 'operator', status: 'Ativo',
+    });
+  }
+  state.operationConfigs[companyId] = { tolerance: 5, criticalDivergence: 20, mode: 'Diário', receiver: '', allowed: '', message: '' };
+  state.modules[companyId] = {
+    admin: { ...defaultModuleConfig('admin'), adminClosing: false },
+    operator: defaultModuleConfig('operator'),
+  };
+  addAudit('Cadastro de cliente', name);
+  clearClientSetup();
+  save();
+  renderAll();
+  alert('Cliente cadastrado com empresa, loja e acessos iniciais.');
+}
+
+function clearClientSetup() {
+  ['setupCompanyName','setupCompanyLegal','setupCompanyCnpj','setupAdminName','setupAdminLogin',
+   'setupOperatorName','setupOperatorLogin','setupStoreName','setupStoreCode','setupNotes'].forEach(clear);
+  setVal('setupAdminPass', '');
+  setVal('setupStoreFund', 100);
+}
+
+function toggleCompany(id) {
+  const c = state.companies.find((x) => x.id === id);
+  if (!c) return;
+  c.status = c.status === 'Inativa' ? 'Ativa' : 'Inativa';
+  addAudit(`Empresa ${c.status === 'Inativa' ? 'inativada' : 'ativada'}`, c.name);
+  save();
+  renderAll();
+}
+
+function deleteCompany(id) {
+  if (!confirm('Excluir empresa e todos os dados vinculados?')) return;
+  state.companies = state.companies.filter((c) => c.id !== id);
+  state.stores = state.stores.filter((s) => s.companyId !== id);
+  state.users = state.users.filter((u) => u.companyId !== id);
+  state.rules = state.rules.filter((r) => r.companyId !== id);
+  state.closings = state.closings.filter((c) => c.companyId !== id);
+  delete state.operationConfigs[id];
+  delete state.modules[id];
+  save();
+  renderAll();
+}
+
+/* --- CRUD — Lojas --- */
+async function createStore() {
+  const cid = val('storeCompany');
+  const name = val('storeName').trim();
+  if (!cid) return alert('Selecione a empresa.');
+  if (!name) return alert('Informe o nome da loja.');
+  const code = val('storeCode').trim();
+  const exists = state.stores.some((s) =>
+    s.companyId === cid &&
+    (s.name.toLowerCase() === name.toLowerCase() ||
+     (code && String(s.code).toLowerCase() === code.toLowerCase()))
+  );
+  if (exists) return alert('Já existe uma loja com este nome ou código nesta empresa.');
+  const store = {
+    id: uid('s'), companyId: cid, name, code,
+    cashType: val('storeCashType') || 'Caixa diário',
+    standardFund: Number(val('storeStandardFund')) || 0,
+    status: val('storeStatus') || 'Ativa',
+  };
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      const row = await createStoreRecord(store);
+      store.id = row.id;
+    } catch (e) {
+      return alert(`Erro ao salvar loja no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção. Configure o Supabase antes de cadastrar lojas.');
+  }
+  state.stores.push(store);
+  ['storeName','storeCode'].forEach(clear);
+  setVal('storeStandardFund', 100);
+  addAudit('Cadastro de loja', name);
+  save();
+  renderAll();
+}
+
+function updateStoreFund(id, value) {
+  const s = state.stores.find((x) => x.id === id);
+  if (!s) return;
+  const old = s.standardFund;
+  s.standardFund = Number(value) || 0;
+  addAudit('Alteração de fundo padrão', `${s.name}: ${money(old)} → ${money(s.standardFund)}`);
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    updateStore(s.id, s).catch((e) => alert(`Erro ao atualizar fundo no Supabase: ${e.message}`));
+  }
+  save();
+  renderAll();
+}
+
+function deleteStore(id) {
+  if (!confirm('Excluir loja e fechamentos vinculados?')) return;
+  state.stores = state.stores.filter((s) => s.id !== id);
+  state.closings = state.closings.filter((c) => c.storeId !== id);
+  state.users.forEach((u) => { if (u.storeId === id) u.storeId = null; });
+  save();
+  renderAll();
+}
+
+/* --- CRUD — Usuários --- */
+function createUserFromMaster() {
+  const cid = val('opCompany');
+  const roleNew = val('newUserRole') || 'operator';
+  if (!cid) return alert('Selecione a empresa.');
+  if (!val('opName') || !val('opLogin')) return alert('Informe nome e login.');
+  if (!DEV_LOCAL_MODE) {
+    return alert('Em produção, crie usuários pelo Supabase Auth e vincule-os na tabela profiles.');
+  }
+  if (state.users.some((u) => String(u.login).toLowerCase() === val('opLogin').toLowerCase())) {
+    return alert('Já existe usuário com este login.');
+  }
+  const storeId = roleNew === 'operator' ? val('opStore') : null;
+  if (roleNew === 'operator' && !storeId) return alert('Selecione a loja do operador.');
+  state.users.push({
+    id: uid('u'), companyId: cid, storeId,
+    name: val('opName'), login: val('opLogin'),
+    pass: val('opPass'),
+    role: roleNew, status: 'Ativo',
+  });
+  ['opName','opLogin'].forEach(clear);
+  setVal('opPass', '');
+  addAudit('Cadastro de usuário', val('opLogin'));
+  save();
+  renderAll();
+}
+
+function loadUserToEdit() {
+  const u = state.users.find((x) => x.id === val('userManageSelect'));
+  if (!u) return;
+  setVal('editUserName', u.name);
+  setVal('editUserLogin', u.login);
+  setVal('editUserRole', u.role);
+  setVal('editUserStatus', u.status || 'Ativo');
+  setVal('editUserPass', '');
+  fillEditUserStore();
+  setVal('editUserStore', u.storeId || '');
+}
+
+async function saveUserEdit() {
+  const u = state.users.find((x) => x.id === val('userManageSelect'));
+  if (!u) return alert('Selecione um usuário.');
+  u.name = val('editUserName');
+  u.login = val('editUserLogin');
+  u.role = val('editUserRole');
+  u.status = val('editUserStatus') || 'Ativo';
+  u.storeId = u.role === 'operator' ? val('editUserStore') : null;
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await updateProfile(u.id, u);
+    } catch (e) {
+      return alert(`Erro ao atualizar profile no Supabase: ${e.message}`);
+    }
+  } else if (DEV_LOCAL_MODE && val('editUserPass')) {
+    u.pass = val('editUserPass');
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para atualizar usuários.');
+  }
+  addAudit('Edição de usuário', u.login);
+  save();
+  renderAll();
+  alert('Usuário atualizado.');
+}
+
+function resetSelectedUserPassword() {
+  const u = state.users.find((x) => x.id === val('userManageSelect'));
+  if (!u) return alert('Selecione um usuário.');
+  if (!DEV_LOCAL_MODE) {
+    return alert('Em produção, redefina a senha pelo Supabase Auth.');
+  }
+  u.pass = '';
+  addAudit('Reset de senha', u.login);
+  save();
+  alert('Senha local removida. Defina uma nova senha no modo de desenvolvimento.');
+}
+
+function deleteSelectedUser() {
+  const id = val('userManageSelect');
+  if (!id) return alert('Selecione um usuário.');
+  if (!confirm('Excluir este usuário?')) return;
+  state.users = state.users.filter((u) => u.id !== id);
+  save();
+  renderAll();
+}
+
+function deleteUser(id) {
+  if (!confirm('Excluir usuário?')) return;
+  state.users = state.users.filter((u) => u.id !== id);
+  save();
+  renderAll();
+}
+
+/* --- CRUD — Regras --- */
+function createRule() {
+  const cid = val('ruleCompany');
+  if (!cid || !val('ruleText')) return alert('Selecione a empresa e informe a regra.');
+  const rule = { id: uid('r'), companyId: cid, type: val('ruleType'), text: val('ruleText') };
+  state.rules.push(rule);
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    createOperationRule(rule).then((row) => { if (row?.id) rule.id = row.id; }).catch((e) => alert(`Erro ao salvar regra no Supabase: ${e.message}`));
+  }
+  clear('ruleText');
+  addAudit('Cadastro de regra', companyName(cid));
+  save();
+  renderAll();
+}
+
+function deleteRule(id) {
+  if (!confirm('Excluir regra?')) return;
+  state.rules = state.rules.filter((r) => r.id !== id);
+  save();
+  renderAll();
+}
+
+/* --- Implantação --- */
+function saveImplantStep() {
+  const cid = val('implantCompany');
+  if (!cid) return alert('Selecione a empresa.');
+  state.implant.push({
+    id: uid('i'), companyId: cid,
+    step: val('implantStep'), status: val('implantStatus'),
+    note: val('implantNote'), date: todayBR(),
+  });
+  clear('implantNote');
+  save();
+  renderAll();
+}
+
+/* --- Configuração operacional --- */
+function saveOperationConfig() {
+  const cid = val('operationCompany');
+  if (!cid) return alert('Selecione a empresa.');
+  state.operationConfigs[cid] = {
+    tolerance: Number(val('operationTolerance')) || 5,
+    criticalDivergence: Number(val('operationCriticalDivergence')) || 20,
+    mode: val('operationMode') || 'Diário',
+    receiver: val('operationReceiver'),
+    allowed: val('operationAllowed'),
+    message: val('operationMessage'),
+  };
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    saveOperationConfigToSupabase(cid, state.operationConfigs[cid]).catch((e) => alert(`Erro ao salvar configuração no Supabase: ${e.message}`));
+  }
+  addAudit('Configuração operacional', companyName(cid));
+  save();
+  renderAll();
+}
+
+/* --- Opções de seleção --- */
+function addSelectOption() {
+  const key = val('optionCategory');
+  const value = val('optionNewValue').trim();
+  if (!key || !value) return alert('Selecione o campo e informe a opção.');
+  state.selectOptions[key] = state.selectOptions[key] || [];
+  if (!state.selectOptions[key].includes(value)) state.selectOptions[key].push(value);
+  clear('optionNewValue');
+  save();
+  renderAll();
+}
+
+function removeSelectOption(key, value) {
+  state.selectOptions[key] = (state.selectOptions[key] || []).filter((v) => v !== value);
+  save();
+  renderAll();
+}
+
+function resetSelectOptions() {
+  if (!confirm('Restaurar opções padrão?')) return;
+  state.selectOptions = defaultSelectOptions();
+  save();
+  renderAll();
+}
+
+/* --- Backup --- */
+function exportBackup() {
+  downloadFile(`backup_caixa5x_${todayISO()}.json`, JSON.stringify(state, null, 2), 'application/json;charset=utf-8');
+}
+
+function importBackup() {
+  const f = $('backupFile')?.files?.[0];
+  if (!f) return alert('Selecione um arquivo JSON.');
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      state = JSON.parse(reader.result);
+      normalizeState();
+      save();
+      renderAll();
+      alert('Backup restaurado com sucesso.');
+    } catch { alert('Arquivo inválido. Verifique o formato JSON.'); }
+  };
+  reader.readAsText(f);
+}
+
+function resetSystem() {
+  if (!confirm('ATENÇÃO: Isto apagará todos os dados. Confirmar?')) return;
+  state = defaultState();
+  save();
+  renderAll();
+}
+
+/* --- Selects (fill) --- */
+function storeOptionsForCompany(companyId) {
+  return state.stores
+    .filter((s) => !companyId || s.companyId === companyId)
+    .map((s) => [s.id, s.name]);
+}
+
+function setOptions(id, rows, placeholder = 'Selecione') {
+  const el = $(id); if (!el) return;
+  const current = el.value;
+  el.innerHTML = `<option value="">${placeholder}</option>` +
+    rows.map(([v, label]) => `<option value="${esc(v)}">${esc(label)}</option>`).join('');
+  if ([...el.options].some((o) => o.value === current)) el.value = current;
+}
+
+function fillSelects() {
+  if (!state) return;
+  const companies = visibleCompanies().map((c) => [c.id, c.name]);
+  [
+    'storeCompany','opCompany','ruleCompany','implantCompany','operationCompany',
+    'ruleFilterCompany','moduleCompany','reportCompany','masterExtractCompany',
+    'masterMovementCompanyFilter','masterDivergenceCompanyFilter',
+    'userManageCompany','usersCompanyFilter',
+  ].forEach((id) => setOptions(id, companies));
+
+  fillStoreSelect();
+  fillClosingStoreSelect();
+  fillReportStore();
+  fillMasterExtractStore();
+  fillMasterMovementStore();
+  fillMasterDivergenceStore();
+  fillUserManageSelect();
+  fillClientReportStore();
+}
+
+function fillStoreSelect() {
+  const cid = val('opCompany');
+  setOptions('opStore', state.stores.filter((s) => !cid || s.companyId === cid).map((s) => [s.id, s.name]));
+}
+function fillClosingStoreSelect() {
+  const stores = visibleStores().filter((s) => s.status !== 'Inativa');
+  const cur = val('closingStore');
+  const el = $('closingStore'); if (!el) return;
+  el.innerHTML = stores.map((s) => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+  if (cur && stores.some((s) => s.id === cur)) el.value = cur;
+  if (!el.value && stores[0]) el.value = stores[0].id;
+  fillClosingResponsible5X();
+}
+function fillClosingResponsible5X() {
+  const storeId = val('closingStore');
+  const store = state.stores.find((s) => s.id === storeId);
+  const users = state.users.filter((u) =>
+    u.companyId === store?.companyId &&
+    (!u.storeId || u.storeId === storeId) &&
+    u.status !== 'Inativo'
+  );
+  const el = $('closingResponsible'); if (!el) return;
+  const cur = el.value;
+  el.innerHTML = '<option value="">Selecione o responsável</option>' +
+    users.map((u) => `<option>${esc(u.name)}</option>`).join('');
+  if (cur && [...el.options].some((o) => o.value === cur)) el.value = cur;
+}
+function fillReportStore() { setOptions('reportStore', storeOptionsForCompany(val('reportCompany')), 'Todas'); }
+function fillClientReportStore() { setOptions('clientReportStore', storeOptionsForCompany(currentUser?.companyId), 'Todas'); }
+function fillMasterExtractStore() { setOptions('masterExtractStore', storeOptionsForCompany(val('masterExtractCompany')), 'Todas'); }
+function fillMasterMovementStore() { setOptions('masterMovementStoreFilter', storeOptionsForCompany(val('masterMovementCompanyFilter')), 'Todas'); }
+function fillMasterDivergenceStore() { setOptions('masterDivergenceStoreFilter', storeOptionsForCompany(val('masterDivergenceCompanyFilter')), 'Todas'); }
+function fillUserManageSelect() {
+  const cid = val('userManageCompany');
+  setOptions('userManageSelect', state.users.filter((u) => !cid || u.companyId === cid).map((u) => [u.id, `${u.name} — ${u.login}`]));
+}
+function fillEditUserStore() {
+  const uidVal = val('userManageSelect');
+  const user = state.users.find((u) => u.id === uidVal);
+  const roleEdit = val('editUserRole');
+  setOptions('editUserStore', roleEdit === 'operator' ? storeOptionsForCompany(user?.companyId || val('userManageCompany')) : [], 'Sem loja');
+}
+function toggleUserStore() {
+  const isAdmin = val('newUserRole') === 'admin';
+  const opStore = $('opStore')?.closest('.field');
+  if (opStore) opStore.style.display = isAdmin ? 'none' : '';
+}
+
+Object.assign(window, {
+  state: null, isBooting: true,
+  DEV_LOCAL_MODE, USE_LOCAL_FALLBACK, NORMALIZED_TABLES,
+  defaultSelectOptions, defaultState, normalizeState, load, save, autosave, addAudit,
+  setupRealtimeSync, stopRealtimeSync, manualRefresh,
+  getCompanies, createCompany, updateCompany, inactivateCompany,
+  getStores, createStoreRecord, updateStore,
+  getProfiles, getCurrentProfile, updateProfile,
+  getModulePermissions, saveModulePermissions,
+  getOperationRules, createOperationRule, updateOperationRule,
+  getOperationConfig, saveOperationConfigToSupabase,
+  getClosingsByScope, createClosing, updateClosing, getPreviousClosing, checkDuplicateClosing,
+  createClosingEntries, createClosingExpenses, getClosingEntries, getClosingExpenses,
+  createCashOpeningAdjustment, getCashOpeningAdjustment,
+  createDivergenceReview, getPendingDivergenceReviews, updateDivergenceReview,
+  logAudit,
+  companyName, storeName, visibleCompanies, visibleStores, cfg,
+  saveClientSetup, clearClientSetup, toggleCompany, deleteCompany,
+  createStore, updateStoreFund, deleteStore,
+  createUserFromMaster, loadUserToEdit, saveUserEdit, resetSelectedUserPassword,
+  deleteSelectedUser, deleteUser,
+  createRule, deleteRule, saveImplantStep, saveOperationConfig,
+  addSelectOption, removeSelectOption, resetSelectOptions,
+  exportBackup, importBackup, resetSystem,
+  storeOptionsForCompany, setOptions, fillSelects,
+  fillStoreSelect, fillClosingStoreSelect, fillClosingResponsible5X,
+  fillReportStore, fillClientReportStore, fillMasterExtractStore,
+  fillMasterMovementStore, fillMasterDivergenceStore,
+  fillUserManageSelect, fillEditUserStore, toggleUserStore,
+});
+
+Object.defineProperty(window, 'state', {
+  get: () => state,
+  set: (v) => { state = v; },
+  configurable: true,
+});
+Object.defineProperty(window, 'isBooting', {
+  get: () => isBooting,
+  set: (v) => { isBooting = v; },
+  configurable: true,
+});
