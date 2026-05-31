@@ -13,9 +13,6 @@ async function init() {
   /* Carrega dados */
   await load();
 
-  /* Renderiza o contador de caixa e monta a UI base */
-  renderCashCounter();
-
   /* Fecha eventos globais */
   bindGlobalEvents();
 
@@ -30,6 +27,7 @@ async function init() {
   fillSelects();
   renderAll();
   bindCurrencyInputs();
+  if (window.bindClosingEvents) bindClosingEvents();
 
   /* Status de conexão */
   text('autosaveStatus', sb ? 'Supabase conectado' : 'Modo local');
@@ -53,6 +51,8 @@ async function init() {
       setupMenu();
       setupRealtimeSync();
       renderAll();
+      bindCurrencyInputs();
+      if (window.bindClosingEvents) bindClosingEvents();
       const page = role === 'master' ? 'dashboard' : firstAllowedPage();
       if (page) showPage(page, document.querySelector(`.nav button[data-page="${page}"]`));
     }
@@ -121,9 +121,10 @@ Object.assign(window, {
   renderMasterMovementsExtract: () => renderFechamentos(),
 
   /* Fechamento */
-  addEntry, addExpense, removeLaunchRow, calc, syncCoinCountTotal,
+  addEntry, addExpense, removeLaunchRow, calc,
   suggestInitialBalance, suggestedTransfer, useSuggestedTransfer,
-  confirmTransfer, saveClosing, saveOpeningAdjustment, reviewDivergence, handleAttachments,
+  bindClosingEvents,
+  confirmTransfer, handleSaveClosingClick, saveClosing, saveOpeningAdjustment, reviewDivergence, handleAttachments,
   /* Formatação — usadas por onblur/onfocus inline */
   formatCurrencyInput, selectOnFocus, parseCurrencyBR, bindCurrencyInputs,
 

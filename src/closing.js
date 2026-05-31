@@ -7,12 +7,6 @@
      finalAfterTransfer  = cashBeforeTransfer - transfer
      fundDivergence      = finalAfterTransfer - standardFund
      status              = f(fundDivergence, tolerance, criticalDivergence)
-
-   AUXILIAR DE CONTAGEM (informativo — não afeta cálculo oficial):
-     auxBills = soma das cédulas no simulador
-     auxCoins = soma das moedas no simulador
-     auxTotal = auxBills + auxCoins
-     physicalDivergence = auxTotal - finalAfterTransfer  (informativo)
 ============================================================ */
 
 let closingAttachments = [];
@@ -21,7 +15,16 @@ let closingAttachments = [];
    HELPERS DE SELEÇÃO
 ================================================================ */
 function selectedStore() {
-  return state.stores.find((s) => s.id === val('closingStore')) || visibleStores()[0];
+  const stores = visibleStores();
+  const selectedId = val('closingStore');
+  const store = stores.find((s) => s.id === selectedId) || stores[0] || null;
+  if (store && !selectedId) setVal('closingStore', store.id);
+  return store;
+}
+
+function safeMoneyNumber(value) {
+  const parsed = typeof value === 'string' ? parseCurrencyBR(value) : Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 const SHIFT_ORDER = { 'Manhã': 1, 'Tarde': 2, 'Noite': 3, 'Integral': 4, 'Outro': 5 };
@@ -83,15 +86,6 @@ function openingReference() {
 function totalEntries()  { return all('.entry').reduce((s, e)  => s + parseCurrencyBR(e.value), 0); }
 function totalExpenses() { return all('.expense').reduce((s, e) => s + parseCurrencyBR(e.value), 0); }
 
-/* Simulador auxiliar */
-function cashCounterTotal() {
-  return all('.cash-count').reduce((s, e) => s + (Number(e.value)||0) * (Number(e.dataset.value)||0), 0);
-}
-function coinCounterTotal() {
-  return all('.cash-count')
-    .filter((e) => Number(e.dataset.value) <= 1)
-    .reduce((s, e) => s + (Number(e.value)||0) * (Number(e.dataset.value)||0), 0);
-}
 
 /* ================================================================
    FUNÇÃO CENTRAL DE CÁLCULO — única fonte de verdade
@@ -101,16 +95,16 @@ function getClosingCalculation() {
   const store = selectedStore();
   const cfgC  = cfg(store?.companyId);
 
-  const initialCash       = num('initial');
-  const entriesTotal      = totalEntries();
-  const expensesTotal     = totalExpenses();
+  const initialCash       = safeMoneyNumber(num('initial'));
+  const entriesTotal      = safeMoneyNumber(totalEntries());
+  const expensesTotal     = safeMoneyNumber(totalExpenses());
   const cashBeforeTransfer = initialCash + entriesTotal - expensesTotal;
-  const transferAmount    = num('transfer');
+  const transferAmount    = safeMoneyNumber(num('transfer'));
   const finalAT           = cashBeforeTransfer - transferAmount;
-  const standardFund      = Number(store?.standardFund || 0);
+  const standardFund      = safeMoneyNumber(store?.standardFund);
   const fundDivergence    = finalAT - standardFund;
-  const tolerance         = Number(cfgC?.tolerance || 5);
-  const critDivergence    = Number(cfgC?.criticalDivergence || 20);
+  const tolerance         = safeMoneyNumber(cfgC?.tolerance ?? 5);
+  const critDivergence    = safeMoneyNumber(cfgC?.criticalDivergence);
 
   /* Status oficial */
   const absFundDiv = Math.abs(fundDivergence);
@@ -126,12 +120,6 @@ function getClosingCalculation() {
   const openRef       = openingReference();
   const openingDiv    = initialCash - Number(openRef.amount || 0);
 
-  /* Auxiliar de contagem (informativo) */
-  const auxCoins      = coinCounterTotal();
-  const auxBills      = cashCounterTotal() - auxCoins;
-  const auxTotal      = cashCounterTotal();
-  const physicalDiv   = auxTotal - finalAT;
-
   return {
     store, cfgC,
     initialCash,
@@ -146,12 +134,8 @@ function getClosingCalculation() {
     criticalDivergence: critDivergence,
     status,
     openingDivergence: openingDiv,
-    openingRef,
+    openingRef: openRef,
     suggestedTransfer: Math.max(0, cashBeforeTransfer - standardFund),
-    auxBills,
-    auxCoins,
-    auxTotal,
-    physicalDivergence: physicalDiv,
   };
 }
 
@@ -159,16 +143,16 @@ function getClosingCalculation() {
 function expectedCash()       { return getClosingCalculation().cashBeforeTransfer; }
 function finalAfterTransfer() { return getClosingCalculation().finalAfterTransfer; }
 function fundDivergence()     { return getClosingCalculation().fundDivergence; }
-function physicalCount()      { return getClosingCalculation().auxTotal; }
-function physicalDivergence() { return getClosingCalculation().physicalDivergence; }
 function suggestedTransfer()  { return getClosingCalculation().suggestedTransfer; }
 function openingDivergence()  { return getClosingCalculation().openingDivergence; }
 
 function closingStatus(diff, companyId) {
   const c   = cfg(companyId);
   const abs = Math.abs(diff);
-  if (abs <= Math.abs(Number(c.tolerance || 0)))                                   return 'OK';
-  if (c.criticalDivergence && abs > Math.abs(Number(c.criticalDivergence || 20))) return 'Crítico';
+  const tolerance = Math.abs(safeMoneyNumber(c.tolerance));
+  const critical = Math.abs(safeMoneyNumber(c.criticalDivergence));
+  if (abs <= tolerance) return 'OK';
+  if (critical > 0 && abs > critical) return 'Crítico';
   return 'Divergência';
 }
 
@@ -196,40 +180,41 @@ function useSuggestedTransfer() {
   calc();
 }
 
-/* ================================================================
-   SINCRONISMO DO AUXILIAR DE CONTAGEM
-   Atualiza apenas os displays do auxiliar.
-   NÃO preenche nenhum campo do formulário principal.
-================================================================ */
-function syncCoinCountTotal() {
-  const cc = getClosingCalculation();
-  all('.cash-count-item').forEach((item) => {
-    const input = item.querySelector('.cash-count');
-    const total = item.querySelector('.cash-count-total');
-    if (input && total) total.textContent = money((Number(input.value) || 0) * (Number(input.dataset.value) || 0));
+function bindClosingEvents() {
+  if (window.__closingEventsBound) return;
+  window.__closingEventsBound = true;
+
+  document.addEventListener('input', (e) => {
+    if (!e.target.closest('#closing')) return;
+    if (e.target.matches('#initial,#transfer,.entry,.expense,.entry-desc,.expense-desc')) calc();
   });
-  text('cashCounterTotal', money(cc.auxTotal));  /* compat */
-  text('auxBillsView',     money(cc.auxBills));
-  text('auxCoinsView',     money(cc.auxCoins));
-  text('auxTotalView',     money(cc.auxTotal));
-  text('physicalDivergenceView', money(cc.physicalDivergence));
-  const physEl = $('physicalDivergenceStatus');
-  if (physEl) {
-    const abs = Math.abs(cc.physicalDivergence);
-    physEl.className   = `status ${abs <= 0.01 ? 'success' : 'warning'}`;
-    physEl.textContent = abs <= 0.01 ? 'Confere' : cc.physicalDivergence > 0 ? 'Sobra' : 'Falta';
-  }
+
+  document.addEventListener('change', (e) => {
+    if (!e.target.closest('#closing')) return;
+    if (e.target.matches('#closingStore')) {
+      fillClosingResponsible5X();
+      suggestInitialBalance();
+      calc();
+      return;
+    }
+    if (e.target.matches('#closingDate,#closingShift')) {
+      suggestInitialBalance();
+      calc();
+      return;
+    }
+    if (e.target.matches('#closingResponsible,.expense-category')) calc();
+  });
+
 }
+
 
 /* ================================================================
    CÁLCULO EM TEMPO REAL
 ================================================================ */
 function calc() {
-  renderCashCounter();
   ensureExpenseCategories();
 
   const cc  = getClosingCalculation();
-  const c   = cc.cfgC;
   const ref = cc.openingRef;
 
   /* Conferência de abertura */
@@ -241,12 +226,11 @@ function calc() {
   if (openAlert) {
     const abs = Math.abs(cc.openingDivergence);
     openAlert.style.display = abs > 0.009 ? '' : 'none';
-    openAlert.className     = `kpi-alert ${abs > cc.criticalDivergence ? 'danger' : 'warning'}`;
+    openAlert.className     = `kpi-alert ${cc.criticalDivergence > 0 && abs > cc.criticalDivergence ? 'danger' : 'warning'}`;
     openAlert.textContent   = 'O saldo inicial não bate com o último saldo fechado.';
   }
 
   /* Bloco 1 — Saldo em caixa (passo a passo) */
-  text('initialCashView', money(cc.initialCash));
   text('totalEntries',    money(cc.entriesTotal));
   text('totalExpenses',   money(cc.expensesTotal));
   text('expectedCash',    money(cc.cashBeforeTransfer));
@@ -258,25 +242,12 @@ function calc() {
   /* Bloco 3 — Resultado */
   text('standardFundView',  money(cc.standardFund));
   text('fundDivergenceView',money(cc.fundDivergence));
-  text('toleranceView',     money(cc.tolerance));
 
   const statusEl = $('closingStatusView');
   if (statusEl) {
     const cls = cc.status === 'OK' ? 'success' : cc.status === 'Crítico' ? 'danger' : 'warning';
     statusEl.className   = `status ${cls}`;
     statusEl.textContent = cc.status;
-  }
-
-  /* Bloco 4 — Auxiliar de contagem */
-  text('auxBillsView', money(cc.auxBills));
-  text('auxCoinsView', money(cc.auxCoins));
-  text('auxTotalView', money(cc.auxTotal));
-  text('physicalDivergenceView', money(cc.physicalDivergence));
-  const physEl = $('physicalDivergenceStatus');
-  if (physEl) {
-    const abs = Math.abs(cc.physicalDivergence);
-    physEl.className   = `status ${abs <= 0.01 ? 'success' : 'warning'}`;
-    physEl.textContent = abs <= 0.01 ? 'Confere' : cc.physicalDivergence > 0 ? 'Sobra' : 'Falta';
   }
 
   /* Leitura automática */
@@ -297,7 +268,6 @@ function calc() {
     `${money(cc.finalAfterTransfer)} (saldo final). Fundo: ${money(cc.standardFund)}. Dif: ${money(cc.fundDivergence)}.`
   );
 
-  bindCurrencyInputs();
 }
 
 /* ================================================================
@@ -315,6 +285,8 @@ function addEntry() {
       </div>
       <button class="btn btn-icon" onclick="removeLaunchRow(this)" title="Remover">×</button>
     </div>`);
+  bindCurrencyInputs($('entries'));
+  calc();
 }
 
 function addExpense() {
@@ -328,6 +300,8 @@ function addExpense() {
       </div>
       <button class="btn btn-icon" onclick="removeLaunchRow(this)" title="Remover">×</button>
     </div>`);
+  bindCurrencyInputs($('expenses'));
+  calc();
 }
 
 function removeLaunchRow(btn) { btn.closest('.launch-row')?.remove(); calc(); }
@@ -339,26 +313,6 @@ function ensureExpenseCategories(root = document) {
     const opts = (state.selectOptions?.expenseCategories || []).map((v) => `<option>${esc(v)}</option>`).join('');
     vf?.insertAdjacentHTML('beforebegin', `<div class="field"><label>Categoria</label><select class="expense-category">${opts}</select></div>`);
   });
-}
-
-function renderCashCounter() {
-  const box = $('cashCounterGrid');
-  if (!box || box.dataset.ready) return;
-  const denoms = [
-    ['200','Cédula R$ 200'],['100','Cédula R$ 100'],['50','Cédula R$ 50'],
-    ['20','Cédula R$ 20'],['10','Cédula R$ 10'],['5','Cédula R$ 5'],['2','Cédula R$ 2'],
-    ['1','Moeda R$ 1,00'],['0.50','Moeda R$ 0,50'],['0.25','Moeda R$ 0,25'],
-    ['0.10','Moeda R$ 0,10'],['0.05','Moeda R$ 0,05'],['0.01','Moeda R$ 0,01'],
-  ];
-  box.innerHTML = denoms.map(([v, l]) =>
-    `<div class="cash-count-item">
-      <label>${l}</label>
-      <input class="cash-count" type="number" min="0" step="1" value="0" data-value="${v}"
-        oninput="syncCoinCountTotal()"/>
-      <strong class="cash-count-total">R$ 0,00</strong>
-    </div>`
-  ).join('');
-  box.dataset.ready = '1';
 }
 
 /* ================================================================
@@ -470,13 +424,45 @@ function confirmTransfer() {
   if (badge) badge.style.display = '';
   const btn = $('confirmTransferBtn');
   if (btn) btn.textContent = '✓ Confirmado';
+  calc();
 }
 
 /* ================================================================
    SALVAR FECHAMENTO
 ================================================================ */
+async function handleSaveClosingClick(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  const btn = $('saveClosingBtn');
+  const originalText = btn ? btn.textContent : '✓ Realizar fechamento';
+
+  try {
+    console.log('[Fechamento] Clique em Realizar fechamento');
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+    }
+
+    await saveClosing();
+  } catch (e) {
+    console.error('[Fechamento] Erro inesperado ao salvar:', e);
+    alert('Erro inesperado ao realizar fechamento: ' + (e.message || e));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  }
+}
+
 async function saveClosing() {
+  console.log('[saveClosing] Iniciando salvamento');
   const cc    = getClosingCalculation();
+  console.log('[saveClosing] Cálculo:', cc);
   const store = cc.store;
 
   if (!store) return alert('Selecione uma loja cadastrada.');
@@ -491,7 +477,10 @@ async function saveClosing() {
 
   const shift       = selectedShift();
   const responsible = val('closingResponsible') || currentUser?.name || '';
-  if (!responsible) return alert('Selecione o responsável pelo fechamento.');
+  if (!responsible) {
+    console.warn('[saveClosing] Responsável vazio', { closingResponsible: val('closingResponsible'), currentUser });
+    return alert('Selecione o responsável pelo fechamento ou verifique o usuário logado.');
+  }
 
   /* Validar entradas/saídas */
   const entryRows   = all('#entries .launch-row');
@@ -529,12 +518,6 @@ async function saveClosing() {
     closingType = 'Retificado'; originalClosingId = existing.id;
   }
 
-  /* Divergência crítica exige observação */
-  if (cc.status === 'Crítico' && !val('closingNotes').trim())
-    return alert('Divergência crítica. Preencha as observações antes de salvar.');
-  if (Math.abs(cc.openingDivergence) > cc.tolerance && !val('closingNotes').trim())
-    return alert('Divergência de abertura acima da tolerância. Preencha as observações.');
-
   /* Montar itens */
   const entries = entryRows
     .map((row) => ({
@@ -550,6 +533,14 @@ async function saveClosing() {
     })).filter((x) => x.value > 0);
 
   const openRef = cc.openingRef;
+  const attachmentUploadQueue = closingAttachments.slice();
+  const attachmentMetadata = attachmentUploadQueue.map((f) => ({
+    name: f.name,
+    size: f.size,
+    type: f.type,
+    lastModified: f.lastModified,
+    url: f.url || '',
+  }));
 
   /* Objeto do fechamento — usa cc como fonte única */
   const closing = {
@@ -560,8 +551,6 @@ async function saveClosing() {
     shift, responsible,
     operator:                   currentUser?.name || '',
     initial:                    cc.initialCash,
-    coinsTotal:                 cc.auxCoins,
-    cashCounterTotal:           cc.auxTotal,
     entries:                    cc.entriesTotal,
     entryItems:                 entries,
     expenses:                   cc.expensesTotal,
@@ -580,11 +569,9 @@ async function saveClosing() {
     openingAdjustmentId:        openRef.adjustment?.id || null,
     diff:                       cc.fundDivergence,
     fundDivergence:             cc.fundDivergence,
-    physicalCount:              cc.auxTotal,
-    physicalDivergence:         cc.physicalDivergence,
     balance:                    cc.fundDivergence,
     notes:                      val('closingNotes'),
-    attachments:                closingAttachments.slice(),
+    attachments:                attachmentMetadata,
     reviewStatus:               cc.status !== 'OK' ? 'Pendente de revisão' : 'Sem divergência',
     status:                     cc.status,
     type:                       closingType, originalClosingId,
@@ -596,7 +583,10 @@ async function saveClosing() {
 
   if (sb && !USE_LOCAL_FALLBACK && currentUser?.authId) {
     try {
+      closing.attachments = attachmentUploadQueue;
+      console.log('[saveClosing] Persistindo fechamento:', closing);
       await createClosing(closing);
+      console.log('[saveClosing] Fechamento persistido com sucesso:', closing.id);
     } catch (e) {
       console.error('[saveClosing] Falha Supabase:', e);
       state.closings = state.closings.filter((x) => x.id !== closing.id);
@@ -607,7 +597,8 @@ async function saveClosing() {
   } else if (!DEV_LOCAL_MODE) {
     state.closings = state.closings.filter((x) => x.id !== closing.id);
     state.divergenceReviews = (state.divergenceReviews || []).filter((r) => r.closingId !== closing.id);
-    return alert('Supabase + sessão ativa são obrigatórios em produção.');
+    renderAll();
+    return alert('Supabase + sessão ativa são obrigatórios em produção. Faça login novamente.');
   }
 
   addAudit(
@@ -623,7 +614,6 @@ async function saveClosing() {
   );
   all('.entry').forEach((e)      => { e.value = formatCurrencyBR(0); });
   all('.expense').forEach((e)    => { e.value = formatCurrencyBR(0); });
-  all('.cash-count').forEach((e) => { e.value = 0; });
   const hint = $('initialBalanceHint');
   if (hint) hint.style.display = 'none';
   const badge = $('transferConfirmedBadge');
@@ -631,13 +621,8 @@ async function saveClosing() {
   const cBtn = $('confirmTransferBtn');
   if (cBtn) cBtn.textContent = 'Confirmar repasse';
 
-  /* Resetar auxiliar de contagem */
-  text('auxBillsView', money(0));
-  text('auxCoinsView', money(0));
-  text('auxTotalView', money(0));
-  text('cashCounterTotal', money(0));
-
-  save(); renderAll(); calc();
+  save();
+  renderAll();
   alert(`Fechamento ${closingType === 'Retificado' ? 'retificado' : 'salvo'} com sucesso!`);
 }
 
@@ -674,14 +659,16 @@ Object.assign(window, {
   closingAttachments,
   getClosingCalculation,
   selectedStore, totalEntries, totalExpenses,
-  cashCounterTotal, coinCounterTotal,
   expectedCash, finalAfterTransfer, fundDivergence,
-  physicalCount, physicalDivergence, closingStatus,
+  closingStatus,
   openingDivergence, suggestedTransfer, useSuggestedTransfer,
+  bindClosingEvents,
   selectedShift, findPreviousClosing, findOpeningAdjustment, openingReference,
-  syncCoinCountTotal, suggestInitialBalance, calc,
+  suggestInitialBalance, calc,
   addEntry, addExpense, removeLaunchRow,
-  ensureExpenseCategories, renderCashCounter,
-  confirmTransfer, saveClosing, saveOpeningAdjustment, reviewDivergence, createDivergenceReviews,
+  ensureExpenseCategories,
+  confirmTransfer, handleSaveClosingClick, saveClosing, saveOpeningAdjustment, reviewDivergence, createDivergenceReviews,
   handleAttachments, renderAttachments, clearAttachmentsUI,
 });
+
+

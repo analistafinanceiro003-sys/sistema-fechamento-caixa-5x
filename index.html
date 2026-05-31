@@ -816,7 +816,7 @@
           </div>
 
           <div class="btn-row" style="margin-top:16px">
-            <button class="btn btn-brand" id="saveClosingBtn" onclick="saveClosing()">✓ Realizar fechamento</button>
+            <button class="btn btn-brand" id="saveClosingBtn" onclick="handleSaveClosingClick(event)">✓ Realizar fechamento</button>
           </div>
         </div>
 
@@ -830,7 +830,7 @@
             <div class="summary">
               <div class="summary-line"><span>Total de entradas</span><strong id="totalEntries">R$ 0,00</strong></div>
               <div class="summary-line"><span>Total de saídas</span><strong id="totalExpenses">R$ 0,00</strong></div>
-              <div class="summary-line summary-line-highlight"><span>Saldo esperado</span><strong id="expectedCash">R$ 0,00</strong></div>
+              <div class="summary-line summary-line-highlight"><span>Saldo em caixa antes do repasse</span><strong id="expectedCash">R$ 0,00</strong></div>
             </div>
           </div>
 
@@ -850,7 +850,7 @@
               </strong></div>
             </div>
             <div class="btn-row" style="margin-top:10px;gap:8px;align-items:center;flex-wrap:wrap">
-              <button class="btn btn-sm" onclick="useSuggestedTransfer()" title="Preenche o repasse com o valor sugerido">← Usar sugerido</button>
+              <button class="btn btn-sm" onclick="useSuggestedTransfer()" title="Preenche o repasse com o valor sugerido">+ Usar sugerido</button>
               <button class="btn btn-primary" id="confirmTransferBtn" onclick="confirmTransfer()">Confirmar repasse</button>
               <span id="transferConfirmedBadge" class="status success" style="display:none;padding:4px 10px;font-size:13px">✓ Repasse confirmado</span>
             </div>
@@ -869,23 +869,7 @@
             </div>
           </div>
 
-          <!-- Bloco 4: Auxiliar de Contagem -->
-          <div class="conf-block">
-            <div class="conf-block-title">Auxiliar de Contagem</div>
-            <div class="box">
-              <h4>Cédulas e moedas</h4>
-              <div class="cash-counter-grid" id="cashCounterGrid"></div>
-            </div>
-            <div class="summary" style="margin-top:12px">
-              <div class="summary-line"><span>Total em cédulas</span><strong id="auxBillsView">R$ 0,00</strong></div>
-              <div class="summary-line"><span>Total em moedas</span><strong id="auxCoinsView">R$ 0,00</strong></div>
-              <div class="summary-line"><span>Total contado</span><strong id="auxTotalView">R$ 0,00</strong></div>
-              <div class="summary-line"><span>Divergência física informativa</span><strong id="physicalDivergenceView">R$ 0,00</strong></div>
-              <div class="summary-line"><span>Status físico</span><strong class="status info" id="physicalDivergenceStatus">-</strong></div>
-            </div>
-          </div>
-
-          <!-- Bloco 5: Regras e leitura automática -->
+          <!-- Bloco 4: Regras e leitura automatica -->
           <div class="box" style="margin-top:12px"><h4>Regras para este operador</h4><div id="operatorRules"></div></div>
           <div class="box" style="margin-top:10px"><h4>Leitura automática 5X</h4><pre class="closing-insight" id="closingInsight">Preencha os valores para gerar a leitura.</pre></div>
         </div>
@@ -943,3 +927,4 @@
 
 </body>
 </html>
+

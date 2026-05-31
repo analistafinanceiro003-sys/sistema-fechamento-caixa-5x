@@ -9,7 +9,6 @@ function renderAll() {
   try { fillSelects(); } catch(e) { console.warn('fillSelects:', e); }
   try { renderSidebarByPermissions(); } catch(e) { console.warn('renderSidebarByPermissions:', e); }
   try { applyModuleAccess(); } catch(e) { console.warn('applyModuleAccess:', e); }
-  try { renderCashCounter(); } catch(e) { console.warn('renderCashCounter:', e); }
   try { renderMetrics(); } catch(e) { console.warn('renderMetrics:', e); }
   try { renderMasterDashboard(); } catch(e) { console.warn('renderMasterDashboard:', e); }
   try { renderCadastros(); } catch(e) { console.warn('renderCadastros:', e); }
@@ -410,8 +409,4 @@ Object.assign(window, {
   renderAll, renderMetrics, renderMasterDashboard, renderCadastros,
   renderUsersByCompany, renderOperacao, renderFechamentos, renderSistema,
   renderAdminViews, renderOperatorViews, renderModuleManager, switchCentral,
-  /* expõe para onchange inline nos HTMLs */
-  parseCurrencyBR: (v) => parseCurrencyBR(v),
-  formatCurrencyInput: (el) => formatCurrencyInput(el),
-  selectOnFocus: (el) => selectOnFocus(el),
 });
