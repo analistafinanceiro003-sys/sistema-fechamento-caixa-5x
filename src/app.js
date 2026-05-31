@@ -131,3 +131,10 @@ Object.assign(window, {
   exportAuditCSV, exportClientMovementsCSV, exportClientDivergencesCSV,
   exportContaAzulCSV, exportConsolidadoCSV,
 });
+
+/* PWA: registra o service worker com segurança — não bloqueia nem quebra o app */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+  });
+}

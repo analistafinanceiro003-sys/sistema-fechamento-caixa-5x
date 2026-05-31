@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fundo escuro (maskable: cobre toda a área segura) -->
+  <rect width="512" height="512" fill="#050b12"/>
+  <!-- Linha de destaque teal no topo -->
+  <rect x="80" y="108" width="352" height="7" rx="3.5" fill="#00d6b4"/>
+  <!-- "5X" principal em branco -->
+  <text
+    x="256" y="310"
+    font-family="'Arial Black','Helvetica Neue',Arial,sans-serif"
+    font-size="240" font-weight="900"
+    fill="#ffffff"
+    text-anchor="middle">5X</text>
+  <!-- Subtítulo "CAIXA" em teal -->
+  <text
+    x="256" y="388"
+    font-family="Arial,'Helvetica Neue',sans-serif"
+    font-size="46" font-weight="700"
+    fill="#00d6b4"
+    text-anchor="middle" letter-spacing="10">CAIXA</text>
+  <!-- Linha de destaque teal na base -->
+  <rect x="80" y="412" width="352" height="7" rx="3.5" fill="#00d6b4" opacity="0.45"/>
+</svg>

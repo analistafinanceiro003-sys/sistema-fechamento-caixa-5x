@@ -210,6 +210,11 @@ tr:hover td{background:#fafbfc}
 .launch-row{display:grid;grid-template-columns:1.5fr 1fr auto;gap:10px;align-items:end;margin-top:8px}
 .launch-row.expense-row{grid-template-columns:1.5fr 1fr 1fr auto}
 .closing-insight{font-size:13px;color:var(--muted);white-space:pre-wrap;line-height:1.6;font-family:var(--font)}
+/* Campos calculados: display-only, nunca editáveis pelo operador */
+.conf-block .summary-line strong,
+.closing-block .summary-line strong{cursor:default;pointer-events:none;user-select:text}
+/* Garante que nenhum strong dentro dos blocos de conferência receba contenteditable */
+.conf-block strong,.closing-block strong{-webkit-user-modify:read-only}
 
 /* ============================================================
    SIMULADOR DE CÉDULAS
