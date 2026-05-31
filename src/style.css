@@ -12,6 +12,7 @@
 }
 
 *{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
 body{font-family:var(--font);background:var(--bg);color:var(--ink);font-weight:400;letter-spacing:-.01em}
 button,input,select,textarea{font-family:var(--font)}
 .hidden{display:none!important}
@@ -58,14 +59,15 @@ button,input,select,textarea{font-family:var(--font)}
 .app{
   display:none;
   grid-template-columns:268px 1fr;
+  height:100vh;
   min-height:100vh;
+  overflow:hidden;
   transition:grid-template-columns .25s ease;
 }
 .app.sidebar-collapsed{grid-template-columns:0px 1fr}
 
 .sidebar{
-  background:var(--nav);color:#fff;min-height:100vh;
-  position:sticky;top:0;
+  background:var(--nav);color:#fff;height:100vh;min-height:100vh;
   padding:20px 14px;
   display:flex;flex-direction:column;
   overflow:hidden;
@@ -79,7 +81,7 @@ button,input,select,textarea{font-family:var(--font)}
 }
 .brand{display:flex;align-items:center;justify-content:flex-start;margin-bottom:18px;flex-shrink:0}
 .side-logo{display:block;width:150px;max-width:100%;height:auto;object-fit:contain}
-.nav{display:flex;flex-direction:column;gap:4px;overflow-y:auto;overflow-x:hidden;padding-right:2px;flex:1}
+.nav{display:flex;flex-direction:column;gap:4px;overflow-y:auto;overflow-x:hidden;padding-right:2px;flex:1;min-height:0}
 .nav-title{font-size:10px;text-transform:uppercase;color:#7d8da1;font-weight:700;margin:12px 8px 4px;letter-spacing:.5px}
 .nav button{border:1px solid transparent;background:transparent;color:#b4c1d4;padding:10px 12px;border-radius:11px;text-align:left;cursor:pointer;font-weight:600;font-size:13px;transition:all .15s;white-space:nowrap}
 .nav button.active,.nav button:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.07);color:#fff}
@@ -91,7 +93,7 @@ button,input,select,textarea{font-family:var(--font)}
 /* ============================================================
    MAIN / HEADER — botão toggle integrado
 ============================================================ */
-.main{padding:26px;max-width:100%;overflow-x:hidden}
+.main{height:100vh;padding:26px;max-width:100%;overflow-x:hidden;overflow-y:auto}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px;flex-wrap:wrap}
 .top-left{display:flex;align-items:center;gap:12px}
 .top h2{font-size:28px;letter-spacing:-.8px;font-weight:650}
