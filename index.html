@@ -478,11 +478,11 @@
 
       <div class="inner-tab-panel active" id="rel-principal">
         <div class="report-grid">
-          <div class="report-card"><h4>Fechamento por loja</h4><p class="subtle">Saldo inicial, entradas, saídas, repasses, saldo final e divergência por unidade.</p><div class="btn-row"><button class="btn btn-primary" onclick="exportCSV()">Exportar CSV</button></div></div>
-          <div class="report-card"><h4>Divergências do período</h4><p class="subtle">Diferenças por data, loja, responsável e status de revisão.</p><div class="btn-row"><button class="btn" onclick="exportDivergencesCSV()">Exportar CSV</button></div></div>
-          <div class="report-card"><h4>Repasses ao caixa central</h4><p class="subtle">Valores entregues por data, loja, responsável e status.</p><div class="btn-row"><button class="btn" onclick="exportTransfersCSV()">Exportar CSV</button></div></div>
-          <div class="report-card"><h4>Saídas por descrição</h4><p class="subtle">Consolida saídas por categoria, motoboy, compras e outros.</p><div class="btn-row"><button class="btn" onclick="exportExpensesCSV()">Exportar CSV</button></div></div>
-          <div class="report-card"><h4>Auditoria operacional</h4><p class="subtle">Log de ações: fechamentos, usuários, configs e alterações.</p><div class="btn-row"><button class="btn" onclick="exportAuditCSV()">Exportar CSV</button></div></div>
+          <div class="report-card"><h4>Fechamento por loja</h4><p class="subtle">Saldo inicial, entradas, saídas, repasses, saldo final e divergência por unidade.</p><div class="btn-row"><button class="btn btn-primary" onclick="exportCSV()">Exportar CSV</button><button class="btn" onclick="exportFechamentoPDF()">Exportar PDF</button></div></div>
+          <div class="report-card"><h4>Divergências do período</h4><p class="subtle">Diferenças por data, loja, responsável e status de revisão.</p><div class="btn-row"><button class="btn" onclick="exportDivergencesCSV()">Exportar CSV</button><button class="btn" onclick="exportDivergencesPDF()">Exportar PDF</button></div></div>
+          <div class="report-card"><h4>Repasses ao caixa central</h4><p class="subtle">Valores entregues por data, loja, responsável e status.</p><div class="btn-row"><button class="btn" onclick="exportTransfersCSV()">Exportar CSV</button><button class="btn" onclick="exportTransfersPDF()">Exportar PDF</button></div></div>
+          <div class="report-card"><h4>Saídas por descrição</h4><p class="subtle">Consolida saídas por categoria, motoboy, compras e outros.</p><div class="btn-row"><button class="btn" onclick="exportExpensesCSV()">Exportar CSV</button><button class="btn" onclick="exportExpensesPDF()">Exportar PDF</button></div></div>
+          <div class="report-card"><h4>Auditoria operacional</h4><p class="subtle">Log de ações: fechamentos, usuários, configs e alterações.</p><div class="btn-row"><button class="btn" onclick="exportAuditCSV()">Exportar CSV</button><button class="btn" onclick="exportAuditPDF()">Exportar PDF</button></div></div>
         </div>
       </div>
 
@@ -490,7 +490,7 @@
         <div class="report-card" style="max-width:480px">
           <h4>Consolidado por empresa</h4>
           <p class="subtle">Total de entradas, saídas, repasses, saldo final, divergência de fundo e divergência física por empresa no período selecionado.</p>
-          <div class="btn-row"><button class="btn btn-primary" onclick="exportConsolidadoCSV()">Exportar CSV</button></div>
+          <div class="btn-row"><button class="btn btn-primary" onclick="exportConsolidadoCSV()">Exportar CSV</button><button class="btn" onclick="exportConsolidadoPDF()">Exportar PDF</button></div>
         </div>
       </div>
 
@@ -701,27 +701,27 @@
           <div class="report-card" id="rpt_fech" data-submod-card="sub_rel_fech">
             <h4>Fechamento por Loja</h4>
             <p class="subtle">Saldo inicial, entradas, saídas, repasse, saldo final e divergência por unidade.</p>
-            <div class="btn-row"><button class="btn" onclick="exportClientMovementsCSV()">Exportar CSV</button></div>
+            <div class="btn-row"><button class="btn" onclick="exportClientMovementsCSV()">Exportar CSV</button><button class="btn" onclick="exportClientMovementsPDF()">Exportar PDF</button></div>
           </div>
           <div class="report-card" id="rpt_cons" data-submod-card="sub_rel_cons">
             <h4>Consolidado por Empresa</h4>
             <p class="subtle">Total de entradas, saídas, repasses e divergências no período.</p>
-            <div class="btn-row"><button class="btn" onclick="exportConsolidadoCSV()">Exportar CSV</button></div>
+            <div class="btn-row"><button class="btn" onclick="exportConsolidadoCSV()">Exportar CSV</button><button class="btn" onclick="exportConsolidadoPDF()">Exportar PDF</button></div>
           </div>
           <div class="report-card" id="rpt_rep" data-submod-card="sub_rel_rep">
             <h4>Repasses ao Caixa Central</h4>
             <p class="subtle">Valores entregues por data, loja, responsável e status.</p>
-            <div class="btn-row"><button class="btn" onclick="exportTransfersCSV()">Exportar CSV</button></div>
+            <div class="btn-row"><button class="btn" onclick="exportTransfersCSV()">Exportar CSV</button><button class="btn" onclick="exportTransfersPDF()">Exportar PDF</button></div>
           </div>
           <div class="report-card" id="rpt_sai" data-submod-card="sub_rel_sai">
             <h4>Saídas por Descrição</h4>
             <p class="subtle">Consolida saídas por categoria e descrição no período.</p>
-            <div class="btn-row"><button class="btn" onclick="exportExpensesCSV()">Exportar CSV</button></div>
+            <div class="btn-row"><button class="btn" onclick="exportExpensesCSV()">Exportar CSV</button><button class="btn" onclick="exportExpensesPDF()">Exportar PDF</button></div>
           </div>
           <div class="report-card" id="rpt_div" data-submod-card="sub_rel_div">
             <h4>Divergências por Loja</h4>
             <p class="subtle">Saldo em caixa, status de revisão e divergências por loja.</p>
-            <div class="btn-row"><button class="btn" onclick="exportClientDivergencesCSV()">Exportar CSV</button></div>
+            <div class="btn-row"><button class="btn" onclick="exportClientDivergencesCSV()">Exportar CSV</button><button class="btn" onclick="exportClientDivergencesPDF()">Exportar PDF</button></div>
           </div>
           <div class="report-card" id="rpt_azul" data-submod-card="sub_rel_azul">
             <h4>Exportação Conta Azul</h4>
@@ -731,7 +731,7 @@
           <div class="report-card" id="rpt_aud" data-submod-card="sub_rel_aud">
             <h4>Auditoria Operacional</h4>
             <p class="subtle">Log de ações: fechamentos, usuários e alterações do sistema.</p>
-            <div class="btn-row"><button class="btn" onclick="exportAuditCSV()">Exportar CSV</button></div>
+            <div class="btn-row"><button class="btn" onclick="exportAuditCSV()">Exportar CSV</button><button class="btn" onclick="exportAuditPDF()">Exportar PDF</button></div>
           </div>
         </div>
       </div>
@@ -915,6 +915,9 @@
 <!-- ============================================================
      SCRIPTS — ordem de carregamento obrigatória
 ============================================================ -->
+<!-- PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="src/utils.js"></script>
 <script src="src/supabaseClient.js"></script>

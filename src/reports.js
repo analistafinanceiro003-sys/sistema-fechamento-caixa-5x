@@ -308,6 +308,193 @@ function exportConsolidadoCSV() {
   exportGenericCSV('consolidado_empresa_5x.csv', headers, rows);
 }
 
+/* ============================================================
+   EXPORTAÇÃO PDF — jsPDF + autoTable (CDN)
+============================================================ */
+let _logoB64 = null;
+
+async function _loadLogo() {
+  if (_logoB64) return _logoB64;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img, 0, 0);
+      _logoB64 = c.toDataURL('image/png');
+      resolve(_logoB64);
+    };
+    img.onerror = () => resolve(null);
+    img.src = '/assets/logo-gestao5x-transparente.png';
+  });
+}
+
+function _fmtM(v) {
+  const n = Number(v);
+  if (v === '' || v == null || isNaN(n)) return v ?? '';
+  const abs = Math.abs(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return (n < 0 ? '-' : '') + 'R$ ' + abs;
+}
+
+function _per(startId, endId) {
+  const s = val(startId) || '', e = val(endId) || '';
+  return s || e ? 'Período: ' + (s || '—') + ' a ' + (e || '—') : '';
+}
+
+async function generatePDF({ title, companyLabel = '', periodLabel = '', headers, rows, filename }) {
+  if (!window.jspdf) { alert('Módulo PDF não carregado. Recarregue a página e tente novamente.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+
+  /* Cabeçalho escuro */
+  doc.setFillColor(13, 23, 32);
+  doc.rect(0, 0, W, 22, 'F');
+
+  const logo = await _loadLogo();
+  if (logo) doc.addImage(logo, 'PNG', 6, 3, 34, 16);
+
+  doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.setTextColor(255, 255, 255);
+  doc.text('GESTÃO 5X', W - 10, 10, { align: 'right' });
+  doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(54, 199, 189);
+  doc.text('Central de Caixa 5X', W - 10, 16, { align: 'right' });
+
+  /* Linha teal separadora */
+  doc.setDrawColor(54, 199, 189); doc.setLineWidth(0.6);
+  doc.line(0, 22, W, 22);
+
+  /* Título */
+  doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.setTextColor(16, 24, 32);
+  doc.text(title, 8, 30);
+
+  /* Metadados */
+  doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(100, 100, 100);
+  const now = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  let mY = 37;
+  if (companyLabel) { doc.text('Empresa: ' + companyLabel, 8, mY); mY += 5; }
+  if (periodLabel)  { doc.text(periodLabel, 8, mY); mY += 5; }
+  doc.text('Emitido em: ' + now, 8, mY);
+
+  /* Tabela */
+  doc.autoTable({
+    head: [headers],
+    body: rows.map((r) => headers.map((h) => r[h] ?? '')),
+    startY: mY + 6,
+    theme: 'striped',
+    headStyles: { fillColor: [13, 23, 32], textColor: [255, 255, 255], fontSize: 7.5, fontStyle: 'bold', cellPadding: 2.5 },
+    bodyStyles: { fontSize: 7.5, textColor: [30, 40, 50], cellPadding: 2 },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    margin: { left: 8, right: 8 },
+    styles: { overflow: 'linebreak', cellWidth: 'auto' },
+    didDrawPage: ({ pageNumber }) => {
+      const total = doc.internal.getNumberOfPages();
+      doc.setFontSize(7); doc.setTextColor(150);
+      doc.text('Página ' + pageNumber + ' de ' + total + '  —  Gestão 5X', W / 2, H - 5, { align: 'center' });
+    },
+  });
+
+  doc.save(filename);
+}
+
+/* --- Funções PDF por relatório --- */
+
+async function exportFechamentoPDF() {
+  const cId = val('reportCompany');
+  const H = ['Empresa','Loja','Data','Turno','Responsável','Entradas','Saídas','Repasse','Saldo Final Após Repasse','Divergência Fundo','Status'];
+  const rows = closingRows(reportFilteredClosings()).map((r) => ({
+    ...r,
+    Entradas: _fmtM(r.Entradas), 'Saídas': _fmtM(r['Saídas']),
+    Repasse: _fmtM(r.Repasse), 'Saldo Final Após Repasse': _fmtM(r['Saldo Final Após Repasse']),
+    'Divergência Fundo': _fmtM(r['Divergência Fundo']),
+  }));
+  await generatePDF({ title: 'Fechamento por Loja', companyLabel: cId ? companyName(cId) : 'Todas as empresas',
+    periodLabel: _per('reportStart', 'reportEnd'), headers: H, rows, filename: 'fechamento_por_loja_5x.pdf' });
+}
+
+async function exportDivergencesPDF() {
+  const cId = val('reportCompany');
+  const H = ['Empresa','Loja','Data','Responsável','Divergência Fundo','Status','Observações'];
+  const rows = closingRows(reportFilteredClosings().filter((c) => Math.abs(Number(c.diff || 0)) > 0))
+    .map((r) => ({ ...r, 'Divergência Fundo': _fmtM(r['Divergência Fundo']) }));
+  await generatePDF({ title: 'Divergências do Período', companyLabel: cId ? companyName(cId) : 'Todas as empresas',
+    periodLabel: _per('reportStart', 'reportEnd'), headers: H, rows, filename: 'divergencias_5x.pdf' });
+}
+
+async function exportTransfersPDF() {
+  const cId = val('reportCompany');
+  const start = val('reportStart') || val('clientReportStart') || '';
+  const end   = val('reportEnd')   || val('clientReportEnd')   || '';
+  const rows = reportFilteredClosings()
+    .filter((c) => Number(c.transfer))
+    .map((c) => ({ Empresa: companyName(c.companyId), Loja: storeName(c.storeId), Data: c.date,
+      'Responsável': c.responsible, Repasse: _fmtM(c.transfer), Status: c.status }));
+  await generatePDF({ title: 'Repasses ao Caixa Central',
+    companyLabel: cId ? companyName(cId) : (role !== 'master' ? companyName(currentUser?.companyId) : 'Todas as empresas'),
+    periodLabel: start || end ? 'Período: ' + (start || '—') + ' a ' + (end || '—') : '',
+    headers: ['Empresa','Loja','Data','Responsável','Repasse','Status'], rows, filename: 'repasses_5x.pdf' });
+}
+
+async function exportExpensesPDF() {
+  const cId = val('reportCompany');
+  const start = val('reportStart') || val('clientReportStart') || '';
+  const end   = val('reportEnd')   || val('clientReportEnd')   || '';
+  const rows = allMovementRows(reportFilteredClosings()).filter((r) => r.Tipo === 'Saída')
+    .map((r) => ({ ...r, Valor: _fmtM(r.Valor) }));
+  await generatePDF({ title: 'Saídas por Descrição',
+    companyLabel: cId ? companyName(cId) : (role !== 'master' ? companyName(currentUser?.companyId) : 'Todas as empresas'),
+    periodLabel: start || end ? 'Período: ' + (start || '—') + ' a ' + (end || '—') : '',
+    headers: ['Empresa','Data','Loja','Descrição','Categoria','Valor','Responsável'], rows, filename: 'saidas_5x.pdf' });
+}
+
+async function exportConsolidadoPDF() {
+  const companies = visibleCompanies();
+  const start = val('reportStart') || val('clientReportStart') || '';
+  const end   = val('reportEnd')   || val('clientReportEnd')   || '';
+  const rows = companies.map((co) => {
+    const cls = getScopedClosings({ companyId: co.id, startDate: start, endDate: end });
+    return {
+      Empresa: co.name,
+      Entradas:     _fmtM(cls.reduce((a, c) => a + Number(c.entries || 0), 0)),
+      'Saídas':     _fmtM(cls.reduce((a, c) => a + Number(c.expenses || 0), 0)),
+      Repasses:     _fmtM(cls.reduce((a, c) => a + Number(c.transfer || 0), 0)),
+      'Saldo Final':_fmtM(cls.reduce((a, c) => a + Number(c.cashBalance ?? c.finalAfterTransfer ?? 0), 0)),
+      'Div. Fundo': _fmtM(cls.reduce((a, c) => a + Number(c.fundDivergence ?? c.diff ?? 0), 0)),
+    };
+  });
+  await generatePDF({ title: 'Consolidado por Empresa',
+    periodLabel: start || end ? 'Período: ' + (start || '—') + ' a ' + (end || '—') : '',
+    headers: ['Empresa','Entradas','Saídas','Repasses','Saldo Final','Div. Fundo'], rows, filename: 'consolidado_empresa_5x.pdf' });
+}
+
+async function exportAuditPDF() {
+  const rows = (state?.audit || []).map((a) => ({ Data: a.date, 'Usuário': a.user, Perfil: a.role, 'Ação': a.action, Detalhe: a.detail }));
+  await generatePDF({ title: 'Auditoria Operacional', headers: ['Data','Usuário','Perfil','Ação','Detalhe'], rows, filename: 'auditoria_5x.pdf' });
+}
+
+async function exportClientMovementsPDF() {
+  const cId = currentUser?.companyId;
+  const H = ['Loja','Data','Turno','Responsável','Entradas','Saídas','Repasse','Saldo Final Após Repasse','Divergência Fundo','Status'];
+  const rows = closingRows(reportFilteredClosings(true)).map((r) => ({
+    ...r,
+    Entradas: _fmtM(r.Entradas), 'Saídas': _fmtM(r['Saídas']),
+    Repasse: _fmtM(r.Repasse), 'Saldo Final Após Repasse': _fmtM(r['Saldo Final Após Repasse']),
+    'Divergência Fundo': _fmtM(r['Divergência Fundo']),
+  }));
+  await generatePDF({ title: 'Fechamento por Loja', companyLabel: cId ? companyName(cId) : '',
+    periodLabel: _per('clientReportStart', 'clientReportEnd'), headers: H, rows, filename: 'fechamento_cliente_5x.pdf' });
+}
+
+async function exportClientDivergencesPDF() {
+  const cId = currentUser?.companyId;
+  const H = ['Loja','Data','Responsável','Divergência Fundo','Status','Observações'];
+  const rows = closingRows(reportFilteredClosings(true).filter((c) => Math.abs(Number(c.diff || 0)) > 0))
+    .map((r) => ({ ...r, 'Divergência Fundo': _fmtM(r['Divergência Fundo']) }));
+  await generatePDF({ title: 'Divergências por Loja', companyLabel: cId ? companyName(cId) : '',
+    periodLabel: _per('clientReportStart', 'clientReportEnd'), headers: H, rows, filename: 'divergencias_cliente_5x.pdf' });
+}
+
 Object.assign(window, {
   getScopedClosings, filteredClosings,
   masterFilteredClosings, extractFilteredClosings,
@@ -317,4 +504,7 @@ Object.assign(window, {
   exportCSV, exportDivergencesCSV, exportTransfersCSV, exportExpensesCSV,
   exportAuditCSV, exportClientMovementsCSV, exportClientDivergencesCSV,
   exportContaAzulCSV, exportConsolidadoCSV,
+  generatePDF,
+  exportFechamentoPDF, exportDivergencesPDF, exportTransfersPDF, exportExpensesPDF,
+  exportConsolidadoPDF, exportAuditPDF, exportClientMovementsPDF, exportClientDivergencesPDF,
 });
