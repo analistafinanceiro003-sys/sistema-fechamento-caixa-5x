@@ -816,7 +816,7 @@
           </div>
 
           <div class="btn-row" style="margin-top:16px">
-            <button class="btn btn-brand" id="saveClosingBtn" disabled onclick="saveClosing()">✓ Realizar fechamento</button>
+            <button class="btn btn-brand" id="saveClosingBtn" onclick="saveClosing()">✓ Realizar fechamento</button>
           </div>
         </div>
 
@@ -838,13 +838,19 @@
           <div class="conf-block">
             <div class="conf-block-title">Repasse</div>
             <div class="summary">
-              <div class="summary-line"><span>Repasse ao caixa central</span><strong>
+              <!-- Sugestão automática: saldo esperado − fundo padrão -->
+              <div class="summary-line">
+                <span>Repasse sugerido <span class="subtle">(saldo − fundo)</span></span>
+                <strong id="suggestedTransferView">R$ 0,00</strong>
+              </div>
+              <div class="summary-line"><span>Repasse informado</span><strong>
                 <input id="transfer" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*" value="0"
                   oninput="calc()" onblur="formatCurrencyInput(this)" onfocus="selectOnFocus(this)"
                   style="max-width:150px;text-align:right"/>
               </strong></div>
             </div>
-            <div class="btn-row" style="margin-top:10px;gap:10px;align-items:center;flex-wrap:wrap">
+            <div class="btn-row" style="margin-top:10px;gap:8px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-sm" onclick="useSuggestedTransfer()" title="Preenche o repasse com o valor sugerido">← Usar sugerido</button>
               <button class="btn btn-primary" id="confirmTransferBtn" onclick="confirmTransfer()">Confirmar repasse</button>
               <span id="transferConfirmedBadge" class="status success" style="display:none;padding:4px 10px;font-size:13px">✓ Repasse confirmado</span>
             </div>

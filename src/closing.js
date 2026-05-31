@@ -14,18 +14,13 @@
 ============================================================ */
 
 let closingAttachments = [];
-/* Controla se o operador confirmou o repasse antes de salvar */
+/* Estado de confirmação do repasse — marca que o operador revisou o valor antes de salvar */
 let transferConfirmed = false;
-let confirmedValues = null; // snapshot dos valores no momento da confirmação
 
 function resetTransferConfirmation() {
-  if (!transferConfirmed) return;
   transferConfirmed = false;
-  confirmedValues = null;
   const badge = $('transferConfirmedBadge');
   if (badge) badge.style.display = 'none';
-  const saveBtn = $('saveClosingBtn');
-  if (saveBtn) saveBtn.disabled = true;
   const confirmBtn = $('confirmTransferBtn');
   if (confirmBtn) confirmBtn.textContent = 'Confirmar repasse';
 }
@@ -113,6 +108,20 @@ function fundDivergence() {
 function physicalCount() { return cashCounterTotal() + num('coinsTotal'); }
 function physicalDivergence() { return physicalCount() - finalAfterTransfer(); }
 
+/* Repasse sugerido = saldo esperado − fundo padrão da loja (valor que deve ficar no caixa) */
+function suggestedTransfer() {
+  const s = selectedStore();
+  return Math.max(0, expectedCash() - Number(s?.standardFund || 0));
+}
+
+/* Preenche o campo de repasse com o valor sugerido e recalcula */
+function useSuggestedTransfer() {
+  const suggested = suggestedTransfer();
+  setVal('transfer', formatCurrencyBR(suggested));
+  resetTransferConfirmation();
+  calc();
+}
+
 function closingStatus(diff, companyId) {
   const c = cfg(companyId);
   const abs = Math.abs(diff);
@@ -173,6 +182,7 @@ function calc() {
   text('totalEntries', money(totalEntries()));
   text('totalExpenses', money(totalExpenses()));
   text('expectedCash', money(expectedCash()));
+  text('suggestedTransferView', money(suggestedTransfer()));
   text('cashBalance', money(finalAfterTransfer()));
   text('standardFundView', money(store?.standardFund || 0));
   text('fundDivergenceView', money(fd));
@@ -222,20 +232,11 @@ function calc() {
     `Cálculo: saldo final após repasse (${money(finalAfterTransfer())}) − fundo padrão (${money(store?.standardFund || 0)}) = ${money(fd)}.`
   );
 
-  /* Se valores mudaram após confirmar repasse, exige nova confirmação */
-  if (transferConfirmed && confirmedValues) {
-    if (
-      Math.abs(num('initial') - confirmedValues.initial) > 0.001 ||
-      Math.abs(totalEntries() - confirmedValues.entries) > 0.001 ||
-      Math.abs(totalExpenses() - confirmedValues.expenses) > 0.001 ||
-      Math.abs(num('transfer') - confirmedValues.transfer) > 0.001
-    ) {
-      resetTransferConfirmation();
-    }
+  /* Se qualquer valor mudar após confirmar repasse, exige nova confirmação */
+  if (transferConfirmed) {
+    const badge = $('transferConfirmedBadge');
+    if (badge) badge.style.display = '';
   }
-  /* Mantém o botão "Realizar fechamento" sincronizado com o estado de confirmação */
-  const saveClosingBtn = $('saveClosingBtn');
-  if (saveClosingBtn) saveClosingBtn.disabled = !transferConfirmed;
 
   bindCurrencyInputs();
 }
@@ -395,34 +396,29 @@ async function reviewDivergence(id, status) {
   renderAll();
 }
 
-/* --- Confirmar repasse --- */
+/* --- Confirmar repasse ---
+   Valida o valor do repasse e marca como confirmado.
+   Pode ser chamado pelo botão "Confirmar repasse" OU automaticamente
+   pelo "Realizar fechamento" quando o operador ainda não confirmou. */
 async function confirmTransfer() {
   const store = selectedStore();
-  if (!store) return alert('Selecione uma loja antes de confirmar o repasse.');
+  if (!store) { alert('Selecione uma loja antes de confirmar o repasse.'); return false; }
   const transfer = num('transfer');
   const expCash = expectedCash();
-  if (transfer < 0) return alert('O valor do repasse não pode ser negativo.');
+  if (transfer < 0) { alert('O valor do repasse não pode ser negativo.'); return false; }
   if (transfer > expCash + 0.001) {
     const ok = confirm(
       `O repasse informado (${money(transfer)}) é maior que o saldo em caixa (${money(expCash)}).\n` +
       'Verifique antes de confirmar.\n\nDeseja confirmar assim mesmo?'
     );
-    if (!ok) return;
+    if (!ok) return false;
   }
   transferConfirmed = true;
-  confirmedValues = {
-    initial: num('initial'),
-    entries: totalEntries(),
-    expenses: totalExpenses(),
-    transfer,
-  };
   const badge = $('transferConfirmedBadge');
   if (badge) badge.style.display = '';
-  const saveBtn = $('saveClosingBtn');
-  if (saveBtn) saveBtn.disabled = false;
   const confirmBtn = $('confirmTransferBtn');
   if (confirmBtn) confirmBtn.textContent = '✓ Repasse confirmado';
-  calc();
+  return true;
 }
 
 /* --- Salvar fechamento --- */
@@ -436,7 +432,11 @@ async function saveClosing() {
     return alert('Esta loja não pertence ao seu acesso.');
   }
 
-  if (!transferConfirmed) return alert('Confirme o repasse antes de realizar o fechamento.');
+  /* Se o operador ainda não confirmou o repasse, confirma agora antes de salvar */
+  if (!transferConfirmed) {
+    const ok = await confirmTransfer();
+    if (!ok) return; /* operador cancelou ou repasse inválido */
+  }
 
   const closingDate = val('closingDate') || todayISO();
   if (!closingDate) return alert('Informe a data do fechamento.');
@@ -500,21 +500,21 @@ async function saveClosing() {
   const tolSnapshot = Number(c.tolerance || 5);
   const critSnapshot = Number(c.criticalDivergence || 20);
 
-  /* Itens */
+  /* Itens — filtrar apenas linhas com valor > 0 para evitar registros inválidos no Supabase */
   const entries = entryRows
     .map((row) => ({
-      description: row.querySelector('.entry-desc')?.value || 'Entrada',
-      value: parseCurrencyBR(row.querySelector('.entry')?.value || 0),
+      description: row.querySelector('.entry-desc')?.value?.trim() || 'Entrada em Dinheiro',
+      value: parseCurrencyBR(row.querySelector('.entry')?.value || '0'),
     }))
-    .filter((x) => x.value > 0 || x.description);
+    .filter((x) => x.value > 0);
 
   const expenses = expenseRows
     .map((row) => ({
-      description: row.querySelector('.expense-desc')?.value || 'Saída',
+      description: row.querySelector('.expense-desc')?.value?.trim() || 'Saída',
       category: row.querySelector('.expense-category')?.value || '',
-      value: parseCurrencyBR(row.querySelector('.expense')?.value || 0),
+      value: parseCurrencyBR(row.querySelector('.expense')?.value || '0'),
     }))
-    .filter((x) => x.value > 0 || x.description);
+    .filter((x) => x.value > 0);
 
   const expCash = expectedCash();
   const finalCash = finalAfterTransfer();
@@ -619,14 +619,7 @@ async function saveClosing() {
   const hint = $('initialBalanceHint');
   if (hint) hint.style.display = 'none';
   /* Resetar estado de confirmação do repasse */
-  transferConfirmed = false;
-  confirmedValues = null;
-  const confirmBadge = $('transferConfirmedBadge');
-  if (confirmBadge) confirmBadge.style.display = 'none';
-  const saveBtnEl = $('saveClosingBtn');
-  if (saveBtnEl) saveBtnEl.disabled = true;
-  const confirmBtnEl = $('confirmTransferBtn');
-  if (confirmBtnEl) confirmBtnEl.textContent = 'Confirmar repasse';
+  resetTransferConfirmation();
 
   save();
   renderAll();
@@ -665,6 +658,7 @@ Object.assign(window, {
   physicalCount, physicalDivergence, closingStatus,
   selectedShift, findPreviousClosing, findOpeningAdjustment, openingReference, openingDivergence,
   syncCoinCountTotal, suggestInitialBalance, calc,
+  suggestedTransfer, useSuggestedTransfer,
   addEntry, addExpense, removeLaunchRow,
   ensureExpenseCategories, renderCashCounter,
   confirmTransfer, saveClosing, saveOpeningAdjustment, reviewDivergence, createDivergenceReviews,
