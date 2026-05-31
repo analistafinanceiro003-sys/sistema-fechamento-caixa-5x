@@ -144,14 +144,12 @@ function closingRows(rows) {
     'Origem Abertura': c.openingReferenceOrigin || '',
     Entradas: c.entries,
     'Saídas': c.expenses,
-    'Saldo Esperado': c.expected,
+    'Saldo em Caixa Antes do Repasse': c.expected,
     Repasse: c.transfer,
     'Saldo Final Após Repasse': c.cashBalance ?? c.finalAfterTransfer,
     'Fundo Padrão': c.standardFund,
     Tolerância: c.toleranceSnapshot ?? cfg(c.companyId).tolerance,
     'Divergência Fundo': c.fundDivergence ?? c.diff,
-    'Total Físico': c.physicalCount || (c.cashCounterTotal + c.coinsTotal) || '',
-    'Divergência Física': c.physicalDivergence || '',
     Status: c.status,
     'Status Revisao': c.reviewStatus,
     'Parecer Admin': (state.divergenceReviews || []).filter((r) => r.closingId === c.id).map((r) => `${r.divergenceType}: ${r.reviewStatus}${r.adminComment ? ' - ' + r.adminComment : ''}`).join(' | '),
@@ -195,7 +193,7 @@ function diffAction(c) {
   const abs = Math.abs(Number(c.diff || 0));
   const c_ = cfg(c.companyId);
   if (c_.criticalDivergence && abs > Math.abs(Number(c_.criticalDivergence))) {
-    return 'Tratar como divergência crítica: revisar contagem, saídas, repasse e fundo.';
+    return 'Tratar como divergência crítica: revisar saídas, repasse e fundo.';
   }
   if (abs > Math.abs(Number(c_.tolerance || 0))) {
     return 'Registrar como divergência operacional e validar com o responsável.';
@@ -206,8 +204,8 @@ function diffAction(c) {
 /* --- Exportações --- */
 const CLOSING_HEADERS = [
   'Empresa','Loja','Data','Turno','Tipo','Responsável','Saldo Inicial','Ultimo Saldo Fechado','Divergencia Abertura','Origem Abertura','Entradas','Saídas',
-  'Saldo Esperado','Repasse','Saldo Final Após Repasse','Fundo Padrão','Tolerância',
-  'Divergência Fundo','Total Físico','Divergência Física','Status','Status Revisao','Parecer Admin','Observações',
+  'Saldo em Caixa Antes do Repasse','Repasse','Saldo Final Após Repasse','Fundo Padrão','Tolerância',
+  'Divergência Fundo','Status','Status Revisao','Parecer Admin','Observações',
   'ID Fechamento',
 ];
 const MOVEMENT_HEADERS = ['Empresa','Data','Loja','Tipo','Descrição','Categoria','Destino','Valor','Responsável','ID Fechamento'];
@@ -273,7 +271,7 @@ function exportContaAzulCSV() {
 
 function exportConsolidadoCSV() {
   const companies = visibleCompanies();
-  const headers = ['Empresa','Período','Entradas','Saídas','Repasses','Saldo Final','Div. Fundo','Div. Física'];
+  const headers = ['Empresa','Período','Entradas','Saídas','Repasses','Saldo Final','Div. Fundo'];
   const start = val('reportStart') || val('clientReportStart') || '';
   const end   = val('reportEnd')   || val('clientReportEnd')   || '';
   const rows = companies.map((company) => {
@@ -286,7 +284,6 @@ function exportConsolidadoCSV() {
       Repasses: closings.reduce((a, c) => a + Number(c.transfer || 0), 0),
       'Saldo Final': closings.reduce((a, c) => a + Number(c.cashBalance ?? c.finalAfterTransfer ?? 0), 0),
       'Div. Fundo': closings.reduce((a, c) => a + Number(c.fundDivergence ?? c.diff ?? 0), 0),
-      'Div. Física': closings.reduce((a, c) => a + Number(c.physicalDivergence || 0), 0),
     };
   });
   exportGenericCSV('consolidado_empresa_5x.csv', headers, rows);
