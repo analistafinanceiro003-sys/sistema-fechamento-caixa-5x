@@ -69,7 +69,7 @@ function openingReference() {
   if (previous) return {
     previous, adjustment: null,
     amount: Number(previous.finalAfterTransfer ?? previous.cashBalance ?? 0),
-    origin: `${previous.date} / ${previous.shift || 'Integral'} / ${storeName(previous.storeId)}`,
+    origin: `${previous.date} / ${previous.shift || 'Integral'} / ${previous.responsible || storeName(previous.storeId)}`,
   };
 
   const adjustment = findOpeningAdjustment(store.id, dateISO, shift);
