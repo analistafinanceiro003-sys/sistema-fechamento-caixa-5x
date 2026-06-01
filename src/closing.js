@@ -161,6 +161,8 @@ function closingStatus(diff, companyId) {
 ================================================================ */
 function suggestInitialBalance() {
   const store   = selectedStore();
+  const dateInput = $('closingDate');
+  if (dateInput && !dateInput.value) dateInput.value = todayISO();
   const dateISO = parseBR(val('closingDate'));
   if (!store || !dateISO) return;
   const ref = openingReference();
@@ -471,7 +473,9 @@ async function saveClosing() {
   if (role === 'admin' && store.companyId !== currentUser?.companyId)
     return alert('Esta loja não pertence ao seu acesso.');
 
-  const closingDate = val('closingDate') || todayISO();
+  const closingDate = todayISO();
+  const dateInput = $('closingDate');
+  if (dateInput) dateInput.value = closingDate;
   const dateISO     = parseBR(closingDate);
   if (!dateISO) return alert('Data de fechamento inválida.');
 

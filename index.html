@@ -746,32 +746,32 @@
         <!-- COLUNA ESQUERDA: Formulário -->
         <div class="card">
           <h3 class="section-title">Fechamento diário</h3>
+          <input id="closingDate" type="hidden"/>
           <div class="form-grid">
             <div class="field"><label>Loja</label><select id="closingStore" onchange="fillClosingResponsible5X();suggestInitialBalance();calc()"></select></div>
-            <div class="field"><label>Data de fechamento</label><input id="closingDate" type="date" onchange="suggestInitialBalance();calc()"/></div>
             <div class="field"><label>Turno do fechamento</label><select id="closingShift" required onchange="suggestInitialBalance();calc()"><option>Manhã</option><option>Tarde</option><option>Noite</option><option selected>Integral</option><option>Outro</option></select></div>
             <div class="field"><label>Responsável</label><select id="closingResponsible"><option value="">Selecione o responsável</option></select></div>
           </div>
 
+          <!-- Conferência de abertura — inclui saldo inicial informado -->
           <div class="closing-block">
             <div class="closing-block-title">Conferência de abertura</div>
             <div class="summary">
               <div class="summary-line"><span>Último saldo fechado</span><strong id="previousFinalAfterTransferView">R$ 0,00</strong></div>
-              <div class="summary-line"><span>Saldo inicial informado</span><strong id="openingInitialView">R$ 0,00</strong></div>
               <div class="summary-line"><span>Divergência de abertura</span><strong id="openingDivergenceView">R$ 0,00</strong></div>
               <div class="summary-line"><span>Origem do saldo anterior</span><strong id="openingOriginView">Caixa inicial</strong></div>
             </div>
             <div class="kpi-alert warning" id="openingDivergenceAlert" style="display:none;margin-top:10px"></div>
-          </div>
-
-          <!-- BLOCO 1: Movimento do caixa -->
-          <div class="closing-block">
-            <div class="closing-block-title">Movimento do caixa</div>
-            <div class="field" style="margin-top:10px">
-              <label>Saldo inicial <span class="subtle" id="initialBalanceHint" style="display:none;font-size:12px"></span></label>
+            <div class="field" style="margin-top:12px">
+              <label>Saldo inicial informado <span class="subtle" id="initialBalanceHint" style="display:none;font-size:12px"></span></label>
               <input id="initial" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*" value="0"
                 oninput="calc()" onblur="formatCurrencyInput(this)" onfocus="selectOnFocus(this)"/>
             </div>
+          </div>
+
+          <!-- BLOCO: Movimento do caixa -->
+          <div class="closing-block">
+            <div class="closing-block-title">Movimento do caixa</div>
 
             <div class="launch-box" id="entries">
               <div class="launch-box-header">
@@ -798,6 +798,27 @@
             </div>
           </div>
 
+          <!-- BLOCO: Repasse -->
+          <div class="closing-block" style="margin-top:14px">
+            <div class="closing-block-title">Repasse</div>
+            <div class="summary">
+              <div class="summary-line">
+                <span>Repasse sugerido <span class="subtle">(saldo − fundo)</span></span>
+                <strong id="suggestedTransferView">R$ 0,00</strong>
+              </div>
+            </div>
+            <div class="field" style="margin-top:10px">
+              <label>Repasse informado</label>
+              <input id="transfer" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*" value="0"
+                oninput="calc()" onblur="formatCurrencyInput(this)" onfocus="selectOnFocus(this)"/>
+            </div>
+            <div class="btn-row" style="margin-top:10px;gap:8px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-sm" onclick="useSuggestedTransfer()" title="Preenche o repasse com o valor sugerido">+ Usar sugerido</button>
+              <button class="btn btn-primary" id="confirmTransferBtn" onclick="confirmTransfer()">Confirmar repasse</button>
+              <span id="transferConfirmedBadge" class="status success" style="display:none;padding:4px 10px;font-size:13px">✓ Repasse confirmado</span>
+            </div>
+          </div>
+
           <!-- Observações -->
           <div class="field full" style="margin-top:14px">
             <label>Observações <span class="subtle">(obrigatório em divergência crítica)</span></label>
@@ -821,8 +842,8 @@
           </div>
         </div>
 
-        <!-- COLUNA DIREITA: Conferência 5X -->
-        <div class="card">
+        <!-- COLUNA DIREITA: Conferência 5X — oculta para operador -->
+        <div class="card operator-hidden" id="conferencia5X">
           <h3 class="section-title">Conferência 5X</h3>
 
           <!-- Bloco 1: Movimento calculado -->
@@ -835,27 +856,10 @@
             </div>
           </div>
 
-          <!-- Bloco 2: Repasse -->
+          <!-- Bloco 2: Saldo após repasse -->
           <div class="conf-block">
             <div class="conf-block-title">Repasse</div>
             <div class="summary">
-              <!-- Sugestão automática: saldo esperado − fundo padrão -->
-              <div class="summary-line">
-                <span>Repasse sugerido <span class="subtle">(saldo − fundo)</span></span>
-                <strong id="suggestedTransferView">R$ 0,00</strong>
-              </div>
-              <div class="summary-line"><span>Repasse informado</span><strong>
-                <input id="transfer" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*" value="0"
-                  oninput="calc()" onblur="formatCurrencyInput(this)" onfocus="selectOnFocus(this)"
-                  style="max-width:150px;text-align:right"/>
-              </strong></div>
-            </div>
-            <div class="btn-row" style="margin-top:10px;gap:8px;align-items:center;flex-wrap:wrap">
-              <button class="btn btn-sm" onclick="useSuggestedTransfer()" title="Preenche o repasse com o valor sugerido">+ Usar sugerido</button>
-              <button class="btn btn-primary" id="confirmTransferBtn" onclick="confirmTransfer()">Confirmar repasse</button>
-              <span id="transferConfirmedBadge" class="status success" style="display:none;padding:4px 10px;font-size:13px">✓ Repasse confirmado</span>
-            </div>
-            <div class="summary" style="margin-top:10px">
               <div class="summary-line summary-line-highlight"><span>Saldo final após repasse</span><strong id="cashBalance">R$ 0,00</strong></div>
             </div>
           </div>
@@ -870,7 +874,7 @@
             </div>
           </div>
 
-          <!-- Bloco 4: Regras e leitura automatica -->
+          <!-- Bloco 4: Regras e leitura automática -->
           <div class="box" style="margin-top:12px"><h4>Regras para este operador</h4><div id="operatorRules"></div></div>
           <div class="box" style="margin-top:10px"><h4>Leitura automática 5X</h4><pre class="closing-insight" id="closingInsight">Preencha os valores para gerar a leitura.</pre></div>
         </div>

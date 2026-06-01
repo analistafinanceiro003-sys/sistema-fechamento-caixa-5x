@@ -122,6 +122,7 @@ async function enterApp() {
 
   role = user.role;
   currentUser = user;
+  document.body.classList.toggle('role-operator', role === 'operator');
   if (sb && user.authId && window.load) {
     await load();
   }
@@ -157,6 +158,7 @@ async function logout() {
   stopRealtimeSync();
   currentUser = null;
   role = 'master';
+  document.body.classList.remove('role-operator');
   $('app').style.display = 'none';
   $('loginScreen').style.display = 'grid';
   closeSidebar();

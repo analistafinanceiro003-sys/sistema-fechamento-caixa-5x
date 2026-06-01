@@ -490,3 +490,7 @@ tr:hover td{background:#fafbfc}
   .page.hidden{display:none!important}
   body{background:#fff}
 }
+
+/* Perfil operador: oculta coluna de Conferência 5X e expande formulário */
+body.role-operator .operator-hidden{display:none!important}
+body.role-operator #closing .panel-grid{grid-template-columns:1fr}

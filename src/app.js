@@ -39,6 +39,7 @@ async function init() {
     if (prof && prof.status !== 'Inativo') {
       /* Sessão ativa: entra direto sem exibir login */
       window.role = prof.role;
+      document.body.classList.toggle('role-operator', prof.role === 'operator');
       window.currentUser = {
         id: prof.id, authId: prof.user_id,
         name: prof.name, email: prof.email,
