@@ -494,3 +494,35 @@ tr:hover td{background:#fafbfc}
 /* Perfil operador: oculta coluna de Conferência 5X e expande formulário */
 body.role-operator .operator-hidden{display:none!important}
 body.role-operator #closing .panel-grid{grid-template-columns:1fr}
+
+/* Card clicável */
+.clickable-card{cursor:pointer;transition:box-shadow .15s,transform .12s}
+.clickable-card:hover{box-shadow:0 8px 30px rgba(54,199,189,.18);transform:translateY(-2px)}
+
+/* Modal edição */
+#editStoreModal{display:none;align-items:center;justify-content:center}
+
+/* Desktop sidebar compacta — expande ao passar o mouse */
+@media(min-width:1101px){
+  .app.sidebar-hover{grid-template-columns:58px 1fr!important;transition:grid-template-columns .22s ease}
+  .app.sidebar-hover .sidebar{
+    width:58px;overflow:hidden;
+    padding:20px 8px;
+    transition:width .22s ease,padding .22s ease,box-shadow .22s ease;
+    position:relative;z-index:50;
+  }
+  .app.sidebar-hover .sidebar:hover{
+    width:268px;padding:20px 14px;
+    overflow:visible;
+    box-shadow:4px 0 24px rgba(0,0,0,.22);
+    z-index:200;
+  }
+  .app.sidebar-hover .brand .side-logo{width:30px;object-fit:cover;object-position:left;transition:width .22s}
+  .app.sidebar-hover .sidebar:hover .brand .side-logo{width:140px;object-fit:contain}
+  .app.sidebar-hover .nav button{padding:10px 6px;overflow:hidden;text-overflow:clip}
+  .app.sidebar-hover .sidebar:hover .nav button{padding:10px 12px}
+  .app.sidebar-hover .side-footer{overflow:hidden}
+  .app.sidebar-hover .sidebar:hover .side-footer{overflow:visible}
+  .app.sidebar-hover .userbox,.app.sidebar-hover .logout{display:none}
+  .app.sidebar-hover .sidebar:hover .userbox,.app.sidebar-hover .sidebar:hover .logout{display:block}
+}

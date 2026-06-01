@@ -6,7 +6,7 @@
      cashBeforeTransfer  = initialCash + entries - expenses
      finalAfterTransfer  = cashBeforeTransfer - transfer
      fundDivergence      = finalAfterTransfer - standardFund
-     status              = f(fundDivergence, tolerance, criticalDivergence)
+     status              = OK se |fundDivergence| <= tolerância, senão Divergência
 ============================================================ */
 
 let closingAttachments = [];
@@ -90,48 +90,43 @@ function totalExpenses() { return all('.expense').reduce((s, e) => s + parseCurr
 /* ================================================================
    FUNÇÃO CENTRAL DE CÁLCULO — única fonte de verdade
    Alimenta: tela, save, histórico, relatórios, divergências.
+   FÓRMULAS OFICIAIS (imutáveis):
+     cashBeforeTransfer  = initialCash + entries - expenses
+     finalAfterTransfer  = cashBeforeTransfer - transfer
+     fundDivergence      = finalAfterTransfer - standardFund
+     status              = OK se |div| <= tolerância, senão Divergência
 ================================================================ */
 function getClosingCalculation() {
   const store = selectedStore();
   const cfgC  = cfg(store?.companyId);
 
-  const initialCash       = safeMoneyNumber(num('initial'));
-  const entriesTotal      = safeMoneyNumber(totalEntries());
-  const expensesTotal     = safeMoneyNumber(totalExpenses());
+  const initialCash        = safeMoneyNumber(num('initial'));
+  const entriesTotal       = safeMoneyNumber(totalEntries());
+  const expensesTotal      = safeMoneyNumber(totalExpenses());
   const cashBeforeTransfer = initialCash + entriesTotal - expensesTotal;
-  const transferAmount    = safeMoneyNumber(num('transfer'));
-  const finalAT           = cashBeforeTransfer - transferAmount;
-  const standardFund      = safeMoneyNumber(store?.standardFund);
-  const fundDivergence    = finalAT - standardFund;
-  const tolerance         = safeMoneyNumber(cfgC?.tolerance ?? 5);
-  const critDivergence    = safeMoneyNumber(cfgC?.criticalDivergence);
+  const transferAmount     = safeMoneyNumber(num('transfer'));
+  const finalAT            = cashBeforeTransfer - transferAmount;
+  const standardFund       = safeMoneyNumber(store?.standardFund);
+  const fundDivergence     = finalAT - standardFund;
+  const tolerance          = safeMoneyNumber(cfgC?.tolerance ?? 5);
 
-  /* Status oficial */
-  const absFundDiv = Math.abs(fundDivergence);
-  let status;
-  if (absFundDiv <= tolerance) {
-    status = 'OK';
-  } else if (critDivergence > 0 && absFundDiv > critDivergence) {
-    status = 'Crítico';
-  } else {
-    status = 'Divergência';
-  }
+  /* Status oficial — sem Crítico */
+  const status = Math.abs(fundDivergence) <= tolerance ? 'OK' : 'Divergência';
 
-  const openRef       = openingReference();
-  const openingDiv    = initialCash - Number(openRef.amount || 0);
+  const openRef    = openingReference();
+  const openingDiv = initialCash - Number(openRef.amount || 0);
 
   return {
     store, cfgC,
     initialCash,
     entriesTotal,
     expensesTotal,
-    cashBeforeTransfer,       /* = saldo em caixa antes do repasse */
+    cashBeforeTransfer,
     transferAmount,
     finalAfterTransfer: finalAT,
     standardFund,
     fundDivergence,
     tolerance,
-    criticalDivergence: critDivergence,
     status,
     openingDivergence: openingDiv,
     openingRef: openRef,
@@ -150,10 +145,7 @@ function closingStatus(diff, companyId) {
   const c   = cfg(companyId);
   const abs = Math.abs(diff);
   const tolerance = Math.abs(safeMoneyNumber(c.tolerance));
-  const critical = Math.abs(safeMoneyNumber(c.criticalDivergence));
-  if (abs <= tolerance) return 'OK';
-  if (critical > 0 && abs > critical) return 'Crítico';
-  return 'Divergência';
+  return abs <= tolerance ? 'OK' : 'Divergência';
 }
 
 /* ================================================================
@@ -228,7 +220,7 @@ function calc() {
   if (openAlert) {
     const abs = Math.abs(cc.openingDivergence);
     openAlert.style.display = abs > 0.009 ? '' : 'none';
-    openAlert.className     = `kpi-alert ${cc.criticalDivergence > 0 && abs > cc.criticalDivergence ? 'danger' : 'warning'}`;
+    openAlert.className     = 'kpi-alert warning';
     openAlert.textContent   = 'O saldo inicial não bate com o último saldo fechado.';
   }
 
@@ -247,7 +239,7 @@ function calc() {
 
   const statusEl = $('closingStatusView');
   if (statusEl) {
-    const cls = cc.status === 'OK' ? 'success' : cc.status === 'Crítico' ? 'danger' : 'warning';
+    const cls = cc.status === 'OK' ? 'success' : 'warning';
     statusEl.className   = `status ${cls}`;
     statusEl.textContent = cc.status;
   }
@@ -255,8 +247,6 @@ function calc() {
   /* Leitura automática */
   const divMsg = cc.status === 'OK'
     ? `✓ Status: OK. Tolerância: ${money(cc.tolerance)}.`
-    : cc.status === 'Crítico'
-    ? `⚠ Status: CRÍTICO. Divergência: ${money(cc.fundDivergence)}. Limite: ${money(cc.criticalDivergence)}.`
     : `◎ Status: Divergência. Diferença: ${money(cc.fundDivergence)}. Tolerância: ${money(cc.tolerance)}.`;
 
   const openMsg = Math.abs(cc.openingDivergence) <= cc.tolerance
@@ -565,7 +555,6 @@ async function saveClosing() {
     cashBalance:                cc.finalAfterTransfer,
     standardFund:               cc.standardFund,
     toleranceSnapshot:          cc.tolerance,
-    criticalDivergenceSnapshot: cc.criticalDivergence,
     previousClosingId:          openRef.previous?.id || null,
     previousFinalAfterTransfer: Number(openRef.amount || 0),
     openingDivergence:          cc.openingDivergence,

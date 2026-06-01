@@ -192,9 +192,6 @@ function diffRead(c) {
 function diffAction(c) {
   const abs = Math.abs(Number(c.diff || 0));
   const c_ = cfg(c.companyId);
-  if (c_.criticalDivergence && abs > Math.abs(Number(c_.criticalDivergence))) {
-    return 'Tratar como divergência crítica: revisar saídas, repasse e fundo.';
-  }
   if (abs > Math.abs(Number(c_.tolerance || 0))) {
     return 'Registrar como divergência operacional e validar com o responsável.';
   }

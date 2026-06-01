@@ -39,11 +39,11 @@ function renderMetrics() {
 
 /* --- MASTER DASHBOARD --- */
 function renderMasterDashboard() {
-  /* Alertas críticos */
-  const critical = state.closings.filter((c) => c.status === 'Divergência crítica').slice(-5);
+  /* Alertas de divergência */
+  const critical = state.closings.filter((c) => c.status === 'Divergência').slice(-5);
   html('dashAlerts', critical.length
-    ? critical.map((c) => `<div class="alert-item danger"><strong>${esc(companyName(c.companyId))} / ${esc(storeName(c.storeId))}</strong><span>${money(c.diff)}</span><span class="subtle">${esc(c.date)}</span></div>`).join('')
-    : '<p class="subtle">Nenhum alerta crítico no momento.</p>'
+    ? critical.map((c) => `<div class="alert-item warning"><strong>${esc(companyName(c.companyId))} / ${esc(storeName(c.storeId))}</strong><span>${money(c.diff)}</span><span class="subtle">${esc(c.date)}</span></div>`).join('')
+    : '<p class="subtle">Nenhuma divergência recente.</p>'
   );
   /* Empresas em implantação */
   const impl = state.companies.filter((c) => c.status === 'Implantação');
@@ -78,19 +78,24 @@ function renderCadastros() {
     </tr>`
   ).join('') || emptyRow(9));
 
-  /* Lojas */
-  html('storesBody', visibleStores().map((s) =>
-    `<tr>
+  /* Lojas — com filtro e ações de editar/excluir */
+  const storeSearch = (val('storeFilter') || '').toLowerCase();
+  const filteredStores = visibleStores().filter((s) =>
+    !storeSearch || s.name.toLowerCase().includes(storeSearch) || (s.code || '').toLowerCase().includes(storeSearch)
+  );
+  html('storesBody', filteredStores.map((s) => {
+    const hasClosings = (state.closings || []).some((c) => c.storeId === s.id);
+    return `<tr>
       <td>${esc(companyName(s.companyId))}</td><td>${esc(s.name)}</td>
       <td>${esc(s.code)}</td><td>${esc(s.cashType)}</td>
-      <td><input type="text" inputmode="decimal" pattern="[0-9.,]*"
-        value="${Number(s.standardFund||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}"
-        onchange="updateStoreFund('${s.id}',parseCurrencyBR(this.value))"
-        onblur="formatCurrencyInput(this)" onfocus="selectOnFocus(this)"
-        style="max-width:130px"/></td>
+      <td>${money(s.standardFund)}</td>
       <td>${tag(s.status)}</td>
-    </tr>`
-  ).join('') || emptyRow(6));
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" onclick="loadStoreToEdit('${s.id}')">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteStore('${s.id}')" ${hasClosings ? 'title="Esta loja possui fechamentos vinculados"' : ''}>Excluir</button>
+      </td>
+    </tr>`;
+  }).join('') || emptyRow(7));
 
   /* Usuários */
   renderUsersByCompany();
@@ -153,7 +158,7 @@ function renderOperacao() {
   html('operationConfigList', Object.entries(state.operationConfigs).map(([cid, c]) =>
     `<div class="kpi-alert" style="margin-bottom:10px">
       <strong>${esc(companyName(cid))}</strong>
-      <p class="subtle">Modo: ${esc(c.mode)} | Tolerância: ${money(c.tolerance)} | Crítica: ${money(c.criticalDivergence)} | Repasse: ${esc(c.receiver || '-')}</p>
+      <p class="subtle">Modo: ${esc(c.mode)} | Tolerância: ${money(c.tolerance)} | Repasse: ${esc(c.receiver || '-')}</p>
     </div>`
   ).join('') || '<p class="subtle">Nenhuma configuração salva.</p>');
 }
@@ -243,7 +248,21 @@ function renderSistema() {
 /* --- ADMIN --- */
 function renderAdminViews() {
   const stores = state.stores.filter((s) => s.companyId === currentUser?.companyId);
-  const rows = getScopedClosings({ scope: 'admin' });
+  const rows   = getScopedClosings({ scope: 'admin' });
+
+  /* KPIs do dashboard */
+  text('aStores',   stores.length);
+  text('aClosings', rows.length);
+  const totalDiff = rows.reduce((a, c) => a + Math.abs(Number(c.diff || 0)), 0);
+  text('aDiff', money(totalDiff));
+
+  /* Saldo Central = soma dos repasses marcados como Recebido */
+  const receipts = getTransferReceipts().filter((r) => r.companyId === currentUser?.companyId);
+  const saldoCentral = receipts.reduce((a, r) => a + Number(r.amount || 0), 0);
+  const pendCount    = rows.filter((c) => Number(c.transfer || 0) > 0 &&
+    !receipts.find((r) => r.closingId === c.id)).length;
+  text('aSaldoCentral', money(saldoCentral));
+  text('aSaldoCentralHint', `${pendCount} repasse(s) pendente(s)`);
 
   /* Dashboard por loja */
   html('adminStoreDashboard', stores.map((s) => {
@@ -271,50 +290,89 @@ function renderAdminViews() {
     `<div class="rule"><span class="dot"></span><span><strong>${esc(r.type)}:</strong> ${esc(r.text)}</span></div>`
   ).join('') || '<p class="subtle">Nenhuma regra cadastrada.</p>');
 
-  /* Movimentações — usa adminMovFilteredClosings() que respeita data/loja */
-  setOptions('adminMovementStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
-  const adminMovRows = adminMovFilteredClosings();
-  const movRows = allMovementRows(adminMovRows);
-  const movHtml = movRows.map((r) =>
-    `<tr><td>${esc(r.Data)}</td><td>${esc(r.Loja)}</td><td>${esc(r.Tipo)}</td><td>${esc(r.Descrição)}</td>
-     <td style="color:${Number(r.Valor)>=0?'var(--success)':'var(--danger)'}">${money(r.Valor)}</td><td>${esc(r.Responsável)}</td></tr>`
-  ).join('') || emptyRow(6);
-  html('adminMovementsDetailBody',  movHtml);
-  html('adminMovementsDetailBody2', movHtml);
-
-  /* Divergências */
-  setOptions('adminDivergenceStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
-  const divRows = adminMovRows.filter((c) =>
-    Math.abs(Number(c.diff||0)) > 0 &&
-    (!val('adminDivergenceStoreFilter') || c.storeId === val('adminDivergenceStoreFilter'))
-  );
-  html('adminDivergencesReviewBody', divRows.map((c) =>
-    `<tr><td>${esc(c.date)}</td><td>${esc(storeName(c.storeId))}</td><td>${esc(c.responsible)}</td>
-     <td>${money(c.cashBalance)}</td><td>${tag(c.reviewStatus)}</td><td>${esc(diffAction(c))}</td></tr>`
-  ).join('') || emptyRow(6));
-
+  /* Saldo Inicial autorizado */
   setOptions('openingAdjustmentStore', stores.map((s) => [s.id, s.name]), 'Selecione');
   if ($('openingAdjustmentDate') && !val('openingAdjustmentDate')) setVal('openingAdjustmentDate', todayISO());
-  const pendingReviews = (state.divergenceReviews || []).filter((r) =>
-    r.companyId === currentUser?.companyId &&
-    (!val('adminDivergenceStoreFilter') || r.storeId === val('adminDivergenceStoreFilter')) &&
-    (r.reviewStatus || 'Pendente') === 'Pendente'
-  );
-  if (pendingReviews.length || state.divergenceReviews?.length) {
-    html('adminDivergencesReviewBody', pendingReviews.map((r) => {
-      const c = state.closings.find((x) => x.id === r.closingId) || {};
-      return `<tr><td>${esc(c.date || '-')}</td><td>${esc(storeName(r.storeId))}</td><td>${esc(c.responsible || '-')}</td>
-       <td>${esc(r.divergenceType)}<br><strong>${money(r.divergenceAmount)}</strong></td><td>${tag(r.reviewStatus)}</td>
-       <td><button class="btn btn-sm" onclick="reviewDivergence('${r.id}','Revisada')">Revisada</button>
-       <button class="btn btn-sm" onclick="reviewDivergence('${r.id}','Justificada')">Justificada</button>
-       <button class="btn btn-sm" onclick="reviewDivergence('${r.id}','Resolvida')">Resolvida</button>
-       <button class="btn btn-sm" onclick="reviewDivergence('${r.id}','Ignorada com justificativa')">Ignorar</button></td></tr>`;
-    }).join('') || emptyRow(6));
-  }
   html('openingAdjustmentsBody', (state.cashOpeningAdjustments || [])
     .filter((a) => a.companyId === currentUser?.companyId)
     .map((a) => `<tr><td>${esc(storeName(a.storeId))}</td><td>${esc(toBRFromISO(parseBR(a.startDate)))}</td><td>${esc(a.shift || 'Integral')}</td><td>${money(a.amount)}</td><td>${esc(a.reason)}</td><td>${esc(a.authorizedBy || '-')}</td></tr>`)
     .join('') || emptyRow(6));
+
+  /* Histórico de fechamentos (afech-historico) — usa filtros adminMovStart/adminMovEnd */
+  setOptions('adminMovementStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
+  const histRows = allMovementRows(adminMovFilteredClosings());
+  html('adminMovementsDetailBody', histRows.map((r) =>
+    `<tr><td>${esc(r.Data)}</td><td>${esc(r.Loja)}</td><td>${esc(r.Tipo)}</td><td>${esc(r.Descrição)}</td>
+     <td style="color:${Number(r.Valor)>=0?'var(--success)':'var(--danger)'}">${money(r.Valor)}</td><td>${esc(r.Responsável)}</td></tr>`
+  ).join('') || emptyRow(6));
+
+  /* Extrato (amov-extrato) — com filtros por loja e período */
+  setOptions('adminExtratStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
+  const extratStore = val('adminExtratStoreFilter');
+  const extratStart = val('adminExtratStart');
+  const extratEnd   = val('adminExtratEnd');
+  const adminMovRows = rows.filter((c) =>
+    (!extratStore || c.storeId === extratStore) &&
+    (!extratStart || parseBR(c.date) >= extratStart) &&
+    (!extratEnd   || parseBR(c.date) <= extratEnd)
+  );
+  html('adminMovementsDetailBody2', allMovementRows(adminMovRows).map((r) =>
+    `<tr><td>${esc(r.Data)}</td><td>${esc(r.Loja)}</td><td>${esc(r.Tipo)}</td><td>${esc(r.Descrição)}</td>
+     <td style="color:${Number(r.Valor)>=0?'var(--success)':'var(--danger)'}">${money(r.Valor)}</td><td>${esc(r.Responsável)}</td></tr>`
+  ).join('') || emptyRow(6));
+
+  /* Repasses Recebidos */
+  setOptions('adminRepasseStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
+  const repStore  = val('adminRepasseStoreFilter');
+  const repStart  = val('adminRepasseStart');
+  const repEnd    = val('adminRepasseEnd');
+  const repStatus = val('adminRepasseStatusFilter');
+  const repasseRows = rows.filter((c) =>
+    Number(c.transfer || 0) > 0 &&
+    (!repStore || c.storeId === repStore) &&
+    (!repStart || parseBR(c.date) >= repStart) &&
+    (!repEnd   || parseBR(c.date) <= repEnd)
+  );
+  html('adminRepassesBody', repasseRows.map((c) => {
+    const receipt = receipts.find((r) => r.closingId === c.id);
+    const status  = receipt ? 'Recebido' : 'Pendente';
+    if (repStatus && status !== repStatus) return '';
+    return `<tr>
+      <td>${esc(c.date)}</td><td>${esc(storeName(c.storeId))}</td><td>${esc(c.responsible || c.operator || '-')}</td>
+      <td>${money(c.transfer)}</td><td>${tag(status)}</td>
+      <td>${receipt ? new Date(receipt.confirmedAt).toLocaleString('pt-BR') : '-'}</td>
+      <td>${esc(receipt?.confirmedBy || '-')}</td>
+      <td>${status === 'Pendente'
+        ? `<button class="btn btn-sm btn-primary" onclick="confirmTransferReceipt('${c.id}')">Recebido</button>`
+        : '<span class="status success">✓</span>'
+      }</td>
+    </tr>`;
+  }).filter(Boolean).join('') || emptyRow(8));
+
+  /* Divergências — com filtro de status */
+  setOptions('adminDivergenceStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
+  const divStatusFilter = val('adminDivergenceStatusFilter') || 'Pendente';
+  const divStoreFilter  = val('adminDivergenceStoreFilter');
+  const allReviews = (state.divergenceReviews || []).filter((r) =>
+    r.companyId === currentUser?.companyId &&
+    (!divStoreFilter || r.storeId === divStoreFilter) &&
+    (!divStatusFilter || (r.reviewStatus || 'Pendente') === divStatusFilter)
+  );
+  html('adminDivergencesReviewBody', allReviews.map((r) => {
+    const c = state.closings.find((x) => x.id === r.closingId) || {};
+    const isOpen = (r.reviewStatus || 'Pendente') === 'Pendente';
+    return `<tr>
+      <td>${esc(c.date || '-')}</td><td>${esc(storeName(r.storeId))}</td><td>${esc(c.responsible || '-')}</td>
+      <td>${esc(r.divergenceType)}<br><strong>${money(r.divergenceAmount)}</strong></td>
+      <td>${tag(r.reviewStatus || 'Pendente')}</td>
+      <td>${isOpen
+        ? `<button class="btn btn-sm" onclick="reviewDivergence('${r.id}','Revisada')">Revisada</button>
+           <button class="btn btn-sm" onclick="reviewDivergence('${r.id}','Justificada')">Justificada</button>
+           <button class="btn btn-sm" onclick="reviewDivergence('${r.id}','Resolvida')">Resolvida</button>`
+        : `<span class="subtle">${esc(r.adminComment || '-')}</span>`
+      }</td>
+    </tr>`;
+  }).join('') || emptyRow(6));
 
   /* Últimas movimentações (dashboard) */
   html('adminMovementsBody', rows.slice(-8).reverse().map((c) =>

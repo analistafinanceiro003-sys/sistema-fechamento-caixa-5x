@@ -55,19 +55,8 @@
   <div class="login-right">
     <div class="login-card">
       <h2>Bem-vindo!</h2>
-      <p>Acesse com seu perfil operacional.</p>
+      <p>Acesse com seu e-mail e senha.</p>
       <div class="stack">
-        <div class="field">
-          <label>Perfil de acesso</label>
-          <div class="input-shell">
-            <span class="icon">▣</span>
-            <select id="profile">
-              <option value="master">Gestão 5X</option>
-              <option value="admin">Administrador Cliente</option>
-              <option value="operator">Operador</option>
-            </select>
-          </div>
-        </div>
         <div class="field">
           <label>E-mail ou usuário</label>
           <div class="input-shell">
@@ -243,9 +232,31 @@
           </div>
           <div class="card">
             <h3 class="section-title">Lojas cadastradas</h3>
+            <div class="filter-bar-5x" style="margin-bottom:10px">
+              <div class="field"><label>Filtrar por nome</label><input id="storeFilter" placeholder="Nome da loja..." oninput="renderCadastros()"/></div>
+            </div>
             <div class="table-wrap">
-              <table><thead><tr><th>Empresa</th><th>Loja</th><th>Código</th><th>Tipo</th><th>Fundo padrão</th><th>Status</th></tr></thead>
+              <table><thead><tr><th>Empresa</th><th>Loja</th><th>Código</th><th>Tipo</th><th>Fundo padrão</th><th>Status</th><th>Ações</th></tr></thead>
               <tbody id="storesBody"></tbody></table>
+            </div>
+          </div>
+          <!-- Modal edição de loja -->
+          <div id="editStoreModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:none;align-items:center;justify-content:center">
+            <div class="card" style="width:min(500px,96vw);max-height:90vh;overflow-y:auto;padding:24px">
+              <h3 class="section-title">Editar loja</h3>
+              <input type="hidden" id="editStoreId"/>
+              <div class="form-grid">
+                <div class="field"><label>Empresa</label><select id="editStoreCompany"></select></div>
+                <div class="field"><label>Nome</label><input id="editStoreName"/></div>
+                <div class="field"><label>Código</label><input id="editStoreCode"/></div>
+                <div class="field"><label>Tipo de caixa</label><select id="editStoreCashType"><option>Caixa diário</option><option>Caixa por turno</option><option>Caixa central</option><option>Caixa delivery</option></select></div>
+                <div class="field"><label>Fundo padrão (R$)</label><input id="editStoreStandardFund" type="number" step="0.01"/></div>
+                <div class="field"><label>Status</label><select id="editStoreStatus"><option>Ativa</option><option>Implantação</option><option>Inativa</option></select></div>
+              </div>
+              <div class="btn-row" style="margin-top:16px">
+                <button class="btn btn-primary" onclick="saveStoreEdit()">Salvar alterações</button>
+                <button class="btn" onclick="closeEditStoreModal()">Cancelar</button>
+              </div>
             </div>
           </div>
         </div>
@@ -362,7 +373,6 @@
             <div class="form-grid">
               <div class="field"><label>Empresa</label><select id="operationCompany"></select></div>
               <div class="field"><label>Tolerância de divergência (R$)</label><input id="operationTolerance" type="number" value="5" step="0.01"/></div>
-              <div class="field"><label>Divergência crítica (R$)</label><input id="operationCriticalDivergence" type="number" value="20" step="0.01"/></div>
               <div class="field"><label>Modo de fechamento</label><select id="operationMode"><option>Diário</option><option>Por turno</option><option>Por operador</option></select></div>
               <div class="field"><label>Responsável pelo repasse</label><input id="operationReceiver" placeholder="Ex: Yago / Financeiro"/></div>
               <div class="field full"><label>Saídas permitidas</label><textarea id="operationAllowed" placeholder="Ex: ajuda de custo, taxa de entrega, compra emergencial."></textarea></div>
@@ -583,10 +593,10 @@
     ============================================================ -->
     <section class="page hidden" id="adminDashboard">
       <div class="grid cards">
-        <div class="card"><div class="metric-label">Lojas</div><div class="metric-value" id="aStores">0</div></div>
-        <div class="card"><div class="metric-label">Fechamentos</div><div class="metric-value" id="aClosings">0</div></div>
-        <div class="card"><div class="metric-label">Operadores</div><div class="metric-value" id="aUsers">0</div></div>
-        <div class="card"><div class="metric-label">Divergência</div><div class="metric-value" id="aDiff">R$ 0,00</div></div>
+        <div class="card clickable-card" onclick="showPage('adminOperacao',document.querySelector('.nav button[data-page=adminOperacao]'));showSubTab('adminOperacao','aop-lojas',document.querySelector('[data-subtab=aop-lojas]'))"><div class="metric-label">Lojas</div><div class="metric-value" id="aStores">0</div></div>
+        <div class="card clickable-card" onclick="showPage('adminFechamento',document.querySelector('.nav button[data-page=adminFechamento]'));showSubTab('adminFechamento','afech-historico',document.querySelector('[data-subtab=afech-historico]'))"><div class="metric-label">Fechamentos</div><div class="metric-value" id="aClosings">0</div></div>
+        <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-divergencias',document.querySelector('[data-subtab=amov-divergencias]'))"><div class="metric-label">Divergências</div><div class="metric-value" id="aDiff">R$ 0,00</div></div>
+        <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-repasses',document.querySelector('[data-subtab=amov-repasses]'))"><div class="metric-label">Saldo Central</div><div class="metric-value" id="aSaldoCentral">R$ 0,00</div><div class="metric-hint" id="aSaldoCentralHint"></div></div>
       </div>
       <div class="card">
         <h3 class="section-title">Dashboard por loja</h3>
@@ -647,6 +657,20 @@
           <h3 class="section-title">Lojas da empresa</h3>
           <div class="table-wrap"><table><thead><tr><th>Loja</th><th>Código</th><th>Tipo</th><th>Fundo padrão</th><th>Status</th></tr></thead><tbody id="adminStoresBody"></tbody></table></div>
         </div>
+        <div class="card" style="margin-top:16px">
+          <h3 class="section-title">Definir Saldo Inicial do Caixa</h3>
+          <p class="subtle" style="margin-bottom:12px">Use para definir o saldo inicial de uma loja ao implantar ou abrir um novo caixa.</p>
+          <div class="form-grid">
+            <div class="field"><label>Loja</label><select id="openingAdjustmentStore"></select></div>
+            <div class="field"><label>Data de início</label><input id="openingAdjustmentDate" type="date"/></div>
+            <div class="field"><label>Turno de início</label><select id="openingAdjustmentShift"><option>Manhã</option><option>Tarde</option><option>Noite</option><option selected>Integral</option><option>Outro</option></select></div>
+            <div class="field"><label>Valor autorizado</label><input id="openingAdjustmentAmount" data-money="br" type="text" inputmode="decimal" pattern="[0-9]*[,.]?[0-9]*" value="0"/></div>
+            <div class="field"><label>Motivo</label><select id="openingAdjustmentReason"><option>Início da operação no sistema</option><option>Caixa limpo</option><option>Complemento de fundo</option><option>Retirada autorizada</option><option>Ajuste operacional</option><option>Correção de divergência anterior</option><option>Outro</option></select></div>
+            <div class="field full"><label>Observações</label><textarea id="openingAdjustmentNotes"></textarea></div>
+          </div>
+          <div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" onclick="saveOpeningAdjustment()">Salvar saldo autorizado</button></div>
+          <div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Loja</th><th>Data</th><th>Turno</th><th>Valor</th><th>Motivo</th><th>Autorizado por</th></tr></thead><tbody id="openingAdjustmentsBody"></tbody></table></div>
+        </div>
       </div>
     </section>
 
@@ -655,33 +679,47 @@
     ============================================================ -->
     <section class="page hidden" id="adminMovimentacoes">
       <div class="inner-tabs">
-        <button class="inner-tab-btn active" data-subtab="amov-extrato"     onclick="showSubTab('adminMovimentacoes','amov-extrato',this)">Extrato</button>
+        <button class="inner-tab-btn active" data-subtab="amov-extrato"      onclick="showSubTab('adminMovimentacoes','amov-extrato',this)">Extrato</button>
+        <button class="inner-tab-btn"        data-subtab="amov-repasses"     onclick="showSubTab('adminMovimentacoes','amov-repasses',this)">Repasses Recebidos</button>
         <button class="inner-tab-btn"        data-subtab="amov-divergencias" onclick="showSubTab('adminMovimentacoes','amov-divergencias',this)">Divergências</button>
       </div>
+
+      <!-- Extrato com filtros -->
       <div class="inner-tab-panel active" id="amov-extrato">
         <div class="card">
           <h3 class="section-title">Movimentações da empresa</h3>
+          <div class="filter-bar-5x" style="margin-bottom:12px">
+            <div class="field"><label>Loja</label><select id="adminExtratStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Data inicial</label><input id="adminExtratStart" type="date" onchange="renderAdminViews()"/></div>
+            <div class="field"><label>Data final</label><input id="adminExtratEnd" type="date" onchange="renderAdminViews()"/></div>
+          </div>
           <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Responsável</th></tr></thead><tbody id="adminMovementsDetailBody2"></tbody></table></div>
         </div>
       </div>
+
+      <!-- Repasses Recebidos -->
+      <div class="inner-tab-panel hidden" id="amov-repasses">
+        <div class="card">
+          <h3 class="section-title">Repasses recebidos das lojas</h3>
+          <div class="filter-bar-5x" style="margin-bottom:12px">
+            <div class="field"><label>Loja</label><select id="adminRepasseStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Data inicial</label><input id="adminRepasseStart" type="date" onchange="renderAdminViews()"/></div>
+            <div class="field"><label>Data final</label><input id="adminRepasseEnd" type="date" onchange="renderAdminViews()"/></div>
+            <div class="field"><label>Status</label><select id="adminRepasseStatusFilter" onchange="renderAdminViews()"><option value="">Todos</option><option value="Pendente">Pendente</option><option value="Recebido">Recebido</option></select></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Operador</th><th>Valor do Repasse</th><th>Status</th><th>Confirmado em</th><th>Por</th><th>Ação</th></tr></thead><tbody id="adminRepassesBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Divergências para revisão -->
       <div class="inner-tab-panel hidden" id="amov-divergencias">
         <div class="card">
           <h3 class="section-title">Divergências para revisão</h3>
-          <div class="filter-bar-5x">
+          <div class="filter-bar-5x" style="margin-bottom:8px">
             <div class="field"><label>Loja</label><select id="adminDivergenceStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Status</label><select id="adminDivergenceStatusFilter" onchange="renderAdminViews()"><option value="Pendente">Pendentes</option><option value="">Todas</option><option value="Revisada">Revisadas</option></select></div>
           </div>
-                    <div class="box" style="margin-bottom:14px">
-            <h4>Definir Saldo Inicial do Caixa</h4>
-            <div class="form-grid">
-              <div class="field"><label>Loja</label><select id="openingAdjustmentStore"></select></div>
-              <div class="field"><label>Data de início</label><input id="openingAdjustmentDate" type="date"/></div>
-              <div class="field"><label>Turno de início</label><select id="openingAdjustmentShift"><option>Manhã</option><option>Tarde</option><option>Noite</option><option selected>Integral</option><option>Outro</option></select></div>
-              <div class="field"><label>Valor autorizado</label><input id="openingAdjustmentAmount" data-money="br" type="text" inputmode="decimal" pattern="[0-9]*[,.]?[0-9]*" value="0"/></div>
-              <div class="field"><label>Motivo</label><select id="openingAdjustmentReason"><option>Início da operação no sistema</option><option>Caixa limpo</option><option>Complemento de fundo</option><option>Retirada autorizada</option><option>Ajuste operacional</option><option>Correção de divergência anterior</option><option>Outro</option></select></div>
-              <div class="field full"><label>Observações</label><textarea id="openingAdjustmentNotes"></textarea></div>
-            </div>
-            <div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" onclick="saveOpeningAdjustment()">Salvar saldo autorizado</button></div>
-          </div><div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Responsável</th><th>Saldo em caixa</th><th>Status revisão</th><th>Ação</th></tr></thead><tbody id="adminDivergencesReviewBody"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Responsável</th><th>Tipo / Valor</th><th>Status revisão</th><th>Ação</th></tr></thead><tbody id="adminDivergencesReviewBody"></tbody></table></div>
         </div>
       </div>
     </section>
@@ -757,8 +795,8 @@
           <div class="closing-block">
             <div class="closing-block-title">Conferência de abertura</div>
             <div class="summary">
-              <div class="summary-line"><span>Último saldo fechado</span><strong id="previousFinalAfterTransferView">R$ 0,00</strong></div>
-              <div class="summary-line"><span>Divergência de abertura</span><strong id="openingDivergenceView">R$ 0,00</strong></div>
+              <div class="summary-line operator-hidden"><span>Último saldo fechado</span><strong id="previousFinalAfterTransferView">R$ 0,00</strong></div>
+              <div class="summary-line operator-hidden"><span>Divergência de abertura</span><strong id="openingDivergenceView">R$ 0,00</strong></div>
               <div class="summary-line"><span>Origem do saldo anterior</span><strong id="openingOriginView">Caixa inicial</strong></div>
             </div>
             <div class="kpi-alert warning" id="openingDivergenceAlert" style="display:none;margin-top:10px"></div>

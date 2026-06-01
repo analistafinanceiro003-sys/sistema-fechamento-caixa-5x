@@ -54,9 +54,8 @@ function tryLocalLogin(login, password, selectedRole) {
   return u || null;
 }
 
-/* --- Entrada principal --- */
+/* --- Entrada principal — perfil detectado automaticamente --- */
 async function enterApp() {
-  const selectedRole = val('profile') || 'master';
   const loginVal = val('loginUser').trim().toLowerCase();
   const passVal  = val('loginPass').trim();
   const errEl    = $('loginError');
@@ -68,17 +67,10 @@ async function enterApp() {
 
   let user = null;
 
-  /* 1. Tenta Supabase Auth */
+  /* 1. Tenta Supabase Auth — perfil identificado pelo banco */
   if (sb) {
     const prof = await trySupabaseLogin(loginVal, passVal);
     if (prof) {
-      if (prof.role !== selectedRole) {
-        if (errEl) {
-          errEl.textContent = `Perfil incorreto. Este usuário é "${prof.role}", não "${selectedRole}".`;
-          errEl.classList.add('show');
-        }
-        return;
-      }
       if (prof.status === 'Inativo') {
         if (errEl) { errEl.textContent = 'Usuário inativo. Contate a Gestão 5X.'; errEl.classList.add('show'); }
         return;
@@ -96,25 +88,28 @@ async function enterApp() {
     }
   }
 
-  /* 2. Fallback local apenas em desenvolvimento sem Supabase real */
+  /* 2. Fallback local — testa todos os perfis em ordem */
   if (!user && window.DEV_LOCAL_MODE) {
-    const localUser = tryLocalLogin(loginVal, passVal, selectedRole);
-    if (localUser) {
-      user = {
-        id: localUser.id,
-        authId: null,
-        name: localUser.name,
-        email: localUser.login,
-        role: localUser.role,
-        companyId: localUser.companyId,
-        storeId: localUser.storeId,
-        status: localUser.status || 'Ativo',
-      };
+    for (const tryRole of ['master', 'admin', 'operator']) {
+      const localUser = tryLocalLogin(loginVal, passVal, tryRole);
+      if (localUser) {
+        user = {
+          id: localUser.id,
+          authId: null,
+          name: localUser.name,
+          email: localUser.login,
+          role: localUser.role,
+          companyId: localUser.companyId,
+          storeId: localUser.storeId,
+          status: localUser.status || 'Ativo',
+        };
+        break;
+      }
     }
   }
 
   if (!user) {
-    if (errEl) { errEl.textContent = 'Login inválido para o perfil selecionado.'; errEl.classList.add('show'); }
+    if (errEl) { errEl.textContent = 'E-mail ou senha incorretos.'; errEl.classList.add('show'); }
     return;
   }
 

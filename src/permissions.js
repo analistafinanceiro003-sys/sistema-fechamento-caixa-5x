@@ -47,8 +47,9 @@ const MODULE_TREE = {
       key: 'adminMovimentacoes', label: 'Movimentações', page: 'adminMovimentacoes',
       defaultEnabled: true,
       submodules: [
-        { key: 'sub_mov_extrato', label: 'Extrato de Movimentações', subTab: 'amov-extrato',     defaultEnabled: true },
-        { key: 'sub_mov_div',     label: 'Divergências',              subTab: 'amov-divergencias', defaultEnabled: true },
+        { key: 'sub_mov_extrato',   label: 'Extrato de Movimentações', subTab: 'amov-extrato',     defaultEnabled: true },
+        { key: 'sub_mov_repasses',  label: 'Repasses Recebidos',       subTab: 'amov-repasses',    defaultEnabled: true },
+        { key: 'sub_mov_div',       label: 'Divergências',             subTab: 'amov-divergencias', defaultEnabled: true },
       ],
     },
     {
@@ -341,7 +342,10 @@ function toggleSidebar() {
     document.querySelector('.sidebar')?.classList.toggle('open');
     $('sidebarOverlay')?.classList.toggle('visible');
   } else {
-    document.querySelector('.app')?.classList.toggle('sidebar-collapsed');
+    const app = document.querySelector('.app');
+    if (!app) return;
+    /* alterna entre compacto-hover e totalmente expandido */
+    app.classList.toggle('sidebar-hover');
   }
 }
 

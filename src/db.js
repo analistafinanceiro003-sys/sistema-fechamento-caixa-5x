@@ -50,14 +50,113 @@ function defaultState() {
     modules: {},
     selectOptions: defaultSelectOptions(),
     audit: [],
+    transferReceipts: [],
   };
+}
+
+/* ----------------------------------------------------------------
+   REPASSES RECEBIDOS
+   Primário: Supabase tabela `transfer_receipts`
+   Fallback:  localStorage (DEV_LOCAL_MODE ou sem sessão ativa)
+   SQL necessário no Supabase:
+     CREATE TABLE transfer_receipts (
+       id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+       closing_id   UUID        NOT NULL,
+       company_id   UUID,
+       store_id     UUID,
+       amount       NUMERIC(10,2) DEFAULT 0,
+       confirmed_by TEXT,
+       notes        TEXT,
+       confirmed_at TIMESTAMPTZ DEFAULT now(),
+       created_at   TIMESTAMPTZ DEFAULT now()
+     );
+     ALTER TABLE transfer_receipts ENABLE ROW LEVEL SECURITY;
+     CREATE POLICY "allow_all_authenticated" ON transfer_receipts
+       FOR ALL USING (auth.role() = 'authenticated');
+---------------------------------------------------------------- */
+const RECEIPTS_LS_KEY = 'caixa5x_transfer_receipts_v1';
+
+function mapTransferReceipt(row) {
+  return {
+    id:          row.id,
+    closingId:   row.closing_id,
+    companyId:   row.company_id,
+    storeId:     row.store_id,
+    amount:      Number(row.amount || 0),
+    confirmedBy: row.confirmed_by || '',
+    notes:       row.notes || '',
+    confirmedAt: row.confirmed_at || row.created_at,
+  };
+}
+
+function getTransferReceipts() {
+  return state?.transferReceipts || [];
+}
+
+function _lsGetReceipts() {
+  try { return JSON.parse(localStorage.getItem(RECEIPTS_LS_KEY) || '[]'); } catch { return []; }
+}
+function _lsSaveReceipts(list) {
+  localStorage.setItem(RECEIPTS_LS_KEY, JSON.stringify(list));
+}
+
+async function createTransferReceiptRecord(receipt) {
+  const row = await supabaseWrite('transfer_receipts', 'insert', cleanPayload({
+    id:           isUuid(receipt.id) ? receipt.id : undefined,
+    closing_id:   receipt.closingId,
+    company_id:   receipt.companyId,
+    store_id:     receipt.storeId,
+    amount:       receipt.amount,
+    confirmed_by: receipt.confirmedBy,
+    notes:        receipt.notes || null,
+  }));
+  return row ? mapTransferReceipt(row) : receipt;
+}
+
+async function confirmTransferReceipt(closingId) {
+  const c = (state.closings || []).find((x) => x.id === closingId);
+  if (!c) return;
+  if ((state.transferReceipts || []).find((r) => r.closingId === closingId)) return;
+
+  const receipt = {
+    id:          uid('tr'),
+    closingId,
+    companyId:   c.companyId,
+    storeId:     c.storeId,
+    amount:      Number(c.transfer || 0),
+    confirmedBy: currentUser?.name || 'ADM',
+    notes:       '',
+    confirmedAt: new Date().toISOString(),
+  };
+
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      const saved = await createTransferReceiptRecord(receipt);
+      if (saved?.id) receipt.id = saved.id;
+    } catch (e) {
+      return alert(`Erro ao confirmar repasse no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase obrigatório em produção para confirmar repasse.');
+  }
+  /* Em todos os casos: atualiza o estado em memória e persiste via save() */
+  state.transferReceipts = state.transferReceipts || [];
+  state.transferReceipts.push(receipt);
+  addAudit('Repasse confirmado', `${storeName(c.storeId)} — ${money(c.transfer)} em ${c.date}`);
+  save();
+  renderAll();
 }
 
 function normalizeState() {
   state = (state && typeof state === 'object') ? state : defaultState();
-  ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit'].forEach((k) => {
+  ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit','transferReceipts'].forEach((k) => {
     if (!Array.isArray(state[k])) state[k] = [];
   });
+  /* Migração: importa recibos salvos na chave antiga (localStorage separado) */
+  if (!state.transferReceipts.length) {
+    const legacy = _lsGetReceipts();
+    if (legacy.length) state.transferReceipts = legacy;
+  }
   state.operationConfigs = (state.operationConfigs && typeof state.operationConfigs === 'object') ? state.operationConfigs : {};
   state.modules = (state.modules && typeof state.modules === 'object') ? state.modules : {};
   state.selectOptions = { ...defaultSelectOptions(), ...(state.selectOptions || {}) };
@@ -219,6 +318,7 @@ async function loadFromNormalizedSupabase() {
   const [
     companies, stores, profiles, modulePermissions, rules, operationConfigs,
     closings, entries, expenses, attachments, openingAdjustments, reviews, audit, selectOptions,
+    transferReceiptsRows,
   ] = await Promise.all([
     selectTable('companies'),
     selectTable('stores'),
@@ -234,6 +334,8 @@ async function loadFromNormalizedSupabase() {
     selectTable('divergence_reviews'),
     selectTable('audit_logs'),
     selectTable('select_options'),
+    /* tabela criada via SQL no Supabase — ver comentário em confirmTransferReceipt */
+    selectTable('transfer_receipts').catch(() => []),
   ]);
 
   const entriesByClosing = groupBy(entries, 'closing_id');
@@ -264,6 +366,7 @@ async function loadFromNormalizedSupabase() {
     audit: audit.map((a) => ({
       id: a.id, date: a.created_at, user: a.user_id || 'Sistema', role: '', action: a.action, detail: a.entity || '', metadata: a.metadata,
     })),
+    transferReceipts: transferReceiptsRows.map(mapTransferReceipt),
   };
   applyModuleRows(modulePermissions);
   applySelectOptionRows(selectOptions);
@@ -371,7 +474,7 @@ function visibleStores() {
 }
 function cfg(companyId) {
   return {
-    tolerance: 5, criticalDivergence: 20, mode: 'Diário',
+    tolerance: 5, mode: 'Diário',
     receiver: '', allowed: '', message: '',
     ...(state?.operationConfigs?.[companyId] || {}),
   };
@@ -1086,8 +1189,63 @@ async function updateStoreFund(id, value) {
   renderAll();
 }
 
+function loadStoreToEdit(id) {
+  const s = state.stores.find((x) => x.id === id);
+  if (!s) return;
+  setVal('editStoreId', s.id);
+  setVal('editStoreName', s.name);
+  setVal('editStoreCode', s.code || '');
+  setVal('editStoreStandardFund', String(s.standardFund || 0));
+  setVal('editStoreStatus', s.status || 'Ativa');
+  setVal('editStoreCashType', s.cashType || 'Caixa diário');
+  /* popular select de empresa */
+  const sel = $('editStoreCompany');
+  if (sel) {
+    sel.innerHTML = state.companies.map((c) => `<option value="${c.id}"${c.id === s.companyId ? ' selected' : ''}>${esc(c.name)}</option>`).join('');
+  }
+  const modal = $('editStoreModal');
+  if (modal) { modal.style.display = 'flex'; }
+}
+
+function closeEditStoreModal() {
+  const modal = $('editStoreModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function saveStoreEdit() {
+  const id = val('editStoreId');
+  const s  = state.stores.find((x) => x.id === id);
+  if (!s) return alert('Loja não encontrada.');
+  const name = val('editStoreName').trim();
+  if (!name) return alert('Informe o nome da loja.');
+  const updated = {
+    ...s,
+    companyId:    val('editStoreCompany')    || s.companyId,
+    name,
+    code:         val('editStoreCode').trim(),
+    cashType:     val('editStoreCashType')   || s.cashType,
+    standardFund: Number(val('editStoreStandardFund')) || 0,
+    status:       val('editStoreStatus')     || s.status,
+  };
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try { await updateStore(id, updated); } catch (e) { return alert(`Erro ao salvar: ${e.message}`); }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase obrigatório em produção.');
+  }
+  Object.assign(s, updated);
+  addAudit('Edição de loja', `${s.name}`);
+  closeEditStoreModal();
+  save();
+  renderAll();
+}
+
 async function deleteStore(id) {
-  if (!confirm('Excluir loja e fechamentos vinculados?')) return;
+  const hasClosings = (state.closings || []).some((c) => c.storeId === id);
+  const storeName_ = state.stores.find((s) => s.id === id)?.name || id;
+  const msg = hasClosings
+    ? `A loja "${storeName_}" possui fechamentos vinculados. Excluí-la removerá esses registros. Confirma?`
+    : `Excluir a loja "${storeName_}"?`;
+  if (!confirm(msg)) return;
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
     try {
       await deleteStoreRecord(id);
@@ -1317,7 +1475,6 @@ async function saveOperationConfig() {
   if (!cid) return alert('Selecione a empresa.');
   const config = {
     tolerance: Number(val('operationTolerance')) || 5,
-    criticalDivergence: Number(val('operationCriticalDivergence')) || 20,
     mode: val('operationMode') || 'Diário',
     receiver: val('operationReceiver'),
     allowed: val('operationAllowed'),

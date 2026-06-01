@@ -84,8 +84,15 @@ function bindGlobalEvents() {
   });
 }
 
+/* Sidebar compacta (hover) por padrão no desktop */
+function initSidebarBehavior() {
+  if (window.innerWidth > 1100) {
+    document.querySelector('.app')?.classList.add('sidebar-hover');
+  }
+}
+
 /* Carrega a app quando o DOM estiver pronto */
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => { init(); initSidebarBehavior(); });
 
 /* ============================================================
    EXPOSIÇÃO GLOBAL EXPLÍCITA
@@ -104,7 +111,7 @@ Object.assign(window, {
   /* DB / CRUD */
   save,
   saveClientSetup, clearClientSetup, toggleCompany, deleteCompany,
-  createStore, updateStoreFund, deleteStore,
+  createStore, updateStoreFund, deleteStore, loadStoreToEdit, saveStoreEdit, closeEditStoreModal,
   createUserFromMaster, toggleUserStore, fillStoreSelect, fillUserManageSelect,
   loadUserToEdit, fillEditUserStore, saveUserEdit,
   resetSelectedUserPassword, deleteSelectedUser, deleteUser,
@@ -120,6 +127,9 @@ Object.assign(window, {
   /* Render */
   renderAll, renderModuleManager, renderUsersByCompany,
   renderMasterMovementsExtract: () => renderFechamentos(),
+
+  /* Repasses */
+  confirmTransferReceipt, getTransferReceipts,
 
   /* Fechamento */
   addEntry, addExpense, removeLaunchRow, calc,
