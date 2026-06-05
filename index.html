@@ -941,80 +941,591 @@
          MASTER: MANUAL DE IMPLANTAÇÃO (exclusivo Gestão 5X)
     ============================================================ -->
     <section class="page hidden" id="manualImplantacao">
-      <div class="card">
-        <h3 class="section-title">Objetivos do Sistema</h3>
-        <p>O <strong>Central de Fechamento de Caixa 5X</strong> é uma plataforma multiempresa de governança financeira diária. Permite que a Gestão 5X acompanhe, em tempo real, os fechamentos de caixa de todos os clientes implantados, identificando divergências, controlando repasses e garantindo rastreabilidade operacional.</p>
+
+      <!-- Cabeçalho do manual com botão PDF -->
+      <div class="card" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <h3 class="section-title" style="margin-bottom:4px">Manual de Implantação — Conferência Caixa em Dinheiro</h3>
+          <p class="subtle">Referência completa para implantação e operação do sistema. Exclusivo Gestão 5X.</p>
+        </div>
+        <button class="btn btn-primary" onclick="exportManualPDF()" style="white-space:nowrap">
+          ↓ Exportar PDF
+        </button>
       </div>
 
-      <div class="card" style="margin-top:16px">
-        <h3 class="section-title">Lógica de Perfis</h3>
-        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:12px">
-          <div class="kpi-alert" style="background:var(--soft)">
-            <strong>Master (Gestão 5X)</strong>
-            <p class="subtle" style="margin-top:6px">Acesso total. Visualiza todas as empresas, cria clientes, gerencia módulos, exporta relatórios consolidados e acessa este manual.</p>
+      <!-- Abas internas -->
+      <div class="inner-tabs">
+        <button class="inner-tab-btn active" data-subtab="man-overview"    onclick="showSubTab('manualImplantacao','man-overview',this)">Visão Geral</button>
+        <button class="inner-tab-btn"        data-subtab="man-perfis"      onclick="showSubTab('manualImplantacao','man-perfis',this)">Perfis</button>
+        <button class="inner-tab-btn"        data-subtab="man-fechamento"  onclick="showSubTab('manualImplantacao','man-fechamento',this)">Fechamento</button>
+        <button class="inner-tab-btn"        data-subtab="man-transacoes"  onclick="showSubTab('manualImplantacao','man-transacoes',this)">Transações</button>
+        <button class="inner-tab-btn"        data-subtab="man-implantacao" onclick="showSubTab('manualImplantacao','man-implantacao',this)">Implantação</button>
+        <button class="inner-tab-btn"        data-subtab="man-checklist"   onclick="showSubTab('manualImplantacao','man-checklist',this)">Checklist</button>
+      </div>
+
+      <!-- ── ABA 1: VISÃO GERAL ── -->
+      <div id="man-overview" class="inner-tab-panel">
+        <div class="card">
+          <h3 class="section-title">O que é o sistema?</h3>
+          <p style="line-height:1.7;color:#374151">
+            O <strong>Central de Fechamento de Caixa 5X</strong> é uma plataforma digital multiempresa de governança financeira diária.
+            Ele substitui as planilhas e anotações em papel, garantindo que cada centavo do caixa seja registrado, conferido e auditado —
+            em tempo real, de qualquer dispositivo com internet.
+          </p>
+          <p style="margin-top:10px;line-height:1.7;color:#374151">
+            A Gestão 5X usa o sistema para acompanhar todos os clientes implantados em um único painel, visualizando fechamentos,
+            divergências e repasses de todas as empresas simultaneamente.
+          </p>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Como funciona o fluxo</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:12px">
+            <div style="background:var(--soft);border:1px solid var(--brand);border-radius:14px;padding:14px;text-align:center">
+              <div style="font-size:22px;margin-bottom:6px">1</div>
+              <strong style="color:var(--brand2)">Operador faz o fechamento</strong>
+              <p class="subtle" style="margin-top:6px;font-size:12px">Informa saldo inicial, entradas, saídas e repasse ao fim do turno</p>
+            </div>
+            <div style="background:var(--soft);border:1px solid var(--brand);border-radius:14px;padding:14px;text-align:center">
+              <div style="font-size:22px;margin-bottom:6px">2</div>
+              <strong style="color:var(--brand2)">Sistema calcula automaticamente</strong>
+              <p class="subtle" style="margin-top:6px;font-size:12px">Divergência, status (OK ou Divergência) e compara com fundo padrão</p>
+            </div>
+            <div style="background:var(--soft);border:1px solid var(--brand);border-radius:14px;padding:14px;text-align:center">
+              <div style="font-size:22px;margin-bottom:6px">3</div>
+              <strong style="color:var(--brand2)">Admin acompanha em tempo real</strong>
+              <p class="subtle" style="margin-top:6px;font-size:12px">Vê o fechamento no painel, confirma repasse e revisa divergências</p>
+            </div>
+            <div style="background:var(--soft);border:1px solid var(--brand);border-radius:14px;padding:14px;text-align:center">
+              <div style="font-size:22px;margin-bottom:6px">4</div>
+              <strong style="color:var(--brand2)">Gestão 5X monitora tudo</strong>
+              <p class="subtle" style="margin-top:6px;font-size:12px">Painel consolidado de todas as empresas, alertas críticos, relatórios</p>
+            </div>
           </div>
-          <div class="kpi-alert" style="background:var(--soft)">
-            <strong>Admin (Cliente)</strong>
-            <p class="subtle" style="margin-top:6px">Acesso à própria empresa. Visualiza fechamentos, histórico, movimentações, divergências e relatórios. Módulos liberados pelo Master.</p>
-          </div>
-          <div class="kpi-alert" style="background:var(--soft)">
-            <strong>Operador (Loja)</strong>
-            <p class="subtle" style="margin-top:6px">Vinculado a uma única loja. Registra fechamento diário, vê seu histórico e, se liberado, consulta as regras operacionais da loja.</p>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Módulos disponíveis</h3>
+          <div class="table-wrap" style="margin-top:12px">
+            <table class="table">
+              <thead><tr><th>Módulo</th><th>O que faz</th><th>Quem acessa</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Fechamento Diário</strong></td><td>Registro de saldo, entradas, saídas, repasse e cálculo automático de divergência</td><td>Operador / Admin</td></tr>
+                <tr><td><strong>Histórico</strong></td><td>Consulta de fechamentos anteriores com filtros por data e loja</td><td>Admin / Operador</td></tr>
+                <tr><td><strong>Regras Operacionais</strong></td><td>Regras visíveis ao operador: saídas permitidas, checklist de conferência</td><td>Admin (cadastra) / Operador (lê)</td></tr>
+                <tr><td><strong>Movimentações</strong></td><td>Extrato consolidado de entradas, saídas e repasses com filtros de data e loja</td><td>Admin / Master</td></tr>
+                <tr><td><strong>Repasses Recebidos</strong></td><td>Confirmação dos valores de repasse enviados pelo operador ao caixa central</td><td>Admin</td></tr>
+                <tr><td><strong>Divergências</strong></td><td>Listagem de fechamentos com divergência acima da tolerância para revisão</td><td>Admin / Master</td></tr>
+                <tr><td><strong>Relatórios</strong></td><td>Exportação PDF e CSV: fechamento por loja, consolidado, repasses, saídas, Conta Azul</td><td>Admin / Master</td></tr>
+                <tr><td><strong>Módulos</strong></td><td>Controle do que cada perfil pode ver em cada empresa</td><td>Master</td></tr>
+                <tr><td><strong>Auditoria</strong></td><td>Log completo de todas as ações realizadas no sistema</td><td>Master</td></tr>
+                <tr><td><strong>Retificação</strong></td><td>Substituição de fechamento incorreto preservando o original com badge visual</td><td>Master / Admin</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
-      <div class="card" style="margin-top:16px">
-        <h3 class="section-title">Funcionalidades Principais</h3>
-        <table class="table" style="margin-top:12px">
-          <thead><tr><th>Módulo</th><th>Descrição</th><th>Perfil</th></tr></thead>
-          <tbody>
-            <tr><td>Fechamento Diário</td><td>Registro de saldo inicial, entradas, saídas, repasse e cálculo automático de divergência</td><td>Operador / Admin</td></tr>
-            <tr><td>Histórico</td><td>Consulta de fechamentos anteriores com filtros por data e loja</td><td>Admin / Operador</td></tr>
-            <tr><td>Regras Operacionais</td><td>Cadastro de regras por empresa/loja (saídas permitidas, repasse, checklist)</td><td>Admin (cadastro) / Operador (leitura)</td></tr>
-            <tr><td>Configuração Operacional</td><td>Tolerância de divergência, modo de operação, mensagem ao operador</td><td>Admin / Master</td></tr>
-            <tr><td>Módulos</td><td>Controle granular de acesso por empresa: quais abas e sub-abas cada perfil vê</td><td>Master</td></tr>
-            <tr><td>Movimentações / Extrato</td><td>Visão consolidada de entradas, saídas e repasses com exportação CSV</td><td>Admin / Master</td></tr>
-            <tr><td>Divergências</td><td>Listagem e revisão de fechamentos com divergência acima da tolerância</td><td>Admin / Master</td></tr>
-            <tr><td>Relatórios</td><td>Exportação CSV/PDF por loja, consolidado, repasses, saídas, Conta Azul</td><td>Admin / Master</td></tr>
-            <tr><td>Repasses Recebidos</td><td>Confirmação de repasses transferidos pelo operador</td><td>Admin</td></tr>
-            <tr><td>Retificação</td><td>Substituição de fechamento com preservação do original e badge visual</td><td>Master / Admin</td></tr>
-            <tr><td>Auditoria</td><td>Log de todas as ações relevantes por usuário</td><td>Master</td></tr>
-          </tbody>
-        </table>
+      <!-- ── ABA 2: PERFIS ── -->
+      <div id="man-perfis" class="inner-tab-panel hidden">
+        <div class="card">
+          <h3 class="section-title">Os três perfis do sistema</h3>
+          <p class="subtle">Cada usuário tem um perfil que determina o que ele vê e o que pode fazer. Os perfis são criados pelo Master e não podem ser alterados pelo próprio usuário.</p>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:14px">
+          <div class="card">
+            <div style="background:#0d1720;color:var(--brand);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;padding:6px 10px;border-radius:8px;display:inline-block;margin-bottom:10px">Master — Gestão 5X</div>
+            <p style="line-height:1.6;color:#374151;font-size:13px">Perfil interno da Gestão 5X. Tem acesso completo a todas as empresas cadastradas, sem restrição de módulos.</p>
+            <div style="margin-top:10px">
+              <p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">O que pode fazer:</p>
+              <ul style="font-size:13px;color:#374151;line-height:1.8;padding-left:16px">
+                <li>Ver e gerenciar todas as empresas clientes</li>
+                <li>Criar, editar e excluir usuários (admin e operador)</li>
+                <li>Configurar módulos por empresa</li>
+                <li>Visualizar todos os fechamentos e divergências</li>
+                <li>Exportar relatórios consolidados de todas as empresas</li>
+                <li>Acessar logs de auditoria completos</li>
+                <li>Retificar fechamentos</li>
+              </ul>
+            </div>
+            <div style="margin-top:10px;background:#fef3c7;border-radius:8px;padding:8px 10px;font-size:12px;color:#92400e">
+              <strong>Como criar:</strong> Diretamente no painel do Supabase, tabela <code>profiles</code>, com <code>role = master</code>.
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="background:#ecfbfa;color:var(--brand2);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;padding:6px 10px;border-radius:8px;display:inline-block;margin-bottom:10px">Admin — Gestor do Cliente</div>
+            <p style="line-height:1.6;color:#374151;font-size:13px">Perfil do gestor ou sócio do cliente. Vê apenas a própria empresa. Os módulos disponíveis são configurados pelo Master.</p>
+            <div style="margin-top:10px">
+              <p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">O que pode fazer:</p>
+              <ul style="font-size:13px;color:#374151;line-height:1.8;padding-left:16px">
+                <li>Visualizar fechamentos de todas as lojas da empresa</li>
+                <li>Consultar histórico com filtros de data e loja</li>
+                <li>Ver movimentações (entradas, saídas, repasses)</li>
+                <li>Confirmar repasses recebidos do operador</li>
+                <li>Revisar divergências e adicionar comentários</li>
+                <li>Exportar relatórios da empresa</li>
+              </ul>
+            </div>
+            <div style="margin-top:10px;background:#fef3c7;border-radius:8px;padding:8px 10px;font-size:12px;color:#92400e">
+              <strong>Como criar:</strong> Cadastros → Usuários → selecionar empresa → perfil Admin → nome + e-mail + senha.
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="background:#f0fdf4;color:#166534;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;padding:6px 10px;border-radius:8px;display:inline-block;margin-bottom:10px">Operador — Funcionário da Loja</div>
+            <p style="line-height:1.6;color:#374151;font-size:13px">Vinculado a uma única loja. Só vê os próprios fechamentos. É o usuário que trabalha no caixa no dia a dia.</p>
+            <div style="margin-top:10px">
+              <p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">O que pode fazer:</p>
+              <ul style="font-size:13px;color:#374151;line-height:1.8;padding-left:16px">
+                <li>Registrar o fechamento do caixa ao fim do turno</li>
+                <li>Consultar seus próprios fechamentos anteriores</li>
+                <li>Ver as regras operacionais da loja (se liberado)</li>
+              </ul>
+            </div>
+            <div style="margin-top:10px;background:#fee2e2;border-radius:8px;padding:8px 10px;font-size:12px;color:#991b1b">
+              <strong>Não pode:</strong> ver valores de outras lojas, confirmar repasses nem alterar configurações.
+            </div>
+            <div style="margin-top:8px;background:#fef3c7;border-radius:8px;padding:8px 10px;font-size:12px;color:#92400e">
+              <strong>Como criar:</strong> Igual ao Admin, mas escolha perfil Operador e selecione a loja vinculada.
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="card" style="margin-top:16px">
-        <h3 class="section-title">Passo a Passo de Implantação</h3>
-        <ol style="margin-top:12px;padding-left:20px;line-height:2">
-          <li><strong>Cadastro da empresa</strong> — Preencher nome fantasia, razão social, CNPJ, segmento, plano e status inicial (Implantação). Usar o Cadastro Guiado.</li>
-          <li><strong>Cadastro de lojas/caixas</strong> — Criar cada ponto de caixa com nome, código, tipo de caixa (diário/turno), fundo padrão e status.</li>
-          <li><strong>Cadastro de operadores</strong> — Criar usuário com perfil Operador via Edge Function, vinculado à empresa e loja corretas. Usar e-mail corporativo real.</li>
-          <li><strong>Regras de caixa</strong> — Cadastrar regras operacionais por empresa/loja: saídas permitidas, limite de repasse, checklist de fechamento.</li>
-          <li><strong>Configuração operacional</strong> — Definir tolerância de divergência (R$), modo de operação, receptor do repasse e mensagem ao operador.</li>
-          <li><strong>Módulos e permissões</strong> — No Gerenciador de Módulos, liberar apenas os módulos necessários para Admin e Operador. Ativar empresa (status → Ativa).</li>
-          <li><strong>Treinamento e início monitorado</strong> — Acompanhar os primeiros fechamentos em tempo real. Verificar divergências e ajustar configurações conforme necessário.</li>
-        </ol>
+      <!-- ── ABA 3: FECHAMENTO DIÁRIO ── -->
+      <div id="man-fechamento" class="inner-tab-panel hidden">
+        <div class="card">
+          <h3 class="section-title">O que é o fechamento diário?</h3>
+          <p style="line-height:1.7;color:#374151">
+            O fechamento é o registro financeiro do caixa realizado ao fim de cada turno ou dia. O operador informa o dinheiro que estava no caixa,
+            o que entrou, o que saiu e o que foi repassado ao caixa central. O sistema calcula automaticamente se o caixa está correto ou se há divergência.
+          </p>
+        </div>
+
+        <div class="card" style="margin-top:14px;background:var(--soft);border:1px solid var(--brand)">
+          <h3 class="section-title">A Fórmula 5X</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px">
+            <div style="background:#fff;border-radius:10px;padding:12px">
+              <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Etapa 1</p>
+              <p style="font-size:13px;font-weight:600;color:#0d1720">Saldo antes do repasse</p>
+              <p style="font-size:12px;color:var(--brand2);margin-top:4px">= Saldo inicial + Entradas − Saídas</p>
+            </div>
+            <div style="background:#fff;border-radius:10px;padding:12px">
+              <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Etapa 2</p>
+              <p style="font-size:13px;font-weight:600;color:#0d1720">Saldo após o repasse</p>
+              <p style="font-size:12px;color:var(--brand2);margin-top:4px">= Saldo antes do repasse − Repasse</p>
+            </div>
+            <div style="background:#fff;border-radius:10px;padding:12px">
+              <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Etapa 3</p>
+              <p style="font-size:13px;font-weight:600;color:#0d1720">Divergência do fundo</p>
+              <p style="font-size:12px;color:var(--brand2);margin-top:4px">= Saldo após repasse − Fundo padrão</p>
+            </div>
+          </div>
+          <p style="margin-top:12px;font-size:12px;color:#374151;line-height:1.6"><strong>Divergência ideal = R$ 0,00.</strong> Se for positiva, sobrou dinheiro no caixa. Se negativa, faltou dinheiro.</p>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Campos do fechamento — explicados</h3>
+          <div class="table-wrap" style="margin-top:12px">
+            <table class="table">
+              <thead><tr><th>Campo</th><th>O que é</th><th>Dica prática</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><strong>Data</strong></td>
+                  <td>Data do fechamento. Geralmente hoje.</td>
+                  <td>Sempre confira a data antes de salvar — não é possível alterar depois sem retificar.</td>
+                </tr>
+                <tr>
+                  <td><strong>Turno</strong></td>
+                  <td>Manhã, Tarde, Noite ou Integral — define qual turno do dia este fechamento representa.</td>
+                  <td>Se a loja opera com turno único, use "Integral".</td>
+                </tr>
+                <tr>
+                  <td><strong>Responsável</strong></td>
+                  <td>Nome do operador que está fazendo o fechamento.</td>
+                  <td>Selecione seu nome na lista. Isso identifica o responsável pelo caixa.</td>
+                </tr>
+                <tr>
+                  <td><strong>Saldo inicial</strong></td>
+                  <td>Quanto havia em dinheiro no caixa no início do turno (o "fundo" que ficou do turno anterior).</td>
+                  <td>Deve bater exatamente com o saldo final do fechamento anterior. Se não bater, o sistema alerta.</td>
+                </tr>
+                <tr>
+                  <td><strong>Entradas</strong></td>
+                  <td>Todo dinheiro que entrou no caixa durante o turno. Cada entrada tem descrição e valor.</td>
+                  <td>Inclua cada tipo de entrada separadamente: "Vendas dinheiro", "Recebimento de troco", etc.</td>
+                </tr>
+                <tr>
+                  <td><strong>Saídas</strong></td>
+                  <td>Todo dinheiro retirado do caixa durante o turno de forma autorizada (pagamentos, ajuda de custo, etc.).</td>
+                  <td>Saídas reduzem o saldo disponível. Sempre informe a categoria e a descrição real.</td>
+                </tr>
+                <tr>
+                  <td><strong>Repasse</strong></td>
+                  <td>Valor enviado ao caixa central ou cofre ao fim do turno. Não é uma saída — é uma transferência de custódia.</td>
+                  <td>O gestor irá confirmar o recebimento deste valor na aba "Repasses Recebidos".</td>
+                </tr>
+                <tr>
+                  <td><strong>Fundo padrão</strong></td>
+                  <td>Valor pré-configurado que deve permanecer no caixa para o próximo turno.</td>
+                  <td>Configurado pelo gestor para cada loja. O operador não altera este campo.</td>
+                </tr>
+                <tr>
+                  <td><strong>Divergência</strong></td>
+                  <td>Diferença calculada automaticamente entre o que deveria estar no caixa e o que efetivamente está.</td>
+                  <td>R$ 0,00 é o ideal. Divergências acima da tolerância aparecem em amarelo/vermelho.</td>
+                </tr>
+                <tr>
+                  <td><strong>Observações</strong></td>
+                  <td>Campo livre para registrar ocorrências do turno ou justificativas de divergência.</td>
+                  <td>Quando houver divergência, explique aqui o motivo. Isso facilita a revisão do gestor.</td>
+                </tr>
+                <tr>
+                  <td><strong>Anexos</strong></td>
+                  <td>Fotos ou PDFs que comprovam as saídas ou ocorrências do turno.</td>
+                  <td>Aceita JPG, PNG e PDF. Tamanho máximo: 10 MB por arquivo.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">O que acontece após salvar</h3>
+          <ol style="padding-left:18px;line-height:2;color:#374151;font-size:13px;margin-top:8px">
+            <li>O fechamento é salvo com status <strong>OK</strong> (divergência dentro da tolerância) ou <strong>Divergência</strong> (fora da tolerância).</li>
+            <li>O gestor (Admin) recebe o fechamento no painel de histórico em tempo real.</li>
+            <li>Se houver divergência acima do limite crítico, aparece um alerta no painel da Gestão 5X.</li>
+            <li>O gestor pode confirmar o repasse na aba <strong>Repasses Recebidos</strong>.</li>
+            <li>Fechamentos com divergência entram na fila de revisão e podem receber comentário do gestor.</li>
+          </ol>
+          <div style="margin-top:12px;background:#fef3c7;border-radius:10px;padding:12px;font-size:13px;color:#92400e">
+            <strong>Importante:</strong> Um fechamento salvo não pode ser excluído. Se houver erro, o gestor pode fazer uma <strong>Retificação</strong>, que substitui o fechamento incorreto e preserva o original para auditoria.
+          </div>
+        </div>
       </div>
 
-      <div class="card" style="margin-top:16px">
-        <h3 class="section-title">Checklist de Ativação</h3>
-        <table class="table" style="margin-top:12px">
-          <thead><tr><th>Item</th><th>Verificação</th></tr></thead>
-          <tbody>
-            <tr><td>DEV_LOCAL_MODE</td><td>Confirmar <code>false</code> em <code>src/db.js</code> linha 12</td></tr>
-            <tr><td>Supabase URL / Key</td><td>Variáveis corretas em <code>src/supabaseClient.js</code></td></tr>
-            <tr><td>CORS Edge Functions</td><td>ALLOWED_ORIGINS com domínio de produção correto</td></tr>
-            <tr><td>RLS ativo</td><td>Todas as 14 tabelas com Row Level Security habilitado</td></tr>
-            <tr><td>Bucket Storage</td><td><code>closing-attachments</code> criado e com política de acesso autenticado</td></tr>
-            <tr><td>Edge Functions</td><td><code>create-user</code> e <code>delete-user</code> deployadas e com secrets configurados</td></tr>
-            <tr><td>Usuário Master</td><td>Perfil <code>role = master</code> criado e ativo no Supabase Auth</td></tr>
-            <tr><td>Empresa de demonstração</td><td>Remover ou inativar empresa "demo" antes de ir ao ar</td></tr>
-            <tr><td>Service Worker</td><td>Verificar que não faz cache de respostas da API Supabase</td></tr>
-            <tr><td>Primeiro login</td><td>Testar fluxo completo: login → fechamento → histórico → logout</td></tr>
-          </tbody>
-        </table>
+      <!-- ── ABA 4: TRANSAÇÕES ── -->
+      <div id="man-transacoes" class="inner-tab-panel hidden">
+
+        <div class="card">
+          <h3 class="section-title">Entradas</h3>
+          <p style="line-height:1.7;color:#374151;margin-bottom:12px">
+            Entradas são todos os valores que <strong>aumentaram o saldo do caixa</strong> durante o turno.
+            Cada entrada deve ter uma descrição clara. O total de entradas é somado automaticamente na fórmula.
+          </p>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Tipo de Entrada</th><th>Descrição</th><th>Exemplo de descrição</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Vendas em dinheiro</strong></td><td>Pagamentos de clientes feitos em espécie</td><td>"Vendas dinheiro 08h–14h"</td></tr>
+                <tr><td><strong>Sangria recebida</strong></td><td>Dinheiro trazido de outro caixa ou do cofre para reforço</td><td>"Reforço do cofre"</td></tr>
+                <tr><td><strong>Troco de fornecedor</strong></td><td>Troco de pagamento a fornecedor que voltou para o caixa</td><td>"Troco NF Distribuidora X"</td></tr>
+                <tr><td><strong>Recebimento avulso</strong></td><td>Qualquer outro valor recebido em dinheiro durante o turno</td><td>"Recebimento aluguel"</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Saídas</h3>
+          <p style="line-height:1.7;color:#374151;margin-bottom:12px">
+            Saídas são retiradas <strong>autorizadas</strong> do caixa durante o turno. Elas reduzem o saldo disponível antes do repasse.
+            Toda saída deve ter categoria e descrição, e idealmente um comprovante em anexo.
+          </p>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Categoria</th><th>O que inclui</th><th>Precisa de comprovante?</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><strong>Ajuda de custo</strong></td>
+                  <td>Vale transporte, refeição ou auxílio a funcionário pago em dinheiro</td>
+                  <td>Recomendado — assinatura do recebedor</td>
+                </tr>
+                <tr>
+                  <td><strong>Taxa de entrega</strong></td>
+                  <td>Pagamento a entregadores ou motoboys em dinheiro</td>
+                  <td>Sim — comprovante ou recibo</td>
+                </tr>
+                <tr>
+                  <td><strong>Compra de mercadoria</strong></td>
+                  <td>Compra emergencial de insumos ou mercadorias com dinheiro do caixa</td>
+                  <td>Sim — nota fiscal obrigatória</td>
+                </tr>
+                <tr>
+                  <td><strong>Outras saídas</strong></td>
+                  <td>Qualquer outra retirada autorizada que não se enquadre nas categorias acima</td>
+                  <td>Sempre justificar no campo descrição</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="margin-top:12px;background:#fee2e2;border-radius:10px;padding:12px;font-size:13px;color:#991b1b">
+            <strong>Atenção:</strong> Saídas sem descrição clara ou sem comprovante aumentam o risco de divergências não justificadas. Oriente os operadores a sempre descrever o motivo da saída.
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Repasse ao Caixa Central</h3>
+          <p style="line-height:1.7;color:#374151;margin-bottom:12px">
+            O repasse é o valor em dinheiro que o operador entrega ao responsável pelo caixa central (gerente, tesoureiro ou cofre)
+            ao fim do turno. <strong>Não é uma saída — é uma transferência de custódia.</strong>
+            O dinheiro não sai da empresa, apenas muda de responsável.
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px">
+              <p style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px">Operador registra:</p>
+              <p style="font-size:13px;color:#374151;line-height:1.6">Informa o valor do repasse no campo "Repasse" antes de salvar o fechamento.</p>
+            </div>
+            <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:12px">
+              <p style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:6px">Gestor confirma:</p>
+              <p style="font-size:13px;color:#374151;line-height:1.6">Acessa a aba "Repasses Recebidos" e confirma que recebeu o dinheiro fisicamente.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Fundo padrão e Divergência de abertura</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
+            <div>
+              <p style="font-size:13px;font-weight:700;color:#0d1720;margin-bottom:6px">Fundo padrão</p>
+              <p style="line-height:1.6;color:#374151;font-size:13px">
+                É o valor que deve permanecer no caixa para o próximo turno após o repasse.
+                Configurado pelo gestor para cada loja (ex: R$ 200,00).
+                Se o saldo após o repasse for igual ao fundo padrão, a divergência é R$ 0,00.
+              </p>
+            </div>
+            <div>
+              <p style="font-size:13px;font-weight:700;color:#0d1720;margin-bottom:6px">Divergência de abertura</p>
+              <p style="line-height:1.6;color:#374151;font-size:13px">
+                O saldo inicial informado pelo operador deve ser igual ao saldo final do fechamento anterior.
+                Se forem diferentes, o sistema exibe um alerta de divergência de abertura.
+                Isso pode indicar que o fundo do turno anterior não foi repassado ou contado corretamente.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <!-- ── ABA 5: IMPLANTAÇÃO ── -->
+      <div id="man-implantacao" class="inner-tab-panel hidden">
+        <div class="card">
+          <h3 class="section-title">Antes de começar — pré-requisitos</h3>
+          <ul style="padding-left:18px;line-height:2;color:#374151;font-size:13px">
+            <li>Sistema publicado em produção com URL definitiva (ex: <code>https://sistema.gestao5x.com.br</code>)</li>
+            <li>Conta Supabase configurada com projeto ativo (banco, Auth, Edge Functions e Storage)</li>
+            <li>Usuário Master criado no Supabase com <code>role = master</code> na tabela <code>profiles</code></li>
+            <li>E-mails corporativos dos usuários Admin e Operadores disponíveis</li>
+          </ul>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Passo a passo completo</h3>
+
+          <div style="margin-top:12px">
+            <!-- Etapa 1 -->
+            <div style="border-left:3px solid var(--brand);padding-left:14px;margin-bottom:20px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">ETAPA 1</span>
+                <strong style="font-size:14px;color:#0d1720">Cadastro da Empresa</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin-bottom:8px">Onde: Menu lateral → <strong>Cadastros</strong> → aba <strong>Cadastro Guiado</strong></p>
+              <ol style="padding-left:18px;line-height:1.9;color:#374151;font-size:13px">
+                <li>Preencha: nome fantasia, razão social, CNPJ, segmento de atuação e plano contratado</li>
+                <li>Status inicial: deixe como <strong>"Implantação"</strong> — não ative ainda</li>
+                <li>Preencha também a primeira loja no mesmo formulário guiado</li>
+                <li>Clique em <strong>"Cadastrar empresa + loja + acesso inicial"</strong></li>
+              </ol>
+              <div style="background:#fef3c7;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#92400e">
+                <strong>Dica:</strong> O Cadastro Guiado cria a empresa, a primeira loja e os acessos iniciais em um único formulário.
+              </div>
+            </div>
+
+            <!-- Etapa 2 -->
+            <div style="border-left:3px solid var(--brand);padding-left:14px;margin-bottom:20px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">ETAPA 2</span>
+                <strong style="font-size:14px;color:#0d1720">Cadastro de Lojas e Caixas</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin-bottom:8px">Onde: <strong>Cadastros</strong> → aba <strong>Lojas e Caixas</strong></p>
+              <ol style="padding-left:18px;line-height:1.9;color:#374151;font-size:13px">
+                <li>Para cada ponto de caixa: informe nome (ex: "Loja Centro"), código curto (ex: LJ01)</li>
+                <li>Tipo de caixa: Caixa diário, Por turno, Central ou Delivery</li>
+                <li><strong>Fundo padrão:</strong> valor em R$ que deve ficar no caixa após o repasse (ex: R$ 200,00)</li>
+                <li>Status: <strong>"Ativa"</strong> — lojas inativas não aparecem para o operador</li>
+              </ol>
+              <div style="background:#fef3c7;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#92400e">
+                <strong>Atenção:</strong> O fundo padrão é essencial para o cálculo de divergência. Defina com o gestor o valor correto antes de ativar.
+              </div>
+            </div>
+
+            <!-- Etapa 3 -->
+            <div style="border-left:3px solid var(--brand);padding-left:14px;margin-bottom:20px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">ETAPA 3</span>
+                <strong style="font-size:14px;color:#0d1720">Cadastro de Usuários</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin-bottom:8px">Onde: <strong>Cadastros</strong> → aba <strong>Usuários</strong></p>
+              <ol style="padding-left:18px;line-height:1.9;color:#374151;font-size:13px">
+                <li>Selecione a empresa na lista suspensa</li>
+                <li>Para o <strong>Admin (gestor)</strong>: selecione perfil Admin, informe nome e e-mail corporativo</li>
+                <li>Para cada <strong>Operador</strong>: selecione perfil Operador e escolha a loja vinculada</li>
+                <li>Defina uma senha inicial (mínimo 6 caracteres)</li>
+                <li>O usuário pode alterar a senha depois pelo botão "Senha" no cabeçalho do sistema</li>
+              </ol>
+              <div style="background:#fee2e2;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#991b1b">
+                <strong>Importante:</strong> Use sempre o e-mail real do usuário. É o login e o canal de recuperação de senha. E-mails genéricos (ex: operador@empresa.com) dificultam a recuperação.
+              </div>
+            </div>
+
+            <!-- Etapa 4 -->
+            <div style="border-left:3px solid var(--brand);padding-left:14px;margin-bottom:20px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">ETAPA 4</span>
+                <strong style="font-size:14px;color:#0d1720">Regras Operacionais</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin-bottom:8px">Onde: <strong>Operação</strong> → aba <strong>Regras</strong></p>
+              <ol style="padding-left:18px;line-height:1.9;color:#374151;font-size:13px">
+                <li>Selecione a empresa e o tipo de regra</li>
+                <li>Tipos disponíveis: Saída permitida, Repasse, Conferência, Divergência, Checklist</li>
+                <li>Regras por empresa: visíveis a todos os operadores da empresa</li>
+                <li>Regras por loja: visíveis apenas ao operador daquela loja</li>
+                <li>Exemplos: "Saída até R$ 50 sem autorização", "Repasse diário às 18h para o gerente Fulano"</li>
+              </ol>
+            </div>
+
+            <!-- Etapa 5 -->
+            <div style="border-left:3px solid var(--brand);padding-left:14px;margin-bottom:20px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">ETAPA 5</span>
+                <strong style="font-size:14px;color:#0d1720">Configuração Operacional</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin-bottom:8px">Onde: <strong>Operação</strong> → aba <strong>Configurações</strong></p>
+              <div class="table-wrap" style="margin-top:8px">
+                <table class="table">
+                  <thead><tr><th>Campo</th><th>O que define</th><th>Valor sugerido</th></tr></thead>
+                  <tbody>
+                    <tr><td><strong>Tolerância</strong></td><td>Divergência máxima considerada aceitável (status OK)</td><td>R$ 5,00</td></tr>
+                    <tr><td><strong>Divergência crítica</strong></td><td>Acima deste valor, aparece alerta vermelho</td><td>R$ 20,00</td></tr>
+                    <tr><td><strong>Modo de operação</strong></td><td>Diário, Por turno ou Por operador</td><td>Diário</td></tr>
+                    <tr><td><strong>Receptor do repasse</strong></td><td>Nome de quem recebe o dinheiro fisicamente</td><td>"Gerente Ana"</td></tr>
+                    <tr><td><strong>Mensagem ao operador</strong></td><td>Texto exibido na tela de fechamento do operador</td><td>"Conte o caixa duas vezes antes de registrar."</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Etapa 6 -->
+            <div style="border-left:3px solid var(--brand);padding-left:14px;margin-bottom:20px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">ETAPA 6</span>
+                <strong style="font-size:14px;color:#0d1720">Módulos e Permissões</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin-bottom:8px">Onde: <strong>Operação</strong> → aba <strong>Módulos</strong></p>
+              <ol style="padding-left:18px;line-height:1.9;color:#374151;font-size:13px">
+                <li>Selecione a empresa e o perfil (Admin ou Operador)</li>
+                <li>Ative apenas os módulos necessários — menos é mais no início</li>
+                <li>Para o Operador: geralmente apenas "Fechamento Diário" e "Meu Histórico"</li>
+                <li>Para o Admin: libere gradualmente conforme o cliente aprende o sistema</li>
+                <li>Alterações entram em vigor imediatamente, sem necessidade de relogin</li>
+              </ol>
+              <div style="background:#fef3c7;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#92400e">
+                <strong>Após configurar tudo:</strong> altere o status da empresa de "Implantação" para <strong>"Ativa"</strong>.
+              </div>
+            </div>
+
+            <!-- Etapa 7 -->
+            <div style="border-left:3px solid var(--brand);padding-left:14px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">ETAPA 7</span>
+                <strong style="font-size:14px;color:#0d1720">Treinamento e Início Monitorado</strong>
+              </div>
+              <ol style="padding-left:18px;line-height:1.9;color:#374151;font-size:13px">
+                <li>Realize um fechamento <strong>teste</strong> com o operador — oriente cada campo</li>
+                <li>Verifique se a divergência calculada faz sentido com os valores informados</li>
+                <li>Mostre ao gestor (Admin) como ver o histórico, confirmar repasses e revisar divergências</li>
+                <li>Nas primeiras semanas: acesse o painel da Gestão 5X diariamente para monitorar</li>
+                <li>Ajuste tolerâncias e regras conforme a operação real do cliente</li>
+              </ol>
+              <div style="background:#f0fdf4;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#166534">
+                <strong>Sucesso:</strong> Empresa ativa, operadores realizando fechamentos diários, gestor confirmando repasses e divergências dentro da tolerância.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ABA 6: CHECKLIST ── -->
+      <div id="man-checklist" class="inner-tab-panel hidden">
+        <div class="card">
+          <h3 class="section-title">Checklist técnico — antes de publicar</h3>
+          <p class="subtle" style="margin-bottom:12px">Verificações de configuração do sistema. Responsabilidade da Gestão 5X.</p>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th style="width:40px">✓</th><th>Item</th><th>Como verificar</th></tr></thead>
+              <tbody>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>DEV_LOCAL_MODE = false</strong></td><td>Confirmar <code>false</code> em <code>src/db.js</code> linha 12</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Supabase URL e chave configurados</strong></td><td>Variáveis corretas em <code>src/supabaseClient.js</code></td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>CORS das Edge Functions</strong></td><td><code>ALLOWED_ORIGINS</code> com o domínio de produção real</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>RLS ativo em todas as tabelas</strong></td><td>14 tabelas com Row Level Security habilitado no Supabase</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Bucket Storage criado</strong></td><td><code>closing-attachments</code> com política de acesso autenticado</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Edge Functions deployadas</strong></td><td><code>create-user</code> e <code>delete-user</code> com secrets <code>PROJECT_URL</code> e <code>SERVICE_ROLE_KEY</code></td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Usuário Master criado</strong></td><td>Perfil <code>role = master</code> ativo no Supabase Auth e na tabela profiles</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Empresa demo removida</strong></td><td>Empresa "demo" inativada ou excluída antes de apresentar ao cliente</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Primeiro login testado</strong></td><td>Login → fechamento → histórico → logout funcionando sem erros</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Checklist operacional — antes de ativar o cliente</h3>
+          <p class="subtle" style="margin-bottom:12px">Verificações de configuração do cliente no sistema.</p>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th style="width:40px">✓</th><th>Item</th><th>Onde configurar</th></tr></thead>
+              <tbody>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Empresa cadastrada com dados corretos</strong></td><td>Cadastros → Cadastro Guiado</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Todas as lojas criadas e ativas</strong></td><td>Cadastros → Lojas e Caixas</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Fundo padrão definido por loja</strong></td><td>Cadastros → Lojas e Caixas</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Usuário Admin criado e testado</strong></td><td>Cadastros → Usuários</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Operador(es) criado(s) e vinculado(s) às lojas</strong></td><td>Cadastros → Usuários</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Tolerância e divergência crítica configuradas</strong></td><td>Operação → Configurações</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Receptor do repasse informado</strong></td><td>Operação → Configurações</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Regras operacionais cadastradas</strong></td><td>Operação → Regras</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Módulos configurados (Admin e Operador)</strong></td><td>Operação → Módulos</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Fechamento teste realizado com operador</strong></td><td>Login operador → Fechamento Diário</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Gestor (Admin) orientado sobre painel</strong></td><td>Login admin → demonstrar histórico e repasses</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Status da empresa alterado para Ativa</strong></td><td>Cadastros → Empresas → editar status</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Checklist do operador — no primeiro dia</h3>
+          <p class="subtle" style="margin-bottom:12px">Para entregar ao operador no treinamento.</p>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th style="width:40px">✓</th><th>O que o operador precisa saber fazer</th></tr></thead>
+              <tbody>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Fazer login com e-mail e senha</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Acessar o Fechamento Diário</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Informar o saldo inicial corretamente (igual ao saldo final do turno anterior)</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Adicionar entradas com descrição clara</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Registrar saídas com categoria e descrição</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Informar o valor do repasse ao gestor</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Salvar o fechamento e verificar o status (OK ou Divergência)</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Em caso de divergência: preencher o campo Observações com a justificativa</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Saber fazer logout ao sair do sistema</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </section>
 
     <!-- ============================================================
