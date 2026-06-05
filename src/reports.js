@@ -331,7 +331,7 @@ function _fmtM(v) {
   const n = Number(v);
   if (v === '' || v == null || isNaN(n)) return v ?? '';
   const abs = Math.abs(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return (n < 0 ? '-' : '') + 'R$ ' + abs;
+  return (n < 0 ? '-' : '') + abs + ' R$';
 }
 
 function _per(startId, endId) {
@@ -661,7 +661,7 @@ async function exportManualPDF() {
       lines: [
         'Saldo antes do repasse  =  Saldo inicial  +  Entradas  −  Saídas',
         'Saldo após o repasse    =  Saldo antes do repasse  −  Repasse',
-        'Divergência do fundo    =  Saldo após repasse  −  Fundo padrão  (ideal = R$ 0,00)',
+        'Divergência do fundo    =  Saldo após repasse  −  Fundo padrão  (ideal = 0,00 R$)',
       ],
     },
     { type: 'table',
@@ -675,7 +675,7 @@ async function exportManualPDF() {
         ['Saídas', 'Retiradas autorizadas do caixa', 'Informe categoria e descrição. Anexe comprovante'],
         ['Repasse', 'Valor enviado ao caixa central', 'Transferência de custódia — gestor confirma o recebimento'],
         ['Fundo padrão', 'Valor que deve permanecer no caixa', 'Configurado pelo gestor para cada loja'],
-        ['Divergência', 'Diferença calculada automaticamente', 'R$ 0,00 ideal. Fora da tolerância gera alerta'],
+        ['Divergência', 'Diferença calculada automaticamente', '0,00 R$ ideal. Fora da tolerância gera alerta'],
         ['Observações', 'Justificativas de ocorrências', 'Obrigatório ao explicar divergências'],
         ['Anexos', 'Comprovantes em arquivo', 'Aceita JPG, PNG e PDF. Máx. 10 MB por arquivo'],
       ],
@@ -718,7 +718,7 @@ async function exportManualPDF() {
         ['2. Lojas', 'Criar cada loja: nome, código, tipo de caixa, fundo padrão. Status: Ativa.', 'Cadastros → Lojas e Caixas', 'Confirme o fundo padrão com o gestor antes de ativar — erro aqui distorce toda a divergência'],
         ['3. Usuários', 'Criar Admin (gestor) e Operador(es) vinculados à empresa e loja correta.', 'Cadastros → Usuários', 'Use e-mail real. Jamais e-mail genérico — dificulta recuperação de senha'],
         ['4. Regras', 'Cadastrar regras: saídas permitidas, limite de repasse, checklist de conferência.', 'Operação → Regras', 'Regras por loja são visíveis apenas ao operador daquela loja'],
-        ['5. Config', 'Definir tolerância de divergência, divergência crítica, receptor do repasse e mensagem ao operador.', 'Operação → Configurações', 'Tolerância recomendada: R$ 5,00. Divergência crítica: R$ 20,00'],
+        ['5. Config', 'Definir tolerância de divergência, divergência crítica, receptor do repasse e mensagem ao operador.', 'Operação → Configurações', 'Tolerância recomendada: 5,00 R$. Divergência crítica: 20,00 R$'],
         ['6. Módulos', 'Liberar apenas módulos necessários para Admin e Operador. Menos módulos = menos confusão.', 'Operação → Módulos', 'Comece conservador. Libere mais módulos conforme o cliente aprende'],
         ['7. Ativação', 'Fazer fechamento teste com o operador. Verificar cálculos. Alterar status para Ativa.', 'Login operador → Fechamento', 'Acompanhe os primeiros 5 fechamentos reais para ajustar tolerâncias se necessário'],
       ],

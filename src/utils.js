@@ -15,11 +15,11 @@ const clear = (id) => setVal(id, '');
 
 /* ============================================================
    FUNÇÕES DE MOEDA
-   Padrão: R$ 1.234,56 na interface; 1234.56 nos cálculos.
+   Padrão: 1.234,56 R$ na interface; 1234.56 nos cálculos.
 ============================================================ */
 
 /* Converte qualquer valor de texto em número limpo.
-   Aceita: "R$ 1.234,56" / "1234,56" / "1234.56" / 1234.56 / "" */
+   Aceita: "1.234,56 R$" / "R$ 1.234,56" / "1234,56" / "1234.56" / 1234.56 / "" */
 function parseCurrencyBR(value) {
   if (value === null || value === undefined || value === '') return 0;
   if (typeof value === 'number') return isNaN(value) ? 0 : value;
@@ -50,9 +50,9 @@ function normalizeMoney(value) {
   return parseCurrencyBR(value);
 }
 
-/* Formata número como "R$ 1.234,56" */
+/* Formata número como "1.234,56 R$" */
 function formatCurrencyBR(value) {
-  return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  return Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' R$';
 }
 
 /* Alias: money() continua sendo a função principal */

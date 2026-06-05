@@ -132,7 +132,7 @@
         <div class="card"><div class="metric-label">Empresas ativas</div><div class="metric-value" id="mCompanies">0</div><div class="metric-hint">Clientes em operação</div></div>
         <div class="card"><div class="metric-label">Lojas / caixas</div><div class="metric-value" id="mStores">0</div><div class="metric-hint">Pontos de fechamento</div></div>
         <div class="card"><div class="metric-label">Fechamentos</div><div class="metric-value" id="mClosings">0</div><div class="metric-hint">Registros salvos</div></div>
-        <div class="card"><div class="metric-label">Divergência total</div><div class="metric-value" id="mDiff">R$ 0,00</div><div class="metric-hint">Soma absoluta</div></div>
+        <div class="card"><div class="metric-label">Divergência total</div><div class="metric-value" id="mDiff">0,00 R$</div><div class="metric-hint">Soma absoluta</div></div>
       </div>
       <div class="panel-grid">
         <div class="card">
@@ -596,8 +596,8 @@
       <div class="grid cards">
         <div class="card clickable-card" onclick="showPage('adminOperacao',document.querySelector('.nav button[data-page=adminOperacao]'));showSubTab('adminOperacao','aop-lojas',document.querySelector('[data-subtab=aop-lojas]'))"><div class="metric-label">Lojas</div><div class="metric-value" id="aStores">0</div></div>
         <div class="card clickable-card" onclick="showPage('adminFechamento',document.querySelector('.nav button[data-page=adminFechamento]'));showSubTab('adminFechamento','afech-historico',document.querySelector('[data-subtab=afech-historico]'))"><div class="metric-label">Fechamentos</div><div class="metric-value" id="aClosings">0</div></div>
-        <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-divergencias',document.querySelector('[data-subtab=amov-divergencias]'))"><div class="metric-label">Divergências</div><div class="metric-value" id="aDiff">R$ 0,00</div></div>
-        <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-repasses',document.querySelector('[data-subtab=amov-repasses]'))"><div class="metric-label">Saldo Central</div><div class="metric-value" id="aSaldoCentral">R$ 0,00</div><div class="metric-hint" id="aSaldoCentralHint"></div></div>
+        <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-divergencias',document.querySelector('[data-subtab=amov-divergencias]'))"><div class="metric-label">Divergências</div><div class="metric-value" id="aDiff">0,00 R$</div></div>
+        <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-repasses',document.querySelector('[data-subtab=amov-repasses]'))"><div class="metric-label">Saldo Central</div><div class="metric-value" id="aSaldoCentral">0,00 R$</div><div class="metric-hint" id="aSaldoCentralHint"></div></div>
       </div>
       <div class="card">
         <h3 class="section-title">Dashboard por loja</h3>
@@ -796,8 +796,8 @@
           <div class="closing-block">
             <div class="closing-block-title">Conferência de abertura</div>
             <div class="summary">
-              <div class="summary-line operator-hidden"><span>Último saldo fechado</span><strong id="previousFinalAfterTransferView">R$ 0,00</strong></div>
-              <div class="summary-line operator-hidden"><span>Divergência de abertura</span><strong id="openingDivergenceView">R$ 0,00</strong></div>
+              <div class="summary-line operator-hidden"><span>Último saldo fechado</span><strong id="previousFinalAfterTransferView">0,00 R$</strong></div>
+              <div class="summary-line operator-hidden"><span>Divergência de abertura</span><strong id="openingDivergenceView">0,00 R$</strong></div>
               <div class="summary-line"><span>Origem do saldo anterior</span><strong id="openingOriginView">Caixa inicial</strong></div>
             </div>
             <div class="kpi-alert warning" id="openingDivergenceAlert" style="display:none;margin-top:10px"></div>
@@ -843,7 +843,7 @@
             <div class="summary">
               <div class="summary-line">
                 <span>Repasse sugerido <span class="subtle">(saldo − fundo)</span></span>
-                <strong id="suggestedTransferView">R$ 0,00</strong>
+                <strong id="suggestedTransferView">0,00 R$</strong>
               </div>
             </div>
             <div class="field" style="margin-top:10px">
@@ -889,9 +889,9 @@
           <div class="conf-block">
             <div class="conf-block-title">Movimento do caixa</div>
             <div class="summary">
-              <div class="summary-line"><span>Total de entradas</span><strong id="totalEntries">R$ 0,00</strong></div>
-              <div class="summary-line"><span>Total de saídas</span><strong id="totalExpenses">R$ 0,00</strong></div>
-              <div class="summary-line summary-line-highlight"><span>Saldo em caixa antes do repasse</span><strong id="expectedCash">R$ 0,00</strong></div>
+              <div class="summary-line"><span>Total de entradas</span><strong id="totalEntries">0,00 R$</strong></div>
+              <div class="summary-line"><span>Total de saídas</span><strong id="totalExpenses">0,00 R$</strong></div>
+              <div class="summary-line summary-line-highlight"><span>Saldo em caixa antes do repasse</span><strong id="expectedCash">0,00 R$</strong></div>
             </div>
           </div>
 
@@ -899,7 +899,7 @@
           <div class="conf-block">
             <div class="conf-block-title">Repasse</div>
             <div class="summary">
-              <div class="summary-line summary-line-highlight"><span>Saldo final após repasse</span><strong id="cashBalance">R$ 0,00</strong></div>
+              <div class="summary-line summary-line-highlight"><span>Saldo final após repasse</span><strong id="cashBalance">0,00 R$</strong></div>
             </div>
           </div>
 
@@ -907,8 +907,8 @@
           <div class="conf-block">
             <div class="conf-block-title">Fundo padrão da loja</div>
             <div class="summary">
-              <div class="summary-line"><span>Fundo padrão</span><strong id="standardFundView">R$ 0,00</strong></div>
-              <div class="summary-line"><span>Divergência 5X (fundo)</span><strong id="fundDivergenceView">R$ 0,00</strong></div>
+              <div class="summary-line"><span>Fundo padrão</span><strong id="standardFundView">0,00 R$</strong></div>
+              <div class="summary-line"><span>Divergência 5X (fundo)</span><strong id="fundDivergenceView">0,00 R$</strong></div>
               <div class="summary-line"><span>Status</span><strong class="status info" id="closingStatusView">-</strong></div>
             </div>
           </div>
@@ -1123,7 +1123,7 @@
               <p style="font-size:12px;color:var(--brand2);margin-top:4px">= Saldo após repasse − Fundo padrão</p>
             </div>
           </div>
-          <p style="margin-top:12px;font-size:12px;color:#374151;line-height:1.6"><strong>Divergência ideal = R$ 0,00.</strong> Se for positiva, sobrou dinheiro no caixa. Se negativa, faltou dinheiro.</p>
+          <p style="margin-top:12px;font-size:12px;color:#374151;line-height:1.6"><strong>Divergência ideal = 0,00 R$.</strong> Se for positiva, sobrou dinheiro no caixa. Se negativa, faltou dinheiro.</p>
         </div>
 
         <div class="card" style="margin-top:14px">
@@ -1175,7 +1175,7 @@
                 <tr>
                   <td><strong>Divergência</strong></td>
                   <td>Diferença calculada automaticamente entre o que deveria estar no caixa e o que efetivamente está.</td>
-                  <td>R$ 0,00 é o ideal. Divergências acima da tolerância aparecem em amarelo/vermelho.</td>
+                  <td>0,00 R$ é o ideal. Divergências acima da tolerância aparecem em amarelo/vermelho.</td>
                 </tr>
                 <tr>
                   <td><strong>Observações</strong></td>
@@ -1293,8 +1293,8 @@
               <p style="font-size:13px;font-weight:700;color:#0d1720;margin-bottom:6px">Fundo padrão</p>
               <p style="line-height:1.6;color:#374151;font-size:13px">
                 É o valor que deve permanecer no caixa para o próximo turno após o repasse.
-                Configurado pelo gestor para cada loja (ex: R$ 200,00).
-                Se o saldo após o repasse for igual ao fundo padrão, a divergência é R$ 0,00.
+                Configurado pelo gestor para cada loja (ex: 200,00 R$).
+                Se o saldo após o repasse for igual ao fundo padrão, a divergência é 0,00 R$.
               </p>
             </div>
             <div>
@@ -1353,7 +1353,7 @@
               <ol style="padding-left:18px;line-height:1.9;color:#374151;font-size:13px">
                 <li>Para cada ponto de caixa: informe nome (ex: "Loja Centro"), código curto (ex: LJ01)</li>
                 <li>Tipo de caixa: Caixa diário, Por turno, Central ou Delivery</li>
-                <li><strong>Fundo padrão:</strong> valor em R$ que deve ficar no caixa após o repasse (ex: R$ 200,00)</li>
+                <li><strong>Fundo padrão:</strong> valor em R$ que deve ficar no caixa após o repasse (ex: 200,00 R$)</li>
                 <li>Status: <strong>"Ativa"</strong> — lojas inativas não aparecem para o operador</li>
               </ol>
               <div style="background:#fef3c7;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#92400e">
@@ -1392,7 +1392,7 @@
                 <li>Tipos disponíveis: Saída permitida, Repasse, Conferência, Divergência, Checklist</li>
                 <li>Regras por empresa: visíveis a todos os operadores da empresa</li>
                 <li>Regras por loja: visíveis apenas ao operador daquela loja</li>
-                <li>Exemplos: "Saída até R$ 50 sem autorização", "Repasse diário às 18h para o gerente Fulano"</li>
+                <li>Exemplos: "Saída até 50 R$ sem autorização", "Repasse diário às 18h para o gerente Fulano"</li>
               </ol>
             </div>
 
@@ -1407,8 +1407,8 @@
                 <table class="table">
                   <thead><tr><th>Campo</th><th>O que define</th><th>Valor sugerido</th></tr></thead>
                   <tbody>
-                    <tr><td><strong>Tolerância</strong></td><td>Divergência máxima considerada aceitável (status OK)</td><td>R$ 5,00</td></tr>
-                    <tr><td><strong>Divergência crítica</strong></td><td>Acima deste valor, aparece alerta vermelho</td><td>R$ 20,00</td></tr>
+                    <tr><td><strong>Tolerância</strong></td><td>Divergência máxima considerada aceitável (status OK)</td><td>5,00 R$</td></tr>
+                    <tr><td><strong>Divergência crítica</strong></td><td>Acima deste valor, aparece alerta vermelho</td><td>20,00 R$</td></tr>
                     <tr><td><strong>Modo de operação</strong></td><td>Diário, Por turno ou Por operador</td><td>Diário</td></tr>
                     <tr><td><strong>Receptor do repasse</strong></td><td>Nome de quem recebe o dinheiro fisicamente</td><td>"Gerente Ana"</td></tr>
                     <tr><td><strong>Mensagem ao operador</strong></td><td>Texto exibido na tela de fechamento do operador</td><td>"Conte o caixa duas vezes antes de registrar."</td></tr>
