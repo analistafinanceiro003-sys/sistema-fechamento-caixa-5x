@@ -73,14 +73,34 @@ const MODULE_TREE = {
   ],
 };
 
+/* Ícones SVG para cada página da sidebar */
+const NAV_ICONS = {
+  dashboard:        `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>`,
+  cadastros:        `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  operacao:         `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  fechamentos:      `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+  relatorios:       `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+  sistema:          `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+  manualImplantacao:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
+  adminDashboard:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>`,
+  adminFechamento:  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+  adminOperacao:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  adminMovimentacoes:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`,
+  adminRelatorios:  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+  closing:          `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+  operatorHistory:  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  operatorRulesPage:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
+};
+
 /* Navegação do Master — sempre completa */
 const MASTER_NAV = [
-  { page: 'dashboard',   label: 'Dashboard'   },
-  { page: 'cadastros',   label: 'Cadastros'   },
-  { page: 'operacao',    label: 'Operação'    },
-  { page: 'fechamentos', label: 'Fechamentos' },
-  { page: 'relatorios',  label: 'Relatórios'  },
-  { page: 'sistema',     label: 'Sistema'     },
+  { page: 'dashboard',        label: 'Dashboard'    },
+  { page: 'cadastros',        label: 'Cadastros'    },
+  { page: 'operacao',         label: 'Operação'     },
+  { page: 'fechamentos',      label: 'Fechamentos'  },
+  { page: 'relatorios',       label: 'Relatórios'   },
+  { page: 'sistema',          label: 'Sistema'      },
+  { page: 'manualImplantacao',label: 'Manual 5X'    },
 ];
 
 /* Alias herdado — mantido para compatibilidade com state.modules antigos */
@@ -104,13 +124,27 @@ function defaultModuleConfig(profile) {
 /* Sem-op: mantido para não quebrar chamadas em db.js */
 function syncModuleAliases(cfg) { return cfg; }
 
+/* Mescla config salva com defaults sem auto-liberar módulos novos para empresas existentes.
+   Empresas sem config alguma recebem defaultEnabled; empresas com config existente recebem
+   false para qualquer chave nova (não habilitam módulo sem aprovação explícita). */
+function mergeModuleConfig(profile, stored) {
+  const defaults = defaultModuleConfig(profile);
+  const hasExistingKeys = stored && Object.keys(stored).some((k) => k !== 'status');
+  if (!hasExistingKeys) {
+    return { ...defaults };
+  }
+  const result = { status: stored.status || defaults.status };
+  Object.keys(defaults).forEach((key) => {
+    if (key === 'status') return;
+    result[key] = key in stored ? stored[key] : false;
+  });
+  return result;
+}
+
 function getModuleConfig(companyId, profile) {
   if (!companyId || !window.state) return defaultModuleConfig(profile);
   state.modules[companyId] = state.modules[companyId] || {};
-  state.modules[companyId][profile] = {
-    ...defaultModuleConfig(profile),
-    ...(state.modules[companyId][profile] || {}),
-  };
+  state.modules[companyId][profile] = mergeModuleConfig(profile, state.modules[companyId][profile]);
   return state.modules[companyId][profile];
 }
 
@@ -181,12 +215,15 @@ function renderSidebarByPermissions() {
   const nav = document.querySelector('.nav');
   if (!nav) return;
 
+  const navBtn = (page, label) => {
+    const icon = NAV_ICONS[page] ? `<span class="nav-icon">${NAV_ICONS[page]}</span>` : '';
+    return `<button data-page="${page}" onclick="showPage('${page}',this)">${icon}<span class="nav-label">${label}</span></button>`;
+  };
+
   if (role === 'master') {
     nav.innerHTML =
       `<div class="nav-title">Gestão 5X</div>` +
-      MASTER_NAV.map(({ page, label }) =>
-        `<button data-page="${page}" onclick="showPage('${page}',this)">${label}</button>`
-      ).join('');
+      MASTER_NAV.map(({ page, label }) => navBtn(page, label)).join('');
     return;
   }
 
@@ -201,7 +238,7 @@ function renderSidebarByPermissions() {
   if (!isBloqueado) {
     tree.forEach((mod) => {
       if (cfg[mod.key] !== false) {
-        html += `<button data-page="${mod.page}" onclick="showPage('${mod.page}',this)">${esc(mod.label)}</button>`;
+        html += navBtn(mod.page, esc(mod.label));
         anyVisible = true;
       }
     });
@@ -257,6 +294,7 @@ const PAGE_TITLES = {
   closing:          ['Fechamento Diário', 'Registro de entradas, saídas e repasse.'],
   operatorHistory:  ['Meu Histórico', 'Seus fechamentos anteriores.'],
   operatorRulesPage:['Regras da Loja', 'Regras operacionais para este caixa.'],
+  manualImplantacao:['Manual de Implantação', 'Referência técnica e operacional — exclusivo Gestão 5X.'],
 };
 
 function showPage(id, btn) {
@@ -410,13 +448,13 @@ async function saveModules() {
   }
   if (window.save) save();
   if (window.renderAll) renderAll();
-  alert('Módulos atualizados. As permissões entrarão em vigor imediatamente.');
+  toast('Módulos atualizados. As permissões entrarão em vigor imediatamente.');
 }
 
 /* Exportação global */
 Object.assign(window, {
-  MODULE_TREE, MASTER_NAV, PAGE_ALIAS_GROUPS, PAGE_TITLES,
-  defaultModuleConfig, syncModuleAliases, getModuleConfig,
+  MODULE_TREE, MASTER_NAV, PAGE_ALIAS_GROUPS, PAGE_TITLES, NAV_ICONS,
+  defaultModuleConfig, syncModuleAliases, mergeModuleConfig, getModuleConfig,
   isPageAllowed, isSubTabAllowed, isCardAllowed,
   firstAllowedPage, firstAllowedSubTab,
   renderSidebarByPermissions, applyModuleAccess,

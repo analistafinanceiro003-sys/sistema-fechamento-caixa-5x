@@ -165,6 +165,20 @@ function flash(message = 'Salvo') {
   setTimeout(() => text('autosaveStatus', 'Autosave ativo'), 1800);
 }
 
+function toast(message, type = 'success', duration = 3500) {
+  const container = $('toastContainer');
+  if (!container) return;
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = message;
+  container.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('toast-visible'));
+  setTimeout(() => {
+    el.classList.remove('toast-visible');
+    el.addEventListener('transitionend', () => el.remove(), { once: true });
+  }, duration);
+}
+
 function downloadFile(filename, content, type = 'text/plain;charset=utf-8') {
   const blob = new Blob([content], { type });
   const url  = URL.createObjectURL(blob);
@@ -212,6 +226,6 @@ Object.assign(window, {
   todayISO, todayBR, parseBR, toBRFromISO,
   formatDateBR, parseDateBR, toISODate,
   validateDateRange, readDateRange,
-  uid, esc, emptyRow, tag, flash, downloadFile,
+  uid, esc, emptyRow, tag, flash, toast, downloadFile,
   csvCell, buildCSV, exportGenericCSV, showSubTab,
 });

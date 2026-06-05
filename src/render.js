@@ -174,7 +174,8 @@ function renderFechamentos() {
       <td>${money(c.expected)}</td><td>${money(c.transfer)}</td>
       <td>${money(c.cashBalance ?? c.finalAfterTransfer)}</td>
       <td>${money(c.fundDivergence ?? c.diff)}<br><span class="subtle">Abertura: ${money(c.openingDivergence || 0)}</span></td>
-      <td>${tag(c.type || 'Original')}</td><td>${tag(c.status)}</td>
+      <td>${tag(c.type || 'Original')}${c.type === 'Retificado' && c.originalClosingId ? `<button class="btn" style="padding:3px 8px;font-size:11px;margin-left:6px" onclick="openOriginalClosingModal('${esc(c.originalClosingId)}')">Ver original</button>` : ''}</td>
+      <td>${tag(c.status)}</td>
     </tr>`
   ).join('') || emptyRow(13));
 
@@ -388,18 +389,36 @@ function renderOperatorViews() {
       <td>${esc(c.date)}</td><td>${esc(storeName(c.storeId))}</td>
       <td>${money(c.entries)}</td><td>${money(c.expenses)}</td><td>${money(c.transfer)}</td>
       <td style="color:${Number(c.diff)<0?'var(--danger)':'var(--warning)'}">${money(c.diff)}</td>
-      <td>${tag(c.type||'Original')}</td><td>${tag(c.status)}</td>
+      <td>${tag(c.type||'Original')}${c.type === 'Retificado' && c.originalClosingId ? `<button class="btn" style="padding:3px 8px;font-size:11px;margin-left:6px" onclick="openOriginalClosingModal('${esc(c.originalClosingId)}')">Ver original</button>` : ''}</td>
+      <td>${tag(c.status)}</td>
     </tr>`
   ).join('') || emptyRow(8));
 
-  /* Regras da loja */
-  const store = selectedStore();
-  const rules = state.rules.filter((r) => r.companyId === store?.companyId);
-  const c = cfg(store?.companyId);
+  /* Regras da loja — bloco no formulário de fechamento (store selecionada no form) */
+  const closingStore = selectedStore();
+  const closingRules = state.rules.filter((r) => r.companyId === closingStore?.companyId && r.status !== 'Inativa');
+  const closingCfg = cfg(closingStore?.companyId);
   html('operatorRules',
-    `${rules.map((r) => `<div class="rule"><span class="dot"></span><span><strong>${esc(r.type)}:</strong> ${esc(r.text)}</span></div>`).join('')}
-    ${c.message ? `<div class="rule"><span class="dot"></span><span>${esc(c.message)}</span></div>` : ''}`
+    `${closingRules.map((r) => `<div class="rule"><span class="dot"></span><span><strong>${esc(r.type)}:</strong> ${esc(r.text)}</span></div>`).join('')}
+    ${closingCfg.message ? `<div class="rule"><span class="dot"></span><span>${esc(closingCfg.message)}</span></div>` : ''}`
     || '<p class="subtle">Nenhuma regra cadastrada.</p>'
+  );
+
+  /* Regras da loja — aba "Regras da Loja" da sidebar do operador */
+  const opStore = state.stores.find((s) => s.id === currentUser?.storeId);
+  const opRules = state.rules.filter((r) =>
+    r.companyId === opStore?.companyId &&
+    (!r.storeId || r.storeId === opStore?.id) &&
+    r.status !== 'Inativa'
+  );
+  const opCfg = cfg(opStore?.companyId);
+  const rulesHtml = opRules.map((r) =>
+    `<div class="rule"><span class="dot"></span><span><strong>${esc(r.type)}:</strong> ${esc(r.text)}</span></div>`
+  ).join('');
+  html('adminRulesList2',
+    rulesHtml
+    + (opCfg.message ? `<div class="rule"><span class="dot"></span><span>${esc(opCfg.message)}</span></div>` : '')
+    || '<p class="subtle">Nenhuma regra cadastrada para esta loja.</p>'
   );
 }
 

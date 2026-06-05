@@ -1,14 +1,15 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-function corsHeaders(req: Request) {
-  const origin = req.headers.get('Origin') || '*';
-  const isAllowedOrigin =
-    origin === '*' ||
-    /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin) ||
-    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+const ALLOWED_ORIGINS = [
+  'https://sistema-fechamento-caixa-5x.vercel.app',
+];
+const DEV_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
 
+function corsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') || '';
+  const isAllowed = ALLOWED_ORIGINS.includes(origin) || DEV_PATTERN.test(origin);
   return {
-    'Access-Control-Allow-Origin': isAllowedOrigin ? origin : 'https://sistema-fechamento-caixa-5x.vercel.app',
+    'Access-Control-Allow-Origin': isAllowed ? origin : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Vary': 'Origin',

@@ -119,6 +119,7 @@
       <div class="top-right">
         <span id="realtimeStatus" style="font-size:12px;font-weight:700;color:#d97706">○ Conectando</span>
         <button class="btn" onclick="manualRefresh()" style="padding:8px 12px;font-size:12px">↻</button>
+        <button class="btn" onclick="changePassword()" style="padding:8px 12px;font-size:12px" title="Alterar minha senha">Senha</button>
         <div class="chip" id="profileChip">Perfil: Gestão 5X</div>
       </div>
     </header>
@@ -937,6 +938,86 @@
     </section>
 
     <!-- ============================================================
+         MASTER: MANUAL DE IMPLANTAÇÃO (exclusivo Gestão 5X)
+    ============================================================ -->
+    <section class="page hidden" id="manualImplantacao">
+      <div class="card">
+        <h3 class="section-title">Objetivos do Sistema</h3>
+        <p>O <strong>Central de Fechamento de Caixa 5X</strong> é uma plataforma multiempresa de governança financeira diária. Permite que a Gestão 5X acompanhe, em tempo real, os fechamentos de caixa de todos os clientes implantados, identificando divergências, controlando repasses e garantindo rastreabilidade operacional.</p>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3 class="section-title">Lógica de Perfis</h3>
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:12px">
+          <div class="kpi-alert" style="background:var(--soft)">
+            <strong>Master (Gestão 5X)</strong>
+            <p class="subtle" style="margin-top:6px">Acesso total. Visualiza todas as empresas, cria clientes, gerencia módulos, exporta relatórios consolidados e acessa este manual.</p>
+          </div>
+          <div class="kpi-alert" style="background:var(--soft)">
+            <strong>Admin (Cliente)</strong>
+            <p class="subtle" style="margin-top:6px">Acesso à própria empresa. Visualiza fechamentos, histórico, movimentações, divergências e relatórios. Módulos liberados pelo Master.</p>
+          </div>
+          <div class="kpi-alert" style="background:var(--soft)">
+            <strong>Operador (Loja)</strong>
+            <p class="subtle" style="margin-top:6px">Vinculado a uma única loja. Registra fechamento diário, vê seu histórico e, se liberado, consulta as regras operacionais da loja.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3 class="section-title">Funcionalidades Principais</h3>
+        <table class="table" style="margin-top:12px">
+          <thead><tr><th>Módulo</th><th>Descrição</th><th>Perfil</th></tr></thead>
+          <tbody>
+            <tr><td>Fechamento Diário</td><td>Registro de saldo inicial, entradas, saídas, repasse e cálculo automático de divergência</td><td>Operador / Admin</td></tr>
+            <tr><td>Histórico</td><td>Consulta de fechamentos anteriores com filtros por data e loja</td><td>Admin / Operador</td></tr>
+            <tr><td>Regras Operacionais</td><td>Cadastro de regras por empresa/loja (saídas permitidas, repasse, checklist)</td><td>Admin (cadastro) / Operador (leitura)</td></tr>
+            <tr><td>Configuração Operacional</td><td>Tolerância de divergência, modo de operação, mensagem ao operador</td><td>Admin / Master</td></tr>
+            <tr><td>Módulos</td><td>Controle granular de acesso por empresa: quais abas e sub-abas cada perfil vê</td><td>Master</td></tr>
+            <tr><td>Movimentações / Extrato</td><td>Visão consolidada de entradas, saídas e repasses com exportação CSV</td><td>Admin / Master</td></tr>
+            <tr><td>Divergências</td><td>Listagem e revisão de fechamentos com divergência acima da tolerância</td><td>Admin / Master</td></tr>
+            <tr><td>Relatórios</td><td>Exportação CSV/PDF por loja, consolidado, repasses, saídas, Conta Azul</td><td>Admin / Master</td></tr>
+            <tr><td>Repasses Recebidos</td><td>Confirmação de repasses transferidos pelo operador</td><td>Admin</td></tr>
+            <tr><td>Retificação</td><td>Substituição de fechamento com preservação do original e badge visual</td><td>Master / Admin</td></tr>
+            <tr><td>Auditoria</td><td>Log de todas as ações relevantes por usuário</td><td>Master</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3 class="section-title">Passo a Passo de Implantação</h3>
+        <ol style="margin-top:12px;padding-left:20px;line-height:2">
+          <li><strong>Cadastro da empresa</strong> — Preencher nome fantasia, razão social, CNPJ, segmento, plano e status inicial (Implantação). Usar o Cadastro Guiado.</li>
+          <li><strong>Cadastro de lojas/caixas</strong> — Criar cada ponto de caixa com nome, código, tipo de caixa (diário/turno), fundo padrão e status.</li>
+          <li><strong>Cadastro de operadores</strong> — Criar usuário com perfil Operador via Edge Function, vinculado à empresa e loja corretas. Usar e-mail corporativo real.</li>
+          <li><strong>Regras de caixa</strong> — Cadastrar regras operacionais por empresa/loja: saídas permitidas, limite de repasse, checklist de fechamento.</li>
+          <li><strong>Configuração operacional</strong> — Definir tolerância de divergência (R$), modo de operação, receptor do repasse e mensagem ao operador.</li>
+          <li><strong>Módulos e permissões</strong> — No Gerenciador de Módulos, liberar apenas os módulos necessários para Admin e Operador. Ativar empresa (status → Ativa).</li>
+          <li><strong>Treinamento e início monitorado</strong> — Acompanhar os primeiros fechamentos em tempo real. Verificar divergências e ajustar configurações conforme necessário.</li>
+        </ol>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3 class="section-title">Checklist de Ativação</h3>
+        <table class="table" style="margin-top:12px">
+          <thead><tr><th>Item</th><th>Verificação</th></tr></thead>
+          <tbody>
+            <tr><td>DEV_LOCAL_MODE</td><td>Confirmar <code>false</code> em <code>src/db.js</code> linha 12</td></tr>
+            <tr><td>Supabase URL / Key</td><td>Variáveis corretas em <code>src/supabaseClient.js</code></td></tr>
+            <tr><td>CORS Edge Functions</td><td>ALLOWED_ORIGINS com domínio de produção correto</td></tr>
+            <tr><td>RLS ativo</td><td>Todas as 14 tabelas com Row Level Security habilitado</td></tr>
+            <tr><td>Bucket Storage</td><td><code>closing-attachments</code> criado e com política de acesso autenticado</td></tr>
+            <tr><td>Edge Functions</td><td><code>create-user</code> e <code>delete-user</code> deployadas e com secrets configurados</td></tr>
+            <tr><td>Usuário Master</td><td>Perfil <code>role = master</code> criado e ativo no Supabase Auth</td></tr>
+            <tr><td>Empresa de demonstração</td><td>Remover ou inativar empresa "demo" antes de ir ao ar</td></tr>
+            <tr><td>Service Worker</td><td>Verificar que não faz cache de respostas da API Supabase</td></tr>
+            <tr><td>Primeiro login</td><td>Testar fluxo completo: login → fechamento → histórico → logout</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================================================
          OPERADOR: REGRAS DA LOJA
     ============================================================ -->
     <section class="page hidden" id="operatorRulesPage">
@@ -953,6 +1034,41 @@
 
 <!-- Status autosave -->
 <div class="autosave" id="autosaveStatus">Autosave ativo</div>
+
+<!-- Toast notifications -->
+<div id="toastContainer"></div>
+
+<!-- Modal: Alterar senha -->
+<div id="changePasswordModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div class="card" style="width:min(420px,96vw);padding:28px">
+    <h3 class="section-title">Alterar senha</h3>
+    <div class="stack" style="margin-top:16px">
+      <div class="field">
+        <label>Nova senha</label>
+        <input id="newPasswordInput" type="password" placeholder="Mínimo 6 caracteres"/>
+      </div>
+      <div class="field">
+        <label>Confirmar nova senha</label>
+        <input id="confirmPasswordInput" type="password" placeholder="Repita a nova senha"/>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:20px">
+      <button id="submitChangePassBtn" class="btn btn-primary" onclick="submitChangePassword()">Salvar nova senha</button>
+      <button class="btn" onclick="closeChangePasswordModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Ver fechamento original (retificações) -->
+<div id="originalClosingModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div class="card" style="width:min(520px,96vw);max-height:90vh;overflow-y:auto;padding:28px">
+    <h3 class="section-title">Fechamento original</h3>
+    <div id="origModalBody" style="margin-top:16px"></div>
+    <div class="btn-row" style="margin-top:20px">
+      <button class="btn" onclick="closeOriginalClosingModal()">Fechar</button>
+    </div>
+  </div>
+</div>
 
 <!-- ============================================================
      SCRIPTS — ordem de carregamento obrigatória

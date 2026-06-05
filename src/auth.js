@@ -147,18 +147,55 @@ async function enterApp() {
 /* --- Logout --- */
 async function logout() {
   clearTimeout(sessionTimer);
+  stopRealtimeSync();
   if (sb) {
     try { await sb.auth.signOut(); } catch {}
   }
-  stopRealtimeSync();
   currentUser = null;
   role = 'master';
+  /* Limpa estado em memória para que o próximo login carregue dados frescos */
+  if (window.state !== undefined) window.state = null;
+  /* Permite re-bind de eventos no próximo login */
+  window.__closingEventsBound = false;
   document.body.classList.remove('role-operator');
   $('app').style.display = 'none';
   $('loginScreen').style.display = 'grid';
   closeSidebar();
-  /* Limpa senha do campo mas mantém e-mail se "lembrar" */
   setVal('loginPass', '');
+}
+
+/* --- Alterar senha (usuário autenticado) --- */
+async function changePassword() {
+  const modal = $('changePasswordModal');
+  if (modal) { modal.style.display = 'flex'; return; }
+}
+
+async function submitChangePassword() {
+  const newPass = val('newPasswordInput');
+  const confirm = val('confirmPasswordInput');
+  if (!newPass || newPass.length < 6) return alert('A nova senha precisa ter pelo menos 6 caracteres.');
+  if (newPass !== confirm) return alert('As senhas não coincidem.');
+  if (!sb) return alert('Supabase não disponível.');
+  const btn = $('submitChangePassBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
+  try {
+    const { error } = await sb.auth.updateUser({ password: newPass });
+    if (error) throw error;
+    if (window.toast) toast('Senha alterada com sucesso!', 'success');
+    else alert('Senha alterada com sucesso!');
+    closeChangePasswordModal();
+  } catch (e) {
+    alert('Erro ao alterar senha: ' + (e.message || 'tente novamente.'));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Salvar nova senha'; }
+  }
+}
+
+function closeChangePasswordModal() {
+  const modal = $('changePasswordModal');
+  if (modal) modal.style.display = 'none';
+  setVal('newPasswordInput', '');
+  setVal('confirmPasswordInput', '');
 }
 
 /* --- Verificação de sessão ativa (Supabase Auth) --- */
@@ -192,8 +229,19 @@ function toggleRemember() {
   if (!checked) localStorage.removeItem('caixa5x_remember');
 }
 
-function forgotPassword() {
-  alert('Para redefinir sua senha, acesse o painel do Supabase ou solicite reset ao administrador do sistema.');
+async function forgotPassword() {
+  const email = val('loginUser').trim();
+  if (!email || !email.includes('@')) return alert('Informe seu e-mail no campo acima antes de prosseguir.');
+  if (!sb) return alert('Supabase não disponível. Solicite redefinição ao administrador.');
+  try {
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) throw error;
+    alert('Link de redefinição enviado para ' + email + '. Verifique sua caixa de entrada.');
+  } catch (e) {
+    alert('Não foi possível enviar o link: ' + (e.message || 'tente novamente.'));
+  }
 }
 
 function openSupport() {
@@ -205,6 +253,7 @@ Object.assign(window, {
   enterApp, logout, checkActiveSession,
   togglePassword, toggleRemember, forgotPassword, openSupport,
   resetSessionTimer,
+  changePassword, submitChangePassword, closeChangePasswordModal,
 });
 
 Object.defineProperty(window, 'role', {

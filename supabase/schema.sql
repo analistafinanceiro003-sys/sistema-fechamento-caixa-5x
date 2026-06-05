@@ -738,9 +738,10 @@ create policy "attachments_scoped_write" on public.closing_attachments
 -- ============================================================
 -- POLICIES: audit_logs
 -- ============================================================
-drop policy if exists "audit_master_all"   on public.audit_logs;
-drop policy if exists "audit_admin_read"   on public.audit_logs;
-drop policy if exists "audit_op_insert"    on public.audit_logs;
+drop policy if exists "audit_master_all"    on public.audit_logs;
+drop policy if exists "audit_admin_read"    on public.audit_logs;
+drop policy if exists "audit_admin_insert"  on public.audit_logs;
+drop policy if exists "audit_op_insert"     on public.audit_logs;
 
 create policy "audit_master_all" on public.audit_logs
   for all to authenticated
@@ -750,6 +751,14 @@ create policy "audit_master_all" on public.audit_logs
 create policy "audit_admin_read" on public.audit_logs
   for select to authenticated
   using (
+    current_user_role() = 'admin'
+    and company_id = current_company_id()
+  );
+
+-- Admin pode registrar eventos de auditoria da própria empresa
+create policy "audit_admin_insert" on public.audit_logs
+  for insert to authenticated
+  with check (
     current_user_role() = 'admin'
     and company_id = current_company_id()
   );

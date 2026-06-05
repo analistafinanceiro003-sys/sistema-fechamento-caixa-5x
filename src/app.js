@@ -7,6 +7,38 @@
      db.js    | closing.js        | reports.js | render.js
 ============================================================ */
 
+/* --- Modal: fechamento original (retificações) --- */
+function openOriginalClosingModal(originalId) {
+  const modal = $('originalClosingModal');
+  if (!modal) return;
+  const orig = (state?.closings || []).find((c) => c.id === originalId);
+  const body = $('origModalBody');
+  if (body) {
+    body.innerHTML = orig
+      ? `<table class="table"><tbody>
+          <tr><th>Data</th><td>${esc(orig.date)}</td></tr>
+          <tr><th>Loja</th><td>${esc(storeName(orig.storeId))}</td></tr>
+          <tr><th>Turno</th><td>${esc(orig.shift || 'Integral')}</td></tr>
+          <tr><th>Responsável</th><td>${esc(orig.responsible)}</td></tr>
+          <tr><th>Saldo inicial</th><td>${money(orig.initial)}</td></tr>
+          <tr><th>Entradas</th><td>${money(orig.entries)}</td></tr>
+          <tr><th>Saídas</th><td>${money(orig.expenses)}</td></tr>
+          <tr><th>Repasse</th><td>${money(orig.transfer)}</td></tr>
+          <tr><th>Saldo final</th><td>${money(orig.finalAfterTransfer)}</td></tr>
+          <tr><th>Divergência</th><td>${money(orig.fundDivergence ?? orig.diff)}</td></tr>
+          <tr><th>Status</th><td>${tag(orig.status)}</td></tr>
+          ${orig.notes ? `<tr><th>Observações</th><td>${esc(orig.notes)}</td></tr>` : ''}
+        </tbody></table>`
+      : '<p class="subtle">Fechamento original não encontrado neste dispositivo.</p>';
+  }
+  modal.style.display = 'flex';
+}
+
+function closeOriginalClosingModal() {
+  const modal = $('originalClosingModal');
+  if (modal) modal.style.display = 'none';
+}
+
 async function init() {
   text('autosaveStatus', 'Carregando...');
 
@@ -101,6 +133,10 @@ document.addEventListener('DOMContentLoaded', () => { init(); initSidebarBehavio
 Object.assign(window, {
   /* Auth */
   enterApp, logout, togglePassword, toggleRemember, forgotPassword, openSupport,
+  changePassword, submitChangePassword, closeChangePasswordModal,
+
+  /* Modais */
+  openOriginalClosingModal, closeOriginalClosingModal,
 
   /* Navegação + módulos (permissions.js) */
   showPage, showSubTab, toggleSidebar, closeSidebar, switchCentral,

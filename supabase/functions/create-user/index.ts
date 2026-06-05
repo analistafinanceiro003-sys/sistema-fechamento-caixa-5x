@@ -1,14 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-function corsHeaders(req: Request) {
-  const origin = req.headers.get('Origin') || '*';
-  const isAllowedOrigin =
-    origin === '*' ||
-    /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin) ||
-    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+const ALLOWED_ORIGINS = [
+  'https://sistema-fechamento-caixa-5x.vercel.app',
+];
+/* Em desenvolvimento local, adicione a origem aqui temporariamente */
+const DEV_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
 
+function corsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') || '';
+  const isAllowed = ALLOWED_ORIGINS.includes(origin) || DEV_PATTERN.test(origin);
   return {
-    'Access-Control-Allow-Origin': isAllowedOrigin ? origin : 'https://sistema-fechamento-caixa-5x.vercel.app',
+    'Access-Control-Allow-Origin': isAllowed ? origin : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Vary': 'Origin',
@@ -28,6 +30,10 @@ function friendlyError(req: Request, message: string, status = 400) {
 
 function normalizeEmail(email: unknown) {
   return String(email || '').trim().toLowerCase();
+}
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
 }
 
 Deno.serve(async (req) => {
@@ -80,7 +86,7 @@ Deno.serve(async (req) => {
   const status = String(body.status || 'Ativo').trim() || 'Ativo';
 
   if (!name) return friendlyError(req, 'Informe o nome do usuário.');
-  if (!email || !email.includes('@')) return friendlyError(req, 'Informe um e-mail válido.');
+  if (!email || !isValidEmail(email)) return friendlyError(req, 'Informe um e-mail válido.');
   if (!password || password.length < 6) return friendlyError(req, 'A senha precisa ter pelo menos 6 caracteres.');
   if (!['admin', 'operator'].includes(role)) return friendlyError(req, 'Perfil inválido. Use Admin ou Operador.');
   if (!['Ativo', 'Inativo'].includes(status)) return friendlyError(req, 'Status inválido para o usuário.');

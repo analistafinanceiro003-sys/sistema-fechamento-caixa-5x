@@ -83,8 +83,11 @@ button,input,select,textarea{font-family:var(--font)}
 .side-logo{display:block;width:140px;max-width:82%;height:auto;object-fit:contain}
 .nav{display:flex;flex-direction:column;gap:4px;overflow-y:auto;overflow-x:hidden;padding-right:2px;flex:1;min-height:0}
 .nav-title{font-size:10px;text-transform:uppercase;color:#7d8da1;font-weight:700;margin:12px 8px 4px;letter-spacing:.5px}
-.nav button{border:1px solid transparent;background:transparent;color:#b4c1d4;padding:10px 12px;border-radius:11px;text-align:left;cursor:pointer;font-weight:600;font-size:13px;transition:all .15s;white-space:nowrap}
+.nav button{display:flex;align-items:center;gap:9px;border:1px solid transparent;background:transparent;color:#b4c1d4;padding:10px 12px;border-radius:11px;text-align:left;cursor:pointer;font-weight:600;font-size:13px;transition:all .15s;white-space:nowrap;width:100%}
 .nav button.active,.nav button:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.07);color:#fff}
+.nav-icon{flex-shrink:0;width:16px;height:16px;opacity:.65;display:flex;align-items:center;justify-content:center;transition:opacity .15s}
+.nav button:hover .nav-icon,.nav button.active .nav-icon{opacity:1}
+.nav-label{flex:1;overflow:hidden;text-overflow:ellipsis}
 .side-footer{margin-top:auto;padding-top:14px;flex-shrink:0}
 .userbox{margin-top:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:12px;color:#cbd5e1;font-size:13px}
 .userbox strong{display:block;color:#fff;font-size:14px}
@@ -519,10 +522,42 @@ body.role-operator #closing .panel-grid{grid-template-columns:1fr}
   }
   .app.sidebar-hover .brand .side-logo{width:30px;object-fit:cover;object-position:left;transition:width .22s}
   .app.sidebar-hover .sidebar:hover .brand .side-logo{width:140px;object-fit:contain}
-  .app.sidebar-hover .nav button{padding:10px 6px;overflow:hidden;text-overflow:clip}
-  .app.sidebar-hover .sidebar:hover .nav button{padding:10px 12px}
+  .app.sidebar-hover .nav button{padding:10px 0;justify-content:center;gap:0;overflow:hidden}
+  .app.sidebar-hover .nav .nav-icon{opacity:.8;width:18px;height:18px}
+  .app.sidebar-hover .nav .nav-label{display:none}
+  .app.sidebar-hover .nav .nav-title{opacity:0;pointer-events:none}
+  .app.sidebar-hover .sidebar:hover .nav button{padding:10px 12px;justify-content:flex-start;gap:9px}
+  .app.sidebar-hover .sidebar:hover .nav .nav-label{display:block}
+  .app.sidebar-hover .sidebar:hover .nav .nav-title{opacity:1}
   .app.sidebar-hover .side-footer{overflow:hidden}
   .app.sidebar-hover .sidebar:hover .side-footer{overflow:visible}
   .app.sidebar-hover .userbox,.app.sidebar-hover .logout{display:none}
   .app.sidebar-hover .sidebar:hover .userbox,.app.sidebar-hover .sidebar:hover .logout{display:block}
+}
+
+/* ============================================================
+   TOAST NOTIFICATIONS
+============================================================ */
+#toastContainer{
+  position:fixed;bottom:28px;right:24px;z-index:9999;
+  display:flex;flex-direction:column-reverse;gap:10px;
+  pointer-events:none;
+}
+.toast{
+  min-width:260px;max-width:380px;
+  padding:13px 18px;border-radius:14px;
+  font-size:14px;font-weight:600;line-height:1.4;
+  box-shadow:0 8px 28px rgba(0,0,0,.18);
+  opacity:0;transform:translateY(12px);
+  transition:opacity .22s ease,transform .22s ease;
+  pointer-events:auto;
+}
+.toast.toast-visible{opacity:1;transform:translateY(0)}
+.toast.toast-success{background:#16a34a;color:#fff}
+.toast.toast-error{background:#dc2626;color:#fff}
+.toast.toast-warning{background:#d97706;color:#fff}
+.toast.toast-info{background:#2563eb;color:#fff}
+@media(max-width:500px){
+  #toastContainer{left:12px;right:12px;bottom:16px}
+  .toast{min-width:0;max-width:100%;width:100%}
 }

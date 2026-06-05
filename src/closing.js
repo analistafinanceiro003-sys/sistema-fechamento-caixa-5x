@@ -219,9 +219,9 @@ function calc() {
   const openAlert = $('openingDivergenceAlert');
   if (openAlert) {
     const abs = Math.abs(cc.openingDivergence);
-    openAlert.style.display = abs > 0.009 ? '' : 'none';
+    openAlert.style.display = abs > cc.tolerance ? '' : 'none';
     openAlert.className     = 'kpi-alert warning';
-    openAlert.textContent   = 'O saldo inicial não bate com o último saldo fechado.';
+    openAlert.textContent   = `Divergência de abertura: ${money(cc.openingDivergence)}. Tolerância configurada: ${money(cc.tolerance)}.`;
   }
 
   /* Bloco 1 — Saldo em caixa (passo a passo) */
@@ -622,8 +622,23 @@ async function saveClosing() {
 /* ================================================================
    ANEXOS
 ================================================================ */
+const ALLOWED_ATTACHMENT_MIME = ['image/jpeg', 'image/png', 'application/pdf'];
+const ALLOWED_ATTACHMENT_EXT  = /\.(jpe?g|png|pdf)$/i;
+const MAX_ATTACHMENT_BYTES    = 10 * 1024 * 1024; // 10 MB
+
 function handleAttachments(files) {
-  closingAttachments.push(...[...files].map((f) => ({
+  const rejected = [];
+  const valid = [...files].filter((f) => {
+    const typeOk = ALLOWED_ATTACHMENT_MIME.includes(f.type) || ALLOWED_ATTACHMENT_EXT.test(f.name);
+    if (!typeOk) { rejected.push(`"${f.name}": tipo não permitido. Use JPG, PNG ou PDF.`); return false; }
+    if (f.size > MAX_ATTACHMENT_BYTES) { rejected.push(`"${f.name}": arquivo muito grande (máx. 10 MB).`); return false; }
+    return true;
+  });
+  if (rejected.length) {
+    if (window.toast) rejected.forEach((msg) => toast(msg, 'error', 5000));
+    else alert(rejected.join('\n'));
+  }
+  closingAttachments.push(...valid.map((f) => ({
     name: f.name, size: f.size, type: f.type, lastModified: f.lastModified, file: f,
   })));
   renderAttachments();

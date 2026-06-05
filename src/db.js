@@ -166,8 +166,8 @@ function normalizeState() {
       state.operationConfigs[c.id] = { tolerance: 5, criticalDivergence: 20, mode: 'Diário', receiver: '', allowed: '', message: '' };
     }
     if (!state.modules[c.id]) state.modules[c.id] = {};
-    state.modules[c.id].admin    = { ...defaultModuleConfig('admin'),    ...(state.modules[c.id].admin    || {}) };
-    state.modules[c.id].operator = { ...defaultModuleConfig('operator'), ...(state.modules[c.id].operator || {}) };
+    state.modules[c.id].admin    = mergeModuleConfig('admin',    state.modules[c.id].admin);
+    state.modules[c.id].operator = mergeModuleConfig('operator', state.modules[c.id].operator);
     syncModuleAliases(state.modules[c.id].admin);
     syncModuleAliases(state.modules[c.id].operator);
   });
@@ -450,7 +450,10 @@ function setupRealtimeSync() {
 }
 
 function stopRealtimeSync() {
-  if (sb && realtimeChannel) sb.removeChannel(realtimeChannel);
+  if (sb && realtimeChannel) {
+    try { realtimeChannel.unsubscribe(); } catch {}
+    sb.removeChannel(realtimeChannel);
+  }
   realtimeChannel = null;
 }
 
@@ -1024,7 +1027,7 @@ async function saveClientSetup() {
       clearClientSetup();
       save();
       renderAll();
-      alert('Cliente cadastrado. Usuários devem ser criados pelo Supabase Auth e vinculados na tabela profiles.');
+      toast('Cliente cadastrado com sucesso.');
     } catch (e) {
       alert(`Erro ao cadastrar cliente no Supabase: ${e.message}`);
     }
@@ -1081,7 +1084,7 @@ async function saveClientSetup() {
   clearClientSetup();
   save();
   renderAll();
-  alert('Cliente cadastrado com empresa, loja e acessos iniciais.');
+  toast('Cliente cadastrado com sucesso.');
 }
 
 function clearClientSetup() {
@@ -1301,7 +1304,7 @@ async function createUserFromMaster() {
         setVal('userManageSelect', profile.id);
         loadUserToEdit();
       }
-      return alert('Usuário cadastrado com sucesso.');
+      return toast('Usuário cadastrado com sucesso.');
     } catch (e) {
       const message = String(e.message || '');
       if (message.toLowerCase().includes('e-mail') || message.toLowerCase().includes('email') || message.toLowerCase().includes('already')) {
@@ -1328,7 +1331,7 @@ async function createUserFromMaster() {
   const created = state.users[state.users.length - 1];
   setVal('userManageSelect', created.id);
   loadUserToEdit();
-  alert('Usuário cadastrado com sucesso.');
+  toast('Usuário cadastrado com sucesso.');
 }
 
 function loadUserToEdit() {
@@ -1365,7 +1368,7 @@ async function saveUserEdit() {
   addAudit('Edição de usuário', u.login);
   save();
   renderAll();
-  alert('Usuário atualizado.');
+  toast('Usuário atualizado.');
 }
 
 function resetSelectedUserPassword() {
@@ -1404,7 +1407,7 @@ async function removeUserById(id) {
   save();
   renderAll();
   fillUserManageSelect();
-  alert('Usuário excluído com sucesso.');
+  toast('Usuário excluído com sucesso.');
 }
 
 function deleteSelectedUser() {
@@ -1572,7 +1575,7 @@ function importBackup() {
       normalizeState();
       save();
       renderAll();
-      alert('Backup restaurado com sucesso.');
+      toast('Backup restaurado com sucesso.');
     } catch { alert('Arquivo inválido. Verifique o formato JSON.'); }
   };
   reader.readAsText(f);
