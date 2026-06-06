@@ -1560,6 +1560,149 @@ async function resetSelectOptions() {
   renderAll();
 }
 
+/* --- Limpar dados operacionais por empresa --- */
+function openLimparDadosModal() {
+  const sel = $('limparEmpresa');
+  if (sel) {
+    sel.innerHTML = '<option value="">Selecione a empresa</option>' +
+      state.companies.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+  }
+  setVal('limparDataDe', '');
+  setVal('limparDataAte', '');
+  setVal('limparConfirmacao', '');
+  const hint = $('limparConfirmacaoHint');
+  if (hint) hint.style.display = 'none';
+  if ($('limparFechamentos'))  $('limparFechamentos').checked  = true;
+  if ($('limparAjustes'))      $('limparAjustes').checked      = true;
+  if ($('limparDivergencias')) $('limparDivergencias').checked = true;
+  if ($('limparRepasses'))     $('limparRepasses').checked     = false;
+  if ($('limparAudit'))        $('limparAudit').checked        = false;
+  const modal = $('limparDadosModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeLimparDadosModal() {
+  const modal = $('limparDadosModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function clearCompanyData() {
+  const companyId = val('limparEmpresa');
+  const company = state.companies.find((c) => c.id === companyId);
+  if (!companyId || !company) return alert('Selecione uma empresa.');
+
+  const typed = val('limparConfirmacao').trim();
+  const hint = $('limparConfirmacaoHint');
+  if (typed.toLowerCase() !== company.name.toLowerCase()) {
+    if (hint) hint.style.display = '';
+    return;
+  }
+  if (hint) hint.style.display = 'none';
+
+  const delClose = !!$('limparFechamentos')?.checked;
+  const delAdj   = !!$('limparAjustes')?.checked;
+  const delDiv   = !!$('limparDivergencias')?.checked;
+  const delRep   = !!$('limparRepasses')?.checked;
+  const delAudit = !!$('limparAudit')?.checked;
+
+  if (!delClose && !delAdj && !delDiv && !delRep && !delAudit) {
+    return alert('Selecione ao menos um tipo de dado para limpar.');
+  }
+
+  const dataDe  = val('limparDataDe')  || null; // ISO YYYY-MM-DD
+  const dataAte = val('limparDataAte') || null; // ISO YYYY-MM-DD
+
+  const itens = [];
+  if (delClose) itens.push('fechamentos (+ entradas, saídas, anexos)');
+  if (delAdj)   itens.push('ajustes de saldo inicial');
+  if (delDiv)   itens.push('revisões de divergência');
+  if (delRep)   itens.push('repasses recebidos');
+  if (delAudit) itens.push('logs de auditoria');
+
+  const periodoTxt = (dataDe || dataAte)
+    ? ` | Período: ${dataDe || 'início'} a ${dataAte || 'hoje'}`
+    : ' | Todos os registros';
+
+  if (!confirm(`Remover permanentemente:\n• ${itens.join('\n• ')}\n\nEmpresa: ${company.name}${periodoTxt}\n\nEsta ação NÃO pode ser desfeita!`)) return;
+
+  try {
+    if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+      if (delClose) {
+        let q = sb.from('closings').delete().eq('company_id', companyId);
+        if (dataDe)  q = q.gte('closing_date', dataDe);
+        if (dataAte) q = q.lte('closing_date', dataAte);
+        const { error } = await q;
+        if (error) throw error;
+      }
+      if (delAdj) {
+        let q = sb.from('cash_opening_adjustments').delete().eq('company_id', companyId);
+        if (dataDe)  q = q.gte('start_date', dataDe);
+        if (dataAte) q = q.lte('start_date', dataAte);
+        const { error } = await q;
+        if (error) throw error;
+      }
+      if (delDiv) {
+        const { error } = await sb.from('divergence_reviews').delete().eq('company_id', companyId);
+        if (error) throw error;
+      }
+      if (delRep) {
+        const { error } = await sb.from('transfer_receipts').delete().eq('company_id', companyId);
+        if (error) throw error;
+      }
+      if (delAudit) {
+        const { error } = await sb.from('audit_logs').delete().eq('company_id', companyId);
+        if (error) throw error;
+      }
+    } else if (!DEV_LOCAL_MODE) {
+      return alert('Supabase Auth/Sessão obrigatório em produção para limpar dados.');
+    }
+
+    /* Filtra estado local */
+    const inPeriod = (isoDate) => {
+      if (!dataDe && !dataAte) return true;
+      if (dataDe  && isoDate < dataDe)  return false;
+      if (dataAte && isoDate > dataAte) return false;
+      return true;
+    };
+
+    let removedIds = new Set();
+    if (delClose) {
+      removedIds = new Set(
+        state.closings
+          .filter((c) => c.companyId === companyId && inPeriod(parseBR(c.date)))
+          .map((c) => c.id)
+      );
+      state.closings = state.closings.filter((c) => !removedIds.has(c.id));
+    }
+    if (delAdj) {
+      state.cashOpeningAdjustments = state.cashOpeningAdjustments.filter((a) => {
+        if (a.companyId !== companyId) return true;
+        return !inPeriod(a.startDate || '');
+      });
+    }
+    if (delDiv) {
+      state.divergenceReviews = state.divergenceReviews.filter((r) => r.companyId !== companyId);
+    } else if (removedIds.size) {
+      state.divergenceReviews = state.divergenceReviews.filter((r) => !removedIds.has(r.closingId));
+    }
+    if (delRep) {
+      state.transferReceipts = (state.transferReceipts || []).filter((r) => r.companyId !== companyId);
+    }
+    if (delAudit) {
+      state.audit = state.audit.filter((a) => a.companyId !== companyId);
+    }
+
+    addAudit('Limpeza de dados operacionais', `${company.name} — ${itens.join(', ')}`);
+    lastOwnSave = Date.now();
+    save();
+    renderAll();
+    closeLimparDadosModal();
+    toast(`Dados de "${company.name}" removidos com sucesso.`);
+  } catch (e) {
+    alert(`Erro ao limpar dados: ${e.message}`);
+  }
+}
+
 /* --- Backup --- */
 function exportBackup() {
   downloadFile(`backup_caixa5x_${todayISO()}.json`, JSON.stringify(state, null, 2), 'application/json;charset=utf-8');
@@ -1694,6 +1837,7 @@ Object.assign(window, {
   deleteSelectedUser, deleteUser,
   createRule, deleteRule, saveImplantStep, saveOperationConfig,
   addSelectOption, removeSelectOption, resetSelectOptions,
+  openLimparDadosModal, closeLimparDadosModal, clearCompanyData,
   exportBackup, importBackup, resetSystem,
   storeOptionsForCompany, setOptions, fillSelects,
   fillStoreSelect, fillClosingStoreSelect, fillClosingResponsible5X,

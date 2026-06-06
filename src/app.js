@@ -154,6 +154,7 @@ Object.assign(window, {
   createRule, deleteRule, renderRulesByCompany: renderOperacao,
   saveImplantStep, saveOperationConfig,
   addSelectOption, removeSelectOption, resetSelectOptions,
+  openLimparDadosModal, closeLimparDadosModal, clearCompanyData,
   exportBackup, importBackup, resetSystem,
 
   /* Selects */

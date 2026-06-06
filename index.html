@@ -572,6 +572,11 @@
             <button class="btn btn-danger" onclick="resetSystem()">Resetar sistema</button>
           </div>
         </div>
+        <div class="card" style="margin-top:16px;border-left:4px solid #dc2626">
+          <h3 class="section-title">Limpar dados operacionais</h3>
+          <p class="subtle" style="margin-bottom:14px">Remove fechamentos, ajustes e revisões de uma empresa sem apagar o cadastro. Útil para limpar registros de demonstração ou teste.</p>
+          <button class="btn btn-danger" onclick="openLimparDadosModal()">Limpar dados por empresa</button>
+        </div>
       </div>
 
       <!-- Logs -->
@@ -1577,6 +1582,61 @@
     <div id="origModalBody" style="margin-top:16px"></div>
     <div class="btn-row" style="margin-top:20px">
       <button class="btn" onclick="closeOriginalClosingModal()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Limpar dados operacionais -->
+<div id="limparDadosModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center">
+  <div class="card" style="width:min(540px,96vw);max-height:90vh;overflow-y:auto;padding:28px">
+    <h3 class="section-title" style="color:#dc2626">Limpar dados operacionais</h3>
+    <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px;margin-bottom:20px">
+      <strong style="color:#dc2626">⚠ Atenção:</strong> Esta ação é permanente e não pode ser desfeita. O cadastro da empresa, lojas e usuários permanece intacto — somente os dados operacionais selecionados serão removidos.
+    </div>
+    <div class="field">
+      <label>Empresa</label>
+      <select id="limparEmpresa"><option value="">Selecione a empresa</option></select>
+    </div>
+    <div class="field">
+      <label>Período (opcional — deixe em branco para limpar todos os registros)</label>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <div style="flex:1"><label style="font-size:12px;color:#666">De</label><input type="date" id="limparDataDe" style="width:100%"/></div>
+        <div style="flex:1"><label style="font-size:12px;color:#666">Até</label><input type="date" id="limparDataAte" style="width:100%"/></div>
+      </div>
+    </div>
+    <div class="field" style="margin-top:4px">
+      <label>O que deseja apagar?</label>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+          <input type="checkbox" id="limparFechamentos" checked style="margin-top:3px"/>
+          <span><strong>Fechamentos</strong><br><span class="subtle">+ entradas, saídas e anexos vinculados</span></span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+          <input type="checkbox" id="limparAjustes" checked style="margin-top:3px"/>
+          <span><strong>Ajustes de saldo inicial</strong><br><span class="subtle">Autorizações de abertura de caixa</span></span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+          <input type="checkbox" id="limparDivergencias" checked style="margin-top:3px"/>
+          <span><strong>Revisões de divergência</strong><br><span class="subtle">Histórico de revisões e justificativas</span></span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+          <input type="checkbox" id="limparRepasses" style="margin-top:3px"/>
+          <span><strong>Repasses recebidos</strong><br><span class="subtle">Confirmações de entrega ao caixa central</span></span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+          <input type="checkbox" id="limparAudit" style="margin-top:3px"/>
+          <span><strong>Logs de auditoria</strong><br><span class="subtle">Histórico de ações do sistema para esta empresa</span></span>
+        </label>
+      </div>
+    </div>
+    <div class="field" style="margin-top:16px">
+      <label>Digite o nome da empresa para confirmar:</label>
+      <input type="text" id="limparConfirmacao" placeholder="Nome da empresa..." autocomplete="off"/>
+      <small id="limparConfirmacaoHint" style="display:none;color:#dc2626;font-size:12px">O nome não confere com o selecionado.</small>
+    </div>
+    <div class="btn-row" style="margin-top:20px">
+      <button class="btn btn-danger" onclick="clearCompanyData()">Limpar dados</button>
+      <button class="btn" onclick="closeLimparDadosModal()">Cancelar</button>
     </div>
   </div>
 </div>
