@@ -1399,16 +1399,43 @@ async function saveUserEdit() {
   toast('Usuário atualizado.');
 }
 
-function resetSelectedUserPassword() {
+async function resetSelectedUserPassword() {
   const u = state.users.find((x) => x.id === val('userManageSelect'));
   if (!u) return alert('Selecione um usuário.');
-  if (!DEV_LOCAL_MODE) {
-    return alert('Em produção, redefina a senha pelo Supabase Auth.');
+  if (DEV_LOCAL_MODE) {
+    u.pass = '';
+    addAudit('Reset de senha', u.login);
+    save();
+    return alert('Senha local removida.');
   }
-  u.pass = '';
-  addAudit('Reset de senha', u.login);
-  save();
-  alert('Senha local removida. Defina uma nova senha no modo de desenvolvimento.');
+  if (!u.authId) return alert('Este usuário não possui vínculo com o Supabase Auth. Crie-o novamente pelo sistema.');
+  const newPass = prompt(`Nova senha para ${u.name}:\n(Mínimo 6 caracteres)`);
+  if (!newPass) return;
+  if (newPass.length < 6) return alert('A senha precisa ter pelo menos 6 caracteres.');
+  try {
+    await resetUserPasswordViaEdgeFunction(u.authId, newPass);
+    addAudit('Reset de senha', u.login);
+    save();
+    toast('Senha redefinida com sucesso.');
+  } catch (e) {
+    alert('Erro ao redefinir senha: ' + (e.message || 'tente novamente.'));
+  }
+}
+
+async function resetUserPasswordViaEdgeFunction(authId, newPassword) {
+  if (!sb || !hasSupabaseSession()) throw new Error('Sessão obrigatória. Faça login novamente.');
+  const { data: sessionData } = await sb.auth.getSession();
+  const token = sessionData?.session?.access_token;
+  if (!token) throw new Error('Sessão não encontrada. Faça login novamente.');
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/reset-user-password`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: authId, new_password: newPassword }),
+  });
+  let data = null;
+  try { data = await response.json(); } catch {}
+  if (!response.ok || !data?.ok) throw new Error(data?.error || 'Não foi possível redefinir a senha.');
+  return data;
 }
 
 async function removeUserById(id) {
@@ -1837,6 +1864,9 @@ function fillClosingStoreSelect() {
   el.innerHTML = stores.map((s) => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
   if (cur && stores.some((s) => s.id === cur)) el.value = cur;
   if (!el.value && stores[0]) el.value = stores[0].id;
+  if (role === 'operator') {
+    el.style.cssText += ';pointer-events:none;appearance:none;-webkit-appearance:none;font-weight:600;background:transparent;border:none;box-shadow:none;padding-left:0';
+  }
   fillClosingResponsible5X();
 }
 function fillClosingResponsible5X() {
@@ -1851,7 +1881,12 @@ function fillClosingResponsible5X() {
   const cur = el.value;
   el.innerHTML = '<option value="">Selecione o responsável</option>' +
     users.map((u) => `<option>${esc(u.name)}</option>`).join('');
-  if (cur && [...el.options].some((o) => o.value === cur)) el.value = cur;
+  if (role === 'operator') {
+    if (currentUser?.name) el.value = currentUser.name;
+    el.style.cssText += ';pointer-events:none;appearance:none;-webkit-appearance:none;font-weight:600;background:transparent;border:none;box-shadow:none;padding-left:0';
+  } else if (cur && [...el.options].some((o) => o.value === cur)) {
+    el.value = cur;
+  }
 }
 function fillReportStore() { setOptions('reportStore', storeOptionsForCompany(val('reportCompany')), 'Todas'); }
 function fillClientReportStore() { setOptions('clientReportStore', storeOptionsForCompany(currentUser?.companyId), 'Todas'); }
@@ -1893,7 +1928,8 @@ Object.assign(window, {
   companyName, storeName, visibleCompanies, visibleStores, cfg,
   saveClientSetup, clearClientSetup, toggleCompany, deleteCompany,
   createStore, updateStoreFund, deleteStore,
-  createUserFromMaster, loadUserToEdit, saveUserEdit, resetSelectedUserPassword, removeUserById,
+  createUserFromMaster, loadUserToEdit, saveUserEdit,
+  resetSelectedUserPassword, resetUserPasswordViaEdgeFunction, removeUserById,
   deleteSelectedUser, deleteUser,
   createRule, deleteRule, saveImplantStep, upsertImplantStep, saveOperationConfig,
   addSelectOption, removeSelectOption, resetSelectOptions,
