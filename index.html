@@ -313,16 +313,18 @@
       <div class="inner-tab-panel hidden" id="cad-implantacao">
         <div class="card">
           <h3 class="section-title">Checklist de implantação por cliente</h3>
-          <div class="form-grid three">
-            <div class="field"><label>Empresa</label><select id="implantCompany"></select></div>
-            <div class="field"><label>Etapa</label><select id="implantStep"><option>1. Cadastro da empresa</option><option>2. Cadastro de lojas/caixas</option><option>3. Cadastro de operadores</option><option>4. Regras de caixa</option><option>5. Treinamento</option><option>6. Início monitorado</option></select></div>
-            <div class="field"><label>Status</label><select id="implantStatus"><option>Pendente</option><option>Em andamento</option><option>Concluído</option></select></div>
-            <div class="field full"><label>Observação</label><textarea id="implantNote"></textarea></div>
+          <p class="subtle" style="margin-bottom:14px">Selecione um cliente para ver e atualizar cada etapa individualmente. As alterações são salvas no Supabase.</p>
+          <div class="field" style="max-width:340px">
+            <label>Empresa</label>
+            <select id="implantCompanyFilter" onchange="renderCadastros()">
+              <option value="">Selecione a empresa</option>
+            </select>
           </div>
-          <div class="btn-row"><button class="btn btn-primary" onclick="saveImplantStep()">Registrar etapa</button></div>
           <div class="table-wrap" style="margin-top:16px">
-            <table><thead><tr><th>Empresa</th><th>Etapa</th><th>Status</th><th>Observação</th><th>Data</th></tr></thead>
-            <tbody id="implantBody"></tbody></table>
+            <table>
+              <thead><tr><th style="min-width:200px">Etapa</th><th>Status</th><th>Observação</th><th>Atualizado</th><th>Ação</th></tr></thead>
+              <tbody id="implantBody"></tbody>
+            </table>
           </div>
         </div>
       </div>

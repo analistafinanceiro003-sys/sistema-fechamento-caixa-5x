@@ -826,6 +826,37 @@ alter publication supabase_realtime add table public.divergence_reviews;
 alter publication supabase_realtime add table public.audit_logs;
 
 -- ============================================================
+-- TABELA: implant_steps (checklist de implantação por empresa)
+-- Execute este bloco no SQL Editor para ativar a aba Implantação
+-- com sincronização Supabase.
+-- ============================================================
+create table if not exists public.implant_steps (
+  id          uuid primary key default gen_random_uuid(),
+  company_id  uuid not null references public.companies(id) on delete cascade,
+  step_key    text not null,
+  step_name   text not null,
+  status      text not null default 'Pendente',
+  note        text,
+  updated_at  timestamptz not null default now(),
+  unique(company_id, step_key)
+);
+
+create trigger trg_implant_steps_updated_at
+  before update on public.implant_steps
+  for each row execute function set_updated_at();
+
+alter table public.implant_steps enable row level security;
+
+create policy "implant_master_all" on public.implant_steps
+  for all to authenticated
+  using (current_user_role() = 'master')
+  with check (current_user_role() = 'master');
+
+create policy "implant_admin_read" on public.implant_steps
+  for select to authenticated
+  using (current_user_role() = 'admin' and company_id = current_company_id());
+
+-- ============================================================
 -- COMO CRIAR O PRIMEIRO USUÁRIO MASTER
 -- ============================================================
 -- 1. Crie o usuário no painel: Authentication → Users → Add User

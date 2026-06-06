@@ -100,17 +100,43 @@ function renderCadastros() {
   /* Usuários */
   renderUsersByCompany();
 
-  /* Implantação */
-  const steps = ['Empresa','Lojas/Caixas','Usuários','Regras','Treinamento','Início monitorado','Conferência','Operação ativa'];
-  const done = new Set(state.implant.filter((i) => i.status === 'Concluído').map((i) => String(i.step).replace(/^\d+\.\s*/,'')));
-  html('setupWizard', steps.map((s, i) =>
-    `<div class="step ${done.has(s) ? 'done' : i < 3 ? 'doing' : 'pending'}">
-      <small>Etapa ${i+1}</small><strong>${esc(s)}</strong>
-    </div>`
-  ).join(''));
-  html('implantBody', state.implant.map((i) =>
-    `<tr><td>${esc(companyName(i.companyId))}</td><td>${esc(i.step)}</td><td>${tag(i.status)}</td><td>${esc(i.note)}</td><td>${esc(i.date)}</td></tr>`
-  ).join('') || emptyRow(5));
+  /* Implantação — checklist editável por empresa */
+  const implantCid = val('implantCompanyFilter') || '';
+  const implantStepsData = implantCid ? (state.implantSteps?.[implantCid] || {}) : null;
+
+  /* Wizard: overview das etapas da empresa selecionada */
+  html('setupWizard', IMPLANT_STEP_LIST.map((s, i) => {
+    const statusVal = implantStepsData?.[s.key]?.status || 'Pendente';
+    const cls = statusVal === 'Concluído' ? 'done' : statusVal === 'Em andamento' ? 'doing' : 'pending';
+    return `<div class="step ${cls}"><small>Etapa ${i + 1}</small><strong>${esc(s.name.replace(/^\d+\.\s*/, ''))}</strong></div>`;
+  }).join(''));
+
+  /* Tabela editável com Salvar por linha */
+  if (implantCid) {
+    html('implantBody', IMPLANT_STEP_LIST.map((s) => {
+      const step = implantStepsData?.[s.key] || { status: 'Pendente', note: '', date: '' };
+      return `<tr>
+        <td><strong>${esc(s.name)}</strong></td>
+        <td>
+          <select id="implantStatus_${s.key}" style="min-width:150px">
+            ${['Pendente','Em andamento','Concluído'].map(
+              (opt) => `<option value="${opt}"${step.status === opt ? ' selected' : ''}>${opt}</option>`
+            ).join('')}
+          </select>
+        </td>
+        <td><input id="implantNote_${s.key}" value="${esc(step.note || '')}" placeholder="Observação..." style="min-width:180px;width:100%"/></td>
+        <td><span class="subtle" style="font-size:12px">${esc(step.date || '-')}</span></td>
+        <td>
+          <button class="btn btn-sm btn-primary"
+            onclick="upsertImplantStep('${implantCid}','${s.key}','${s.name}',
+              document.getElementById('implantStatus_${s.key}').value,
+              document.getElementById('implantNote_${s.key}').value)">Salvar</button>
+        </td>
+      </tr>`;
+    }).join(''));
+  } else {
+    html('implantBody', `<tr><td colspan="5" style="text-align:center;padding:24px" class="subtle">Selecione uma empresa para ver e editar o checklist.</td></tr>`);
+  }
 }
 
 function renderUsersByCompany() {

@@ -15,6 +15,16 @@ const NORMALIZED_TABLES = [
   'companies','stores','profiles','module_permissions','operation_rules','operation_configs',
   'closings','closing_entries','closing_expenses','closing_attachments',
   'cash_opening_adjustments','divergence_reviews','audit_logs','select_options',
+  'implant_steps',
+];
+
+const IMPLANT_STEP_LIST = [
+  { key: 'step_1', name: '1. Cadastro da empresa' },
+  { key: 'step_2', name: '2. Cadastro de lojas/caixas' },
+  { key: 'step_3', name: '3. Cadastro de operadores' },
+  { key: 'step_4', name: '4. Regras de caixa' },
+  { key: 'step_5', name: '5. Treinamento' },
+  { key: 'step_6', name: '6. Início monitorado' },
 ];
 
 /* --- Opções padrão de seleção --- */
@@ -46,6 +56,7 @@ function defaultState() {
     cashOpeningAdjustments: [],
     divergenceReviews: [],
     implant: [],
+    implantSteps: {},
     operationConfigs: {},
     modules: {},
     selectOptions: defaultSelectOptions(),
@@ -159,6 +170,7 @@ function normalizeState() {
   }
   state.operationConfigs = (state.operationConfigs && typeof state.operationConfigs === 'object') ? state.operationConfigs : {};
   state.modules = (state.modules && typeof state.modules === 'object') ? state.modules : {};
+  state.implantSteps = (state.implantSteps && typeof state.implantSteps === 'object' && !Array.isArray(state.implantSteps)) ? state.implantSteps : {};
   state.selectOptions = { ...defaultSelectOptions(), ...(state.selectOptions || {}) };
   state.stores.forEach((s) => { s.standardFund = Number(s.standardFund || 0); });
   state.companies.forEach((c) => {
@@ -314,11 +326,24 @@ function applySelectOptionRows(rows = []) {
   state.selectOptions = options;
 }
 
+function buildImplantStepsState(rows = []) {
+  const result = {};
+  rows.forEach((row) => {
+    if (!result[row.company_id]) result[row.company_id] = {};
+    result[row.company_id][row.step_key] = {
+      status: row.status || 'Pendente',
+      note: row.note || '',
+      date: row.updated_at ? row.updated_at.substring(0, 10) : '',
+    };
+  });
+  return result;
+}
+
 async function loadFromNormalizedSupabase() {
   const [
     companies, stores, profiles, modulePermissions, rules, operationConfigs,
     closings, entries, expenses, attachments, openingAdjustments, reviews, audit, selectOptions,
-    transferReceiptsRows,
+    transferReceiptsRows, implantStepsRows,
   ] = await Promise.all([
     selectTable('companies'),
     selectTable('stores'),
@@ -336,6 +361,8 @@ async function loadFromNormalizedSupabase() {
     selectTable('select_options'),
     /* tabela criada via SQL no Supabase — ver comentário em confirmTransferReceipt */
     selectTable('transfer_receipts').catch(() => []),
+    /* tabela implant_steps — execute o bloco em supabase/schema.sql para ativar */
+    selectTable('implant_steps').catch(() => []),
   ]);
 
   const entriesByClosing = groupBy(entries, 'closing_id');
@@ -360,6 +387,7 @@ async function loadFromNormalizedSupabase() {
       reviewedBy: r.reviewed_by, reviewedAt: r.reviewed_at, createdAt: r.created_at, updatedAt: r.updated_at,
     })),
     implant: [],
+    implantSteps: buildImplantStepsState(implantStepsRows),
     operationConfigs: operationConfigs.reduce((acc, row) => ({ ...acc, [row.company_id]: mapOperationConfig(row) }), {}),
     modules: {},
     selectOptions: defaultSelectOptions(),
@@ -1458,18 +1486,43 @@ async function deleteRule(id) {
   renderAll();
 }
 
-/* --- Implantação --- */
-function saveImplantStep() {
-  const cid = val('implantCompany');
-  if (!cid) return alert('Selecione a empresa.');
-  state.implant.push({
-    id: uid('i'), companyId: cid,
-    step: val('implantStep'), status: val('implantStatus'),
-    note: val('implantNote'), date: todayBR(),
-  });
-  clear('implantNote');
+/* --- Implantação (checklist editável por empresa, sincronizado com Supabase) --- */
+async function upsertImplantStep(companyId, stepKey, stepName, status, note) {
+  if (!companyId || !stepKey) return;
+  if (!state.implantSteps) state.implantSteps = {};
+  if (!state.implantSteps[companyId]) state.implantSteps[companyId] = {};
+  state.implantSteps[companyId][stepKey] = { status: status || 'Pendente', note: note || '', date: todayISO() };
+
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      const { error } = await sb.from('implant_steps').upsert({
+        company_id: companyId,
+        step_key: stepKey,
+        step_name: stepName,
+        status: status || 'Pendente',
+        note: note || null,
+      }, { onConflict: 'company_id,step_key' });
+      if (error && error.code !== '42P01') throw error;
+      if (error?.code === '42P01') console.warn('Tabela implant_steps não encontrada. Execute o SQL em supabase/schema.sql.');
+    } catch (e) {
+      if (!String(e.message).includes('42P01') && !String(e.message).includes('does not exist')) {
+        return alert(`Erro ao salvar etapa: ${e.message}`);
+      }
+      console.warn('implant_steps não existe — salvo apenas localmente.');
+    }
+  } else if (!DEV_LOCAL_MODE && !hasSupabaseSession()) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para salvar etapas.');
+  }
+
+  addAudit('Implantação', `${companyName(companyId)} — ${stepName}: ${status}`);
+  lastOwnSave = Date.now();
   save();
-  renderAll();
+  renderCadastros();
+  toast(`Etapa "${stepName}" → ${status}`);
+}
+
+function saveImplantStep() {
+  /* stub de compatibilidade — substituído por upsertImplantStep */
 }
 
 /* --- Configuração operacional --- */
@@ -1750,7 +1803,7 @@ function fillSelects() {
   if (!state) return;
   const companies = visibleCompanies().map((c) => [c.id, c.name]);
   [
-    'storeCompany','opCompany','ruleCompany','implantCompany','operationCompany',
+    'storeCompany','opCompany','ruleCompany','implantCompanyFilter','operationCompany',
     'ruleFilterCompany','moduleCompany','reportCompany','masterExtractCompany',
     'masterMovementCompanyFilter','masterDivergenceCompanyFilter',
     'userManageCompany','usersCompanyFilter',
@@ -1816,7 +1869,7 @@ function toggleUserStore() {
 
 Object.assign(window, {
   state: null, isBooting: true,
-  DEV_LOCAL_MODE, USE_LOCAL_FALLBACK, NORMALIZED_TABLES,
+  DEV_LOCAL_MODE, USE_LOCAL_FALLBACK, NORMALIZED_TABLES, IMPLANT_STEP_LIST,
   defaultSelectOptions, defaultState, normalizeState, load, save, autosave, addAudit,
   setupRealtimeSync, stopRealtimeSync, manualRefresh,
   getCompanies, createCompany, updateCompany, inactivateCompany, deleteCompanyRecord,
@@ -1835,7 +1888,7 @@ Object.assign(window, {
   createStore, updateStoreFund, deleteStore,
   createUserFromMaster, loadUserToEdit, saveUserEdit, resetSelectedUserPassword, removeUserById,
   deleteSelectedUser, deleteUser,
-  createRule, deleteRule, saveImplantStep, saveOperationConfig,
+  createRule, deleteRule, saveImplantStep, upsertImplantStep, saveOperationConfig,
   addSelectOption, removeSelectOption, resetSelectOptions,
   openLimparDadosModal, closeLimparDadosModal, clearCompanyData,
   exportBackup, importBackup, resetSystem,

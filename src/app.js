@@ -152,7 +152,7 @@ Object.assign(window, {
   loadUserToEdit, fillEditUserStore, saveUserEdit,
   resetSelectedUserPassword, deleteSelectedUser, deleteUser,
   createRule, deleteRule, renderRulesByCompany: renderOperacao,
-  saveImplantStep, saveOperationConfig,
+  saveImplantStep, upsertImplantStep, saveOperationConfig,
   addSelectOption, removeSelectOption, resetSelectOptions,
   openLimparDadosModal, closeLimparDadosModal, clearCompanyData,
   exportBackup, importBackup, resetSystem,
