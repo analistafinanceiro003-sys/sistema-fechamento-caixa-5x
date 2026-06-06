@@ -44,57 +44,50 @@ Deno.serve(async (req) => {
     return friendlyError(req, 'Sessão inválida ou expirada. Faça login novamente.', 401);
   }
 
-  const { data: requester, error: requesterError } = await admin
+  const { data: requester } = await admin
     .from('profiles')
     .select('id, user_id, role, status')
     .eq('user_id', authUser.user.id)
     .maybeSingle();
 
-  if (requesterError) return friendlyError(req, 'Não foi possível validar seu perfil.', 500);
   if (!requester || requester.role !== 'master' || requester.status === 'Inativo') {
-    return friendlyError(req, 'Apenas o perfil Master pode excluir usuários.', 403);
+    return friendlyError(req, 'Apenas o perfil Master pode redefinir senhas.', 403);
   }
 
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
-    return friendlyError(req, 'Dados inválidos para exclusão do usuário.');
+    return friendlyError(req, 'Dados inválidos.');
   }
 
   const userId = String(body.user_id || '').trim();
-  const profileId = String(body.profile_id || '').trim();
-  if (!userId || !profileId) return friendlyError(req, 'Usuário não informado para exclusão.');
-  if (userId === authUser.user.id) return friendlyError(req, 'Você não pode excluir seu próprio usuário.', 403);
+  const newPassword = String(body.new_password || '').trim();
 
-  const { data: targetProfile, error: targetError } = await admin
+  if (!userId) return friendlyError(req, 'Usuário não informado.');
+  if (!newPassword || newPassword.length < 6) return friendlyError(req, 'A nova senha precisa ter pelo menos 6 caracteres.');
+  if (userId === authUser.user.id) return friendlyError(req, 'Use "Alterar senha" para redefinir sua própria senha.', 403);
+
+  const { data: targetProfile } = await admin
     .from('profiles')
-    .select('id, user_id, name, email, role, company_id, store_id')
-    .eq('id', profileId)
+    .select('id, name, email, company_id, store_id')
     .eq('user_id', userId)
     .maybeSingle();
 
-  if (targetError) return friendlyError(req, 'Não foi possível localizar o usuário.', 500);
   if (!targetProfile) return friendlyError(req, 'Usuário não encontrado.', 404);
+
+  const { error: updateError } = await admin.auth.admin.updateUserById(userId, { password: newPassword });
+  if (updateError) return friendlyError(req, 'Não foi possível redefinir a senha.', 500);
 
   await admin.from('audit_logs').insert({
     user_id: requester.user_id,
     company_id: targetProfile.company_id,
     store_id: targetProfile.store_id,
-    action: 'Exclusão de usuário',
+    action: 'Reset de senha',
     entity: 'profile',
     entity_id: targetProfile.id,
-    metadata: {
-      target_user_id: targetProfile.user_id,
-      email: targetProfile.email,
-      role: targetProfile.role,
-    },
-  });
+    metadata: { email: targetProfile.email, target_user_id: userId },
+  }).catch(() => {});
 
-  const { error: deleteAuthError } = await admin.auth.admin.deleteUser(userId);
-  if (deleteAuthError) return friendlyError(req, 'Não foi possível excluir o usuário.', 500);
-
-  await admin.from('profiles').delete().eq('id', profileId);
-
-  return json(req, { ok: true, message: 'Usuário excluído com sucesso.' });
+  return json(req, { ok: true, message: 'Senha redefinida com sucesso.' });
 });

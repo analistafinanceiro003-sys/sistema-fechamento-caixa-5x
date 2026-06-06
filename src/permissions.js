@@ -101,6 +101,8 @@ const MASTER_NAV = [
   { page: 'relatorios',       label: 'Relatórios'   },
   { page: 'sistema',          label: 'Sistema'      },
   { page: 'manualImplantacao',label: 'Manual 5X'    },
+  { page: 'closing',          label: 'Fechamento'   },
+  { page: 'adminOperacao',    label: 'Op. Cliente'  },
 ];
 
 /* Alias herdado — mantido para compatibilidade com state.modules antigos */

@@ -1,16 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const ALLOWED_ORIGINS = [
-  'https://sistema-fechamento-caixa-5x.vercel.app',
-];
-/* Em desenvolvimento local, adicione a origem aqui temporariamente */
-const DEV_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
-
 function corsHeaders(req: Request) {
-  const origin = req.headers.get('Origin') || '';
-  const isAllowed = ALLOWED_ORIGINS.includes(origin) || DEV_PATTERN.test(origin);
+  const origin = req.headers.get('Origin') || '*';
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Vary': 'Origin',

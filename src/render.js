@@ -318,10 +318,11 @@ function renderAdminViews() {
   ).join('') || '<p class="subtle">Nenhuma regra cadastrada.</p>');
 
   /* Saldo Inicial autorizado */
-  setOptions('openingAdjustmentStore', stores.map((s) => [s.id, s.name]), 'Selecione');
+  const adjStores = role === 'master' ? state.stores.filter((s) => s.status !== 'Inativa') : stores;
+  setOptions('openingAdjustmentStore', adjStores.map((s) => [s.id, s.name]), 'Selecione');
   if ($('openingAdjustmentDate') && !val('openingAdjustmentDate')) setVal('openingAdjustmentDate', todayISO());
   html('openingAdjustmentsBody', (state.cashOpeningAdjustments || [])
-    .filter((a) => a.companyId === currentUser?.companyId)
+    .filter((a) => role === 'master' || a.companyId === currentUser?.companyId)
     .map((a) => `<tr><td>${esc(storeName(a.storeId))}</td><td>${esc(toBRFromISO(parseBR(a.startDate)))}</td><td>${esc(a.shift || 'Integral')}</td><td>${money(a.amount)}</td><td>${esc(a.reason)}</td><td>${esc(a.authorizedBy || '-')}</td></tr>`)
     .join('') || emptyRow(6));
 
