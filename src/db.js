@@ -1502,12 +1502,19 @@ async function upsertImplantStep(companyId, stepKey, stepName, status, note) {
         status: status || 'Pendente',
         note: note || null,
       }, { onConflict: 'company_id,step_key' });
-      if (error && error.code !== '42P01') throw error;
-      if (error?.code === '42P01') console.warn('Tabela implant_steps não encontrada. Execute o SQL em supabase/schema.sql.');
-    } catch (e) {
-      if (!String(e.message).includes('42P01') && !String(e.message).includes('does not exist')) {
-        return alert(`Erro ao salvar etapa: ${e.message}`);
+      if (error) {
+        const msg = String(error.message || error.code || '');
+        const isMissingTable = msg.includes('42P01') || msg.includes('schema cache') || msg.includes('does not exist') || msg.includes('Could not find');
+        if (isMissingTable) {
+          console.warn('Tabela implant_steps não encontrada. Execute o SQL em supabase/schema.sql.');
+        } else {
+          throw error;
+        }
       }
+    } catch (e) {
+      const msg = String(e.message || '');
+      const isMissingTable = msg.includes('42P01') || msg.includes('schema cache') || msg.includes('does not exist') || msg.includes('Could not find');
+      if (!isMissingTable) return alert(`Erro ao salvar etapa: ${e.message}`);
       console.warn('implant_steps não existe — salvo apenas localmente.');
     }
   } else if (!DEV_LOCAL_MODE && !hasSupabaseSession()) {
