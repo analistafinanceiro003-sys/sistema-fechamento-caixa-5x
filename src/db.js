@@ -62,6 +62,7 @@ function defaultState() {
     selectOptions: defaultSelectOptions(),
     audit: [],
     transferReceipts: [],
+    storeDocuments: [],
   };
 }
 
@@ -160,7 +161,7 @@ async function confirmTransferReceipt(closingId) {
 
 function normalizeState() {
   state = (state && typeof state === 'object') ? state : defaultState();
-  ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit','transferReceipts'].forEach((k) => {
+  ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit','transferReceipts','storeDocuments'].forEach((k) => {
     if (!Array.isArray(state[k])) state[k] = [];
   });
   /* Migração: importa recibos salvos na chave antiga (localStorage separado) */
@@ -343,7 +344,7 @@ async function loadFromNormalizedSupabase() {
   const [
     companies, stores, profiles, modulePermissions, rules, operationConfigs,
     closings, entries, expenses, attachments, openingAdjustments, reviews, audit, selectOptions,
-    transferReceiptsRows, implantStepsRows,
+    transferReceiptsRows, implantStepsRows, storeDocumentsRows,
   ] = await Promise.all([
     selectTable('companies'),
     selectTable('stores'),
@@ -363,6 +364,8 @@ async function loadFromNormalizedSupabase() {
     selectTable('transfer_receipts').catch(() => []),
     /* tabela implant_steps — execute o bloco em supabase/schema.sql para ativar */
     selectTable('implant_steps').catch(() => []),
+    /* tabela store_documents — execute o bloco em supabase/schema.sql para ativar */
+    selectTable('store_documents').catch(() => []),
   ]);
 
   const entriesByClosing = groupBy(entries, 'closing_id');
@@ -395,6 +398,7 @@ async function loadFromNormalizedSupabase() {
       id: a.id, date: a.created_at, user: a.user_id || 'Sistema', role: '', action: a.action, detail: a.entity || '', metadata: a.metadata,
     })),
     transferReceipts: transferReceiptsRows.map(mapTransferReceipt),
+    storeDocuments: storeDocumentsRows.map(mapStoreDocument),
   };
   applyModuleRows(modulePermissions);
   applySelectOptionRows(selectOptions);
@@ -1897,6 +1901,163 @@ function fillUserManageSelect() {
   const cid = val('userManageCompany');
   setOptions('userManageSelect', state.users.filter((u) => !cid || u.companyId === cid).map((u) => [u.id, `${u.name} — ${u.login}`]));
 }
+/* ================================================================
+   PASTA DE DOCUMENTOS — store_documents
+   Arquivos independentes enviados por operadores (não vinculados a fechamentos).
+================================================================ */
+function mapStoreDocument(row) {
+  return {
+    id:          row.id,
+    companyId:   row.company_id,
+    storeId:     row.store_id,
+    name:        row.file_name,
+    path:        row.file_path  || '',
+    url:         row.file_url   || '',
+    type:        row.file_type  || '',
+    size:        Number(row.file_size || 0),
+    description: row.description || '',
+    uploadedBy:  row.uploaded_by,
+    createdAt:   row.created_at,
+  };
+}
+
+async function uploadStoreDocument({ storeId, file, description }) {
+  const store = state.stores.find((s) => s.id === storeId);
+  if (!store) throw new Error('Loja não encontrada.');
+  const safeName = String(file.name).replace(/[^\w.\-]+/g, '_');
+  const filePath = `${store.companyId}/${storeId}/${Date.now()}_${safeName}`;
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    const { error: uploadError } = await sb.storage
+      .from('store-documents')
+      .upload(filePath, file, { upsert: false, contentType: file.type || 'application/octet-stream' });
+    if (uploadError) throw uploadError;
+    const { data: publicData } = sb.storage.from('store-documents').getPublicUrl(filePath);
+    const row = await supabaseWrite('store_documents', 'insert', cleanPayload({
+      company_id:  store.companyId,
+      store_id:    storeId,
+      file_name:   file.name,
+      file_path:   filePath,
+      file_url:    publicData?.publicUrl || filePath,
+      file_type:   file.type || '',
+      file_size:   file.size || 0,
+      description: description || null,
+      uploaded_by: currentUser?.authId || undefined,
+    }));
+    return row ? mapStoreDocument(row) : null;
+  } else if (!DEV_LOCAL_MODE) {
+    throw new Error('Supabase obrigatório em produção para enviar documentos.');
+  }
+  return {
+    id: uid('doc'), companyId: store.companyId, storeId,
+    name: file.name, path: filePath, url: '', type: file.type || '',
+    size: file.size || 0, description: description || '',
+    uploadedBy: currentUser?.authId || null, createdAt: new Date().toISOString(),
+  };
+}
+
+async function deleteStoreDocument(docId, filePath) {
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    if (filePath) {
+      const { error: storageError } = await sb.storage.from('store-documents').remove([filePath]);
+      if (storageError) console.warn('[deleteStoreDocument] Storage (não-fatal):', storageError.message);
+    }
+    await supabaseWrite('store_documents', 'delete', {}, { id: docId });
+  } else if (!DEV_LOCAL_MODE) {
+    throw new Error('Supabase obrigatório em produção para excluir documentos.');
+  }
+}
+
+async function clearStoreDocumentsByStore(storeId) {
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    const { data: docs } = await sb.from('store_documents').select('file_path').eq('store_id', storeId);
+    const paths = (docs || []).map((d) => d.file_path).filter(Boolean);
+    for (let i = 0; i < paths.length; i += 100) {
+      const { error } = await sb.storage.from('store-documents').remove(paths.slice(i, i + 100));
+      if (error) console.warn('[clearStoreDocuments] Storage batch (não-fatal):', error.message);
+    }
+    const { error } = await sb.from('store_documents').delete().eq('store_id', storeId);
+    if (error) throw error;
+  } else if (!DEV_LOCAL_MODE) {
+    throw new Error('Supabase obrigatório em produção para limpar documentos.');
+  }
+}
+
+/* --- Handlers de UI --- */
+const ALLOWED_DOC_MIME = ['image/jpeg', 'image/png', 'application/pdf'];
+const ALLOWED_DOC_EXT  = /\.(jpe?g|png|pdf)$/i;
+const MAX_DOC_BYTES    = 10 * 1024 * 1024;
+
+function previewDocUpload(input) {
+  const file = input?.files?.[0];
+  const nameEl = $('docUploadFileName');
+  if (nameEl) nameEl.textContent = file ? file.name : 'Clique para selecionar ou arraste um arquivo';
+}
+
+async function handleDocUpload() {
+  const input = $('docUploadFile');
+  const file = input?.files?.[0];
+  if (!file) return alert('Selecione um arquivo para enviar.');
+  if (!ALLOWED_DOC_MIME.includes(file.type) && !ALLOWED_DOC_EXT.test(file.name))
+    return alert('Tipo não permitido. Use JPG, PNG ou PDF.');
+  if (file.size > MAX_DOC_BYTES) return alert('Arquivo muito grande. Máximo: 10 MB.');
+  const storeId = currentUser?.storeId;
+  if (!storeId) return alert('Operador sem loja vinculada. Contate o administrador.');
+  const description = val('docUploadDescription') || '';
+  const btn = $('docUploadBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+  try {
+    const doc = await uploadStoreDocument({ storeId, file, description });
+    if (doc) {
+      state.storeDocuments = state.storeDocuments || [];
+      state.storeDocuments.unshift(doc);
+    }
+    if (input) input.value = '';
+    const nameEl = $('docUploadFileName');
+    if (nameEl) nameEl.textContent = 'Clique para selecionar ou arraste um arquivo';
+    setVal('docUploadDescription', '');
+    addAudit('Documento enviado', `${storeName(storeId)} — ${file.name}`);
+    save();
+    renderAll();
+    toast('Documento enviado com sucesso!');
+  } catch (e) {
+    alert('Erro ao enviar documento: ' + (e.message || 'tente novamente.'));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar documento'; }
+  }
+}
+
+async function handleDeleteDoc(docId, filePath) {
+  const doc = (state.storeDocuments || []).find((d) => d.id === docId);
+  if (!doc) return;
+  if (!confirm(`Remover "${doc.name}"?`)) return;
+  try {
+    await deleteStoreDocument(docId, filePath || doc.path);
+    state.storeDocuments = (state.storeDocuments || []).filter((d) => d.id !== docId);
+    addAudit('Documento removido', `${storeName(doc.storeId)} — ${doc.name}`);
+    save();
+    renderAll();
+    toast('Documento removido.');
+  } catch (e) {
+    alert('Erro ao remover documento: ' + (e.message || 'tente novamente.'));
+  }
+}
+
+async function handleClearStoreDocuments(storeId, storeNameParam) {
+  const count = (state.storeDocuments || []).filter((d) => d.storeId === storeId).length;
+  if (!count) return toast('A pasta já está vazia.');
+  if (!confirm(`Limpar todos os ${count} arquivo(s) da pasta "${storeNameParam}"?\nEsta ação não pode ser desfeita.`)) return;
+  try {
+    await clearStoreDocumentsByStore(storeId);
+    state.storeDocuments = (state.storeDocuments || []).filter((d) => d.storeId !== storeId);
+    addAudit('Pasta de documentos limpa', `${storeNameParam} — ${count} arquivo(s) removido(s)`);
+    save();
+    renderAll();
+    toast(`Pasta de "${storeNameParam}" limpa com sucesso.`);
+  } catch (e) {
+    alert('Erro ao limpar pasta: ' + (e.message || 'tente novamente.'));
+  }
+}
+
 function fillEditUserStore() {
   const uidVal = val('userManageSelect');
   const user = state.users.find((u) => u.id === uidVal);
@@ -1940,6 +2101,8 @@ Object.assign(window, {
   fillReportStore, fillClientReportStore, fillMasterExtractStore,
   fillMasterMovementStore, fillMasterDivergenceStore,
   fillUserManageSelect, fillEditUserStore, toggleUserStore,
+  mapStoreDocument, uploadStoreDocument, deleteStoreDocument, clearStoreDocumentsByStore,
+  previewDocUpload, handleDocUpload, handleDeleteDoc, handleClearStoreDocuments,
 });
 
 Object.defineProperty(window, 'state', {

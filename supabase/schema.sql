@@ -857,6 +857,116 @@ create policy "implant_admin_read" on public.implant_steps
   using (current_user_role() = 'admin' and company_id = current_company_id());
 
 -- ============================================================
+-- TABELA: store_documents (Pasta de Documentos por Loja)
+-- Arquivos independentes enviados por operadores — não vinculados a fechamentos.
+-- Execute este bloco para ativar o módulo "Documentos".
+-- ============================================================
+create table if not exists public.store_documents (
+  id          uuid primary key default gen_random_uuid(),
+  company_id  uuid not null references public.companies(id) on delete cascade,
+  store_id    uuid not null references public.stores(id) on delete cascade,
+  file_name   text not null,
+  file_path   text,
+  file_url    text,
+  file_type   text,
+  file_size   bigint,
+  description text,
+  uploaded_by uuid references auth.users(id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists idx_store_docs_company on public.store_documents(company_id);
+create index if not exists idx_store_docs_store   on public.store_documents(store_id);
+create index if not exists idx_store_docs_created on public.store_documents(created_at desc);
+
+alter table public.store_documents enable row level security;
+
+drop policy if exists "store_docs_master_all"  on public.store_documents;
+drop policy if exists "store_docs_admin_all"   on public.store_documents;
+drop policy if exists "store_docs_op_store"    on public.store_documents;
+
+create policy "store_docs_master_all" on public.store_documents
+  for all to authenticated
+  using (is_master())
+  with check (is_master());
+
+create policy "store_docs_admin_all" on public.store_documents
+  for all to authenticated
+  using (
+    current_user_role() = 'admin'
+    and company_id = current_company_id()
+  )
+  with check (
+    current_user_role() = 'admin'
+    and company_id = current_company_id()
+  );
+
+create policy "store_docs_op_store" on public.store_documents
+  for all to authenticated
+  using (
+    current_user_role() = 'operator'
+    and store_id = current_store_id()
+  )
+  with check (
+    current_user_role() = 'operator'
+    and store_id = current_store_id()
+  );
+
+-- ============================================================
+-- SUPABASE STORAGE — Buckets necessários
+-- Execute no SQL Editor do Supabase para criar os buckets e políticas.
+-- ============================================================
+
+-- Bucket: store-documents (Pasta de Documentos por Loja)
+insert into storage.buckets (id, name, public)
+values ('store-documents', 'store-documents', false)
+on conflict (id) do nothing;
+
+-- Bucket: closing-attachments (Anexos de Fechamentos)
+insert into storage.buckets (id, name, public)
+values ('closing-attachments', 'closing-attachments', false)
+on conflict (id) do nothing;
+
+-- Políticas de Storage — store-documents
+drop policy if exists "store_docs_storage_master" on storage.objects;
+drop policy if exists "store_docs_storage_admin"  on storage.objects;
+drop policy if exists "store_docs_storage_op"     on storage.objects;
+
+create policy "store_docs_storage_master"
+  on storage.objects for all to authenticated
+  using   (bucket_id = 'store-documents' and is_master())
+  with check (bucket_id = 'store-documents' and is_master());
+
+create policy "store_docs_storage_admin"
+  on storage.objects for all to authenticated
+  using   (bucket_id = 'store-documents' and current_user_role() = 'admin')
+  with check (bucket_id = 'store-documents' and current_user_role() = 'admin');
+
+create policy "store_docs_storage_op"
+  on storage.objects for all to authenticated
+  using   (bucket_id = 'store-documents' and current_user_role() = 'operator')
+  with check (bucket_id = 'store-documents' and current_user_role() = 'operator');
+
+-- Políticas de Storage — closing-attachments
+drop policy if exists "closing_att_storage_master" on storage.objects;
+drop policy if exists "closing_att_storage_admin"  on storage.objects;
+drop policy if exists "closing_att_storage_op"     on storage.objects;
+
+create policy "closing_att_storage_master"
+  on storage.objects for all to authenticated
+  using   (bucket_id = 'closing-attachments' and is_master())
+  with check (bucket_id = 'closing-attachments' and is_master());
+
+create policy "closing_att_storage_admin"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'closing-attachments' and current_user_role() = 'admin');
+
+create policy "closing_att_storage_op"
+  on storage.objects for all to authenticated
+  using   (bucket_id = 'closing-attachments' and current_user_role() = 'operator')
+  with check (bucket_id = 'closing-attachments' and current_user_role() = 'operator');
+
+-- ============================================================
 -- COMO CRIAR O PRIMEIRO USUÁRIO MASTER
 -- ============================================================
 -- 1. Crie o usuário no painel: Authentication → Users → Add User

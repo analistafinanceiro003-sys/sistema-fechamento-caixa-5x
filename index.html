@@ -524,6 +524,7 @@
         <button class="inner-tab-btn active" onclick="showSubTab('sistema','sis-configuracoes',this)">Configurações Gerais</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-backup',this)">Backup e Manutenção</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-logs',this)">Logs de Auditoria</button>
+        <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-documentos',this)">Documentos</button>
       </div>
 
       <!-- Configurações -->
@@ -592,6 +593,19 @@
           <div class="btn-row" style="margin-top:14px">
             <button class="btn" onclick="exportAuditCSV()">Exportar logs CSV</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Documentos — pasta por empresa/loja (Master) -->
+      <div class="inner-tab-panel hidden" id="sis-documentos">
+        <div class="card">
+          <h3 class="section-title">Pastas de documentos — todos os clientes</h3>
+          <p class="subtle" style="margin-bottom:14px">Arquivos enviados pelos operadores organizados por empresa e loja. Você pode visualizar, baixar ou limpar cada pasta.</p>
+          <div class="filter-bar-5x" style="margin-bottom:16px">
+            <div class="field"><label>Empresa</label><select id="docFilterCompany" onchange="renderDocumentos()"><option value="">Todas as empresas</option></select></div>
+            <div class="field"><label>Loja</label><select id="docFilterStore" onchange="renderDocumentos()"><option value="">Todas as lojas</option></select></div>
+          </div>
+          <div id="masterDocFolders"></div>
         </div>
       </div>
     </section>
@@ -690,6 +704,7 @@
         <button class="inner-tab-btn active" data-subtab="amov-extrato"      onclick="showSubTab('adminMovimentacoes','amov-extrato',this)">Extrato</button>
         <button class="inner-tab-btn"        data-subtab="amov-repasses"     onclick="showSubTab('adminMovimentacoes','amov-repasses',this)">Repasses Recebidos</button>
         <button class="inner-tab-btn"        data-subtab="amov-divergencias" onclick="showSubTab('adminMovimentacoes','amov-divergencias',this)">Divergências</button>
+        <button class="inner-tab-btn"        data-subtab="amov-documentos"   onclick="showSubTab('adminMovimentacoes','amov-documentos',this)">Documentos</button>
       </div>
 
       <!-- Extrato com filtros -->
@@ -728,6 +743,15 @@
             <div class="field"><label>Status</label><select id="adminDivergenceStatusFilter" onchange="renderAdminViews()"><option value="Pendente">Pendentes</option><option value="">Todas</option><option value="Revisada">Revisadas</option></select></div>
           </div>
           <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Responsável</th><th>Tipo / Valor</th><th>Status revisão</th><th>Ação</th></tr></thead><tbody id="adminDivergencesReviewBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Documentos por loja -->
+      <div class="inner-tab-panel hidden" id="amov-documentos">
+        <div class="card">
+          <h3 class="section-title">Pasta de documentos por loja</h3>
+          <p class="subtle" style="margin-bottom:14px">Arquivos enviados pelos operadores. Visualize, baixe ou limpe a pasta de cada loja.</p>
+          <div id="adminDocFolders"></div>
         </div>
       </div>
     </section>
@@ -1544,6 +1568,37 @@
         <div id="operatorRulesPage-content">
           <div id="adminRulesList2"></div>
         </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         OPERADOR: DOCUMENTOS
+    ============================================================ -->
+    <section class="page hidden" id="operatorDocumentos">
+      <div class="card">
+        <h3 class="section-title">Enviar documento</h3>
+        <p class="subtle" style="margin-bottom:14px">Envie fotos, comprovantes ou PDFs para a pasta da sua loja. Formatos aceitos: JPG, PNG, PDF (máx. 10 MB).</p>
+        <div class="form-grid">
+          <div class="field full">
+            <label>Arquivo</label>
+            <input type="file" id="docUploadFile" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" style="display:none" onchange="previewDocUpload(this)"/>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <button class="btn" type="button" onclick="document.getElementById('docUploadFile').click()">Selecionar arquivo</button>
+              <span id="docUploadFileName" class="subtle" style="font-size:13px">Nenhum arquivo selecionado</span>
+            </div>
+          </div>
+          <div class="field full">
+            <label>Descrição / Observação (opcional)</label>
+            <input id="docUploadDescription" type="text" placeholder="Ex: Comprovante de vendas 07/06, Nota fiscal entrada..."/>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:14px">
+          <button id="docUploadBtn" class="btn btn-primary" type="button" onclick="handleDocUpload()">Enviar documento</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3 class="section-title">Documentos enviados pela sua loja</h3>
+        <div id="operatorDocList"></div>
       </div>
     </section>
 

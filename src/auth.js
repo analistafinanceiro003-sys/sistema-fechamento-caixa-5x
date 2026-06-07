@@ -245,7 +245,7 @@ async function forgotPassword() {
 }
 
 function openSupport() {
-  window.open('https://wa.me/', '_blank');
+  window.open('https://wa.me/5500000000000', '_blank');
 }
 
 Object.assign(window, {

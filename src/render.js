@@ -19,6 +19,7 @@ function renderAll() {
   try { renderOperatorViews(); } catch(e) { console.warn('renderOperatorViews:', e); }
   try { renderModuleManager(); } catch(e) { console.warn('renderModuleManager:', e); }
   try { renderAttachments(); } catch(e) { console.warn('renderAttachments:', e); }
+  try { renderDocumentos(); } catch(e) { console.warn('renderDocumentos:', e); }
   try { calc(); } catch(e) { console.warn('calc:', e); }
 }
 
@@ -509,8 +510,79 @@ function switchCentral(tabId, btn) {
   btn?.classList.add('active');
 }
 
+/* ================================================================
+   PASTA DE DOCUMENTOS — renderização por perfil
+================================================================ */
+function renderDocumentos() {
+  const docs = state.storeDocuments || [];
+  const docItem = (d) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #f1f5f9;font-size:13px">
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        ${esc(d.name)}${d.description ? ` <span class="subtle">— ${esc(d.description)}</span>` : ''}
+      </span>
+      <span class="subtle" style="white-space:nowrap">${Math.round((d.size||0)/1024)} KB</span>
+      <span class="subtle" style="white-space:nowrap">${esc((d.createdAt||'').slice(0,10))}</span>
+      ${d.url ? `<a class="btn btn-sm" href="${esc(d.url)}" target="_blank" rel="noopener" style="white-space:nowrap">Ver</a>` : ''}
+      <button class="btn btn-danger btn-sm" onclick="handleDeleteDoc('${d.id}','${esc(d.path||'')}')">Remover</button>
+    </div>`;
+
+  if (role === 'operator') {
+    const myDocs = docs.filter((d) => d.storeId === currentUser?.storeId)
+      .sort((a, b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    html('operatorDocList', myDocs.length
+      ? myDocs.map(docItem).join('')
+      : '<p class="subtle" style="padding:16px">Nenhum documento enviado ainda.</p>'
+    );
+    return;
+  }
+
+  const storeFolder = (s) => {
+    const storeDocs = docs.filter((d) => d.storeId === s.id)
+      .sort((a, b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    const header = role === 'master'
+      ? `${esc(companyName(s.companyId))} / ${esc(s.name)}`
+      : esc(s.name);
+    return `
+      <div class="rule-company-card" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+          <h4 style="margin:0">${header} <span class="subtle">(${storeDocs.length} arquivo${storeDocs.length!==1?'s':''})</span></h4>
+          ${storeDocs.length ? `<button class="btn btn-danger btn-sm" onclick="handleClearStoreDocuments('${s.id}','${esc(s.name)}')">Limpar pasta</button>` : ''}
+        </div>
+        ${storeDocs.length
+          ? storeDocs.map(docItem).join('')
+          : '<p class="subtle" style="padding:8px">Pasta vazia.</p>'
+        }
+      </div>`;
+  };
+
+  if (role === 'admin') {
+    const myStores = state.stores.filter((s) => s.companyId === currentUser?.companyId);
+    html('adminDocFolders', myStores.map(storeFolder).join('') || '<p class="subtle">Nenhuma loja cadastrada.</p>');
+    return;
+  }
+
+  if (role === 'master') {
+    const filterCo    = val('docFilterCompany') || '';
+    const filterStore = val('docFilterStore')   || '';
+    const coEl = $('docFilterCompany');
+    if (coEl && coEl.options.length <= 1) {
+      coEl.innerHTML = '<option value="">Todas as empresas</option>' +
+        state.companies.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    }
+    if (filterCo) {
+      setOptions('docFilterStore', state.stores.filter((s) => s.companyId === filterCo).map((s) => [s.id, s.name]), 'Todas as lojas');
+    }
+    const visStores = state.stores.filter((s) =>
+      (!filterCo    || s.companyId === filterCo) &&
+      (!filterStore || s.id === filterStore)
+    );
+    html('masterDocFolders', visStores.map(storeFolder).join('') || '<p class="subtle">Nenhum arquivo encontrado.</p>');
+  }
+}
+
 Object.assign(window, {
   renderAll, renderMetrics, renderMasterDashboard, renderCadastros,
   renderUsersByCompany, renderOperacao, renderFechamentos, renderSistema,
   renderAdminViews, renderOperatorViews, renderModuleManager, switchCentral,
+  renderDocumentos,
 });
