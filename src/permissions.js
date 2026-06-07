@@ -141,7 +141,7 @@ function mergeModuleConfig(profile, stored) {
   const result = { status: stored.status || defaults.status };
   Object.keys(defaults).forEach((key) => {
     if (key === 'status') return;
-    result[key] = key in stored ? stored[key] : false;
+    result[key] = key in stored ? stored[key] : defaults[key];
   });
   return result;
 }
