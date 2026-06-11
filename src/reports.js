@@ -12,9 +12,11 @@ function getScopedClosings({
   startDate = null,
   endDate = null,
   onlyDivergences = false,
+  includeDeleted = false,
   scope = null,
 } = {}) {
   let rows = [...(state?.closings || [])];
+  if (!includeDeleted) rows = rows.filter((c) => c.type !== 'Excluído');
 
   /* Escopo por role */
   const effectiveScope = scope || role;

@@ -219,9 +219,9 @@ function calc() {
   const openAlert = $('openingDivergenceAlert');
   if (openAlert) {
     const abs = Math.abs(cc.openingDivergence);
-    openAlert.style.display = abs > cc.tolerance ? '' : 'none';
+    openAlert.style.display = abs > 0 ? '' : 'none';
     openAlert.className     = 'kpi-alert warning';
-    openAlert.textContent   = `Divergência de abertura: ${money(cc.openingDivergence)}. Tolerância configurada: ${money(cc.tolerance)}.`;
+    openAlert.textContent   = `Divergência de abertura: ${money(cc.openingDivergence)}. Saldo informado difere do saldo autorizado.`;
   }
 
   /* Bloco 1 — Saldo em caixa (passo a passo) */
@@ -661,6 +661,122 @@ function clearAttachmentsUI() {
 }
 
 /* ================================================================
+   EXCLUIR FECHAMENTO — soft delete exclusivo para Gestão 5X
+================================================================ */
+async function confirmDeleteClosing(id) {
+  if (role !== 'master') return alert('Apenas Gestão 5X pode excluir fechamentos.');
+  const closing = (state.closings || []).find((c) => c.id === id);
+  if (!closing) return alert('Fechamento não encontrado.');
+  const motivo = prompt(
+    `Confirme a exclusão do fechamento de "${storeName(closing.storeId)}" em ${closing.date}.\n\nInforme o motivo da exclusão:`
+  );
+  if (!motivo?.trim()) return alert('O motivo é obrigatório para excluir um fechamento.');
+
+  if (sb && !USE_LOCAL_FALLBACK && currentUser?.authId) {
+    try {
+      await softDeleteClosing(id);
+    } catch (e) { return alert(`Erro ao excluir: ${e.message}`); }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase obrigatório em produção.');
+  }
+
+  closing.type = 'Excluído';
+  addAudit('Exclusão de fechamento', `${storeName(closing.storeId)} / ${closing.date} — Motivo: ${motivo.trim()} — Valor anterior: ${money(closing.fundDivergence ?? closing.diff)}`);
+  save(); renderAll();
+  alert('Fechamento excluído (inativado). O registro foi preservado no banco de dados com rastreabilidade.');
+}
+
+/* ================================================================
+   RETIFICAR FECHAMENTO — cria novo registro Retificado (Gestão 5X)
+================================================================ */
+let _rectifyTargetId = null;
+
+function openRectifyModal(id) {
+  if (role !== 'master') return alert('Apenas Gestão 5X pode retificar fechamentos.');
+  const closing = (state.closings || []).find((c) => c.id === id);
+  if (!closing) return alert('Fechamento não encontrado.');
+  _rectifyTargetId = id;
+  const modal = $('rectifyClosingModal');
+  const body  = $('rectifyModalBody');
+  if (body) {
+    body.innerHTML = `<table class="table"><tbody>
+      <tr><th>Loja</th><td>${esc(storeName(closing.storeId))}</td></tr>
+      <tr><th>Data</th><td>${esc(closing.date)}</td></tr>
+      <tr><th>Turno</th><td>${esc(closing.shift || 'Integral')}</td></tr>
+      <tr><th>Responsável</th><td>${esc(closing.responsible)}</td></tr>
+      <tr><th>Saldo inicial</th><td>${money(closing.initial)}</td></tr>
+      <tr><th>Entradas</th><td>${money(closing.entries)}</td></tr>
+      <tr><th>Saídas</th><td>${money(closing.expenses)}</td></tr>
+      <tr><th>Repasse</th><td>${money(closing.transfer)}</td></tr>
+      <tr><th>Saldo final</th><td>${money(closing.finalAfterTransfer)}</td></tr>
+      <tr><th>Divergência</th><td>${money(closing.fundDivergence ?? closing.diff)}</td></tr>
+      <tr><th>Status</th><td>${tag(closing.status)}</td></tr>
+      ${closing.notes ? `<tr><th>Obs. original</th><td>${esc(closing.notes)}</td></tr>` : ''}
+    </tbody></table>`;
+  }
+  const reasonEl = $('rectifyReason');
+  const notesEl  = $('rectifyNotes');
+  if (reasonEl) reasonEl.value = '';
+  if (notesEl)  notesEl.value  = closing.notes || '';
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeRectifyModal() {
+  const modal = $('rectifyClosingModal');
+  if (modal) modal.style.display = 'none';
+  _rectifyTargetId = null;
+}
+
+async function saveRectification() {
+  if (role !== 'master') return alert('Apenas Gestão 5X pode retificar fechamentos.');
+  const id = _rectifyTargetId;
+  if (!id) return;
+  const original = (state.closings || []).find((c) => c.id === id);
+  if (!original) return alert('Fechamento original não encontrado.');
+  const motivo = ($('rectifyReason')?.value || '').trim();
+  if (!motivo) return alert('O motivo da retificação é obrigatório.');
+  const novasObs = ($('rectifyNotes')?.value || '').trim();
+
+  const retificado = {
+    ...original,
+    id:               uid('cl'),
+    type:             'Retificado',
+    originalClosingId: original.id,
+    notes:            `[Retificação por ${currentUser?.name || 'master'} em ${new Date().toLocaleDateString('pt-BR')}] Motivo: ${motivo}${novasObs ? ` | Obs: ${novasObs}` : ''}`,
+    reviewStatus:     'Retificado',
+    createdAt:        new Date().toISOString(),
+    attachments:      [],
+    entryItems:       original.entryItems || [],
+    expenseItems:     original.expenseItems || [],
+  };
+
+  state.closings.push(retificado);
+
+  if (sb && !USE_LOCAL_FALLBACK && currentUser?.authId) {
+    try {
+      await createClosing(retificado);
+    } catch (e) {
+      state.closings = state.closings.filter((c) => c.id !== retificado.id);
+      renderAll();
+      return alert(`Erro ao salvar retificação: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    state.closings = state.closings.filter((c) => c.id !== retificado.id);
+    renderAll();
+    return alert('Supabase obrigatório em produção.');
+  }
+
+  addAudit(
+    'Retificação de fechamento',
+    `${storeName(original.storeId)} / ${original.date} — Motivo: ${motivo} — Valor anterior: ${money(original.fundDivergence ?? original.diff)}`
+  );
+
+  closeRectifyModal();
+  save(); renderAll();
+  alert('Retificação salva com sucesso! O fechamento original foi preservado.');
+}
+
+/* ================================================================
    EXPOSIÇÃO GLOBAL
 ================================================================ */
 Object.assign(window, {
@@ -677,6 +793,7 @@ Object.assign(window, {
   ensureExpenseCategories,
   confirmTransfer, handleSaveClosingClick, saveClosing, saveOpeningAdjustment, reviewDivergence, createDivergenceReviews,
   handleAttachments, renderAttachments, clearAttachmentsUI,
+  confirmDeleteClosing, openRectifyModal, closeRectifyModal, saveRectification,
 });
 
 

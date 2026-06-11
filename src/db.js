@@ -955,6 +955,10 @@ async function updateClosing(id, closing) {
   }), { id });
 }
 
+async function softDeleteClosing(id) {
+  return supabaseWrite('closings', 'update', { type: 'Excluído' }, { id });
+}
+
 async function createCashOpeningAdjustment(adjustment) {
   return supabaseWrite('cash_opening_adjustments', 'insert', cleanPayload({
     id: isUuid(adjustment.id) ? adjustment.id : undefined,
@@ -2081,7 +2085,7 @@ Object.assign(window, {
   getModulePermissions, saveModulePermissions,
   getOperationRules, createOperationRule, updateOperationRule, deleteOperationRule,
   getOperationConfig, saveOperationConfigToSupabase, saveSelectOptionsToSupabase,
-  getClosingsByScope, createClosing, updateClosing, getPreviousClosing, checkDuplicateClosing,
+  getClosingsByScope, createClosing, updateClosing, softDeleteClosing, getPreviousClosing, checkDuplicateClosing,
   createClosingEntries, createClosingExpenses, createClosingAttachments, getClosingEntries, getClosingExpenses,
   createCashOpeningAdjustment, getCashOpeningAdjustment,
   createDivergenceReview, getPendingDivergenceReviews, updateDivergenceReview,

@@ -193,8 +193,12 @@ function renderOperacao() {
 /* --- FECHAMENTOS (sub-abas: movimentações, extrato, divergências) --- */
 function renderFechamentos() {
   /* Movimentações */
-  html('movementsBody', masterFilteredClosings().map((c) =>
-    `<tr>
+  html('movementsBody', masterFilteredClosings().map((c) => {
+    const atts = c.attachments || [];
+    const attHtml = atts.length
+      ? atts.map((a) => a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener" style="display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${esc(a.name)}</a>` : esc(a.name)).join('')
+      : '<span class="subtle" style="font-size:11px">—</span>';
+    return `<tr>
       <td>${esc(companyName(c.companyId))}</td><td>${esc(storeName(c.storeId))}</td>
       <td>${esc(c.date)}<br><span class="subtle">${esc(c.shift || 'Integral')}</span></td><td>${esc(c.responsible)}</td>
       <td>${money(c.initial)}</td><td>${money(c.entries)}</td><td>${money(c.expenses)}</td>
@@ -203,8 +207,13 @@ function renderFechamentos() {
       <td>${money(c.fundDivergence ?? c.diff)}<br><span class="subtle">Abertura: ${money(c.openingDivergence || 0)}</span></td>
       <td>${tag(c.type || 'Original')}${c.type === 'Retificado' && c.originalClosingId ? `<button class="btn" style="padding:3px 8px;font-size:11px;margin-left:6px" onclick="openOriginalClosingModal('${esc(c.originalClosingId)}')">Ver original</button>` : ''}</td>
       <td>${tag(c.status)}</td>
-    </tr>`
-  ).join('') || emptyRow(13));
+      <td style="min-width:100px">${attHtml}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" onclick="openRectifyModal('${esc(c.id)}')" title="Retificar fechamento">Retificar</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDeleteClosing('${esc(c.id)}')" title="Excluir fechamento" style="margin-top:4px">Excluir</button>
+      </td>
+    </tr>`;
+  }).join('') || emptyRow(15));
 
   /* Extrato — usa extractFilteredClosings() que já respeita data/loja */
   const type = val('masterExtractType');
@@ -327,13 +336,26 @@ function renderAdminViews() {
     .map((a) => `<tr><td>${esc(storeName(a.storeId))}</td><td>${esc(toBRFromISO(parseBR(a.startDate)))}</td><td>${esc(a.shift || 'Integral')}</td><td>${money(a.amount)}</td><td>${esc(a.reason)}</td><td>${esc(a.authorizedBy || '-')}</td></tr>`)
     .join('') || emptyRow(6));
 
-  /* Histórico de fechamentos (afech-historico) — usa filtros adminMovStart/adminMovEnd */
+  /* Histórico de fechamentos (afech-historico) — resumo por fechamento */
   setOptions('adminMovementStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
-  const histRows = allMovementRows(adminMovFilteredClosings());
-  html('adminMovementsDetailBody', histRows.map((r) =>
-    `<tr><td>${esc(r.Data)}</td><td>${esc(r.Loja)}</td><td>${esc(r.Tipo)}</td><td>${esc(r.Descrição)}</td>
-     <td style="color:${Number(r.Valor)>=0?'var(--success)':'var(--danger)'}">${money(r.Valor)}</td><td>${esc(r.Responsável)}</td></tr>`
-  ).join('') || emptyRow(6));
+  const histClosings = adminMovFilteredClosings();
+  html('adminMovementsDetailBody', [...histClosings].reverse().map((c) => {
+    const salFinal = Number(c.cashBalance ?? c.finalAfterTransfer ?? 0);
+    const div = Number(c.fundDivergence ?? c.diff ?? 0);
+    return `<tr>
+      <td>${esc(c.date)}</td>
+      <td>${esc(storeName(c.storeId))}</td>
+      <td>${esc(c.shift || 'Integral')}</td>
+      <td>${esc(c.responsible || c.operator || '-')}</td>
+      <td>${money(c.initial)}</td>
+      <td>${money(c.entries)}</td>
+      <td>${money(c.expenses)}</td>
+      <td>${money(c.transfer)}</td>
+      <td>${money(salFinal)}</td>
+      <td style="color:${div !== 0 ? 'var(--danger)' : 'var(--success)'}">${money(div)}</td>
+      <td>${tag(c.status)}</td>
+    </tr>`;
+  }).join('') || emptyRow(11));
 
   /* Extrato (amov-extrato) — com filtros por loja e período */
   setOptions('adminExtratStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
@@ -405,22 +427,30 @@ function renderAdminViews() {
 
   /* Últimas movimentações (dashboard) */
   html('adminMovementsBody', rows.slice(-8).reverse().map((c) =>
-    `<tr><td>${esc(c.date)}</td><td>${esc(storeName(c.storeId))}</td><td>${money(c.entries)}</td><td>${money(c.diff)}</td><td>${tag(c.status)}</td></tr>`
-  ).join('') || emptyRow(5));
+    `<tr><td>${esc(c.date)}</td><td>${esc(storeName(c.storeId))}</td><td>${money(c.initial)}</td><td>${money(c.entries)}</td><td>${money(c.cashBalance ?? c.finalAfterTransfer ?? 0)}</td><td>${money(c.diff)}</td><td>${tag(c.status)}</td></tr>`
+  ).join('') || emptyRow(7));
 }
 
 /* --- OPERADOR --- */
 function renderOperatorViews() {
   const rows = operatorHistoryClosings(); /* respeita filtro de data */
-  html('operatorHistoryBody', [...rows].reverse().map((c) =>
-    `<tr>
+  html('operatorHistoryBody', [...rows].reverse().map((c) => {
+    const atts = c.attachments || [];
+    const attHtml = atts.length
+      ? atts.map((a) => a.url
+          ? `<a href="${esc(a.url)}" target="_blank" rel="noopener" style="display:inline-block;font-size:11px;margin-right:4px">${esc(a.name)}</a>`
+          : `<span style="font-size:11px">${esc(a.name)}</span>`
+        ).join('')
+      : '<span class="subtle" style="font-size:11px">—</span>';
+    return `<tr>
       <td>${esc(c.date)}</td><td>${esc(storeName(c.storeId))}</td>
       <td>${money(c.entries)}</td><td>${money(c.expenses)}</td><td>${money(c.transfer)}</td>
       <td style="color:${Number(c.diff)<0?'var(--danger)':'var(--warning)'}">${money(c.diff)}</td>
       <td>${tag(c.type||'Original')}${c.type === 'Retificado' && c.originalClosingId ? `<button class="btn" style="padding:3px 8px;font-size:11px;margin-left:6px" onclick="openOriginalClosingModal('${esc(c.originalClosingId)}')">Ver original</button>` : ''}</td>
       <td>${tag(c.status)}</td>
-    </tr>`
-  ).join('') || emptyRow(8));
+      <td>${attHtml}</td>
+    </tr>`;
+  }).join('') || emptyRow(9));
 
   /* Regras da loja — bloco no formulário de fechamento (store selecionada no form) */
   const closingStore = selectedStore();

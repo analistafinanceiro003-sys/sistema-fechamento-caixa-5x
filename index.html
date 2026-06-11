@@ -427,7 +427,7 @@
             <div class="field"><label>Data final</label><input id="masterFechEnd" type="date" onchange="renderFechamentos()"/></div>
           </div>
           <div class="table-wrap">
-            <table><thead><tr><th>Empresa</th><th>Loja</th><th>Data</th><th>Responsável</th><th>Inicial</th><th>Entradas</th><th>Saídas</th><th>Saldo Esp.</th><th>Repasse</th><th>Saldo Final</th><th>Div. Fundo</th><th>Tipo</th><th>Status</th></tr></thead>
+            <table><thead><tr><th>Empresa</th><th>Loja</th><th>Data</th><th>Responsável</th><th>Inicial</th><th>Entradas</th><th>Saídas</th><th>Saldo Esp.</th><th>Repasse</th><th>Saldo Final</th><th>Div. Fundo</th><th>Tipo</th><th>Status</th><th>Anexos</th><th>Ações</th></tr></thead>
             <tbody id="movementsBody"></tbody></table>
           </div>
         </div>
@@ -626,7 +626,7 @@
       </div>
       <div class="card" style="margin-top:16px">
         <h3 class="section-title">Últimas movimentações</h3>
-        <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Entradas</th><th>Divergência</th><th>Status</th></tr></thead><tbody id="adminMovementsBody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Saldo Inicial</th><th>Entradas</th><th>Saldo Final</th><th>Divergência</th><th>Status</th></tr></thead><tbody id="adminMovementsBody"></tbody></table></div>
       </div>
     </section>
 
@@ -656,7 +656,7 @@
             <div class="field"><label>Data final</label><input id="adminMovEnd" type="date" onchange="renderAdminViews()"/></div>
           </div>
           <div class="table-wrap">
-            <table><thead><tr><th>Data</th><th>Loja</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Responsável</th></tr></thead>
+            <table><thead><tr><th>Data</th><th>Loja</th><th>Turno</th><th>Responsável</th><th>Saldo Inicial</th><th>Entradas</th><th>Saídas</th><th>Repasse</th><th>Saldo Final</th><th>Divergência</th><th>Status</th></tr></thead>
             <tbody id="adminMovementsDetailBody"></tbody></table>
           </div>
         </div>
@@ -831,7 +831,7 @@
               <div class="summary-line operator-hidden"><span>Divergência de abertura</span><strong id="openingDivergenceView">0,00 R$</strong></div>
               <div class="summary-line"><span>Origem do saldo anterior</span><strong id="openingOriginView">Caixa inicial</strong></div>
             </div>
-            <div class="kpi-alert warning" id="openingDivergenceAlert" style="display:none;margin-top:10px"></div>
+            <div class="kpi-alert warning operator-hidden" id="openingDivergenceAlert" style="display:none;margin-top:10px"></div>
             <div class="field" style="margin-top:12px">
               <label>Saldo inicial informado <span class="subtle" id="initialBalanceHint" style="display:none;font-size:12px"></span></label>
               <input id="initial" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*" value="0"
@@ -962,7 +962,7 @@
           <div class="field"><label>Data final</label><input id="opHistEnd" type="date" onchange="renderOperatorViews()"/></div>
         </div>
         <div class="table-wrap">
-          <table><thead><tr><th>Data</th><th>Loja</th><th>Entradas</th><th>Saídas</th><th>Repasse</th><th>Divergência</th><th>Tipo</th><th>Status</th></tr></thead>
+          <table><thead><tr><th>Data</th><th>Loja</th><th>Entradas</th><th>Saídas</th><th>Repasse</th><th>Divergência</th><th>Tipo</th><th>Status</th><th>Anexos</th></tr></thead>
           <tbody id="operatorHistoryBody"></tbody></table>
         </div>
       </div>
@@ -1639,6 +1639,26 @@
     <div id="origModalBody" style="margin-top:16px"></div>
     <div class="btn-row" style="margin-top:20px">
       <button class="btn" onclick="closeOriginalClosingModal()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Retificar fechamento (Gestão 5X) -->
+<div id="rectifyClosingModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div class="card" style="width:min(560px,96vw);max-height:90vh;overflow-y:auto;padding:28px">
+    <h3 class="section-title">Retificar fechamento</h3>
+    <div id="rectifyModalBody" style="margin-top:16px"></div>
+    <div class="field" style="margin-top:16px">
+      <label>Motivo da retificação <span style="color:#dc2626">*</span></label>
+      <textarea id="rectifyReason" placeholder="Descreva o motivo da retificação..." style="min-height:80px"></textarea>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label>Observações adicionais</label>
+      <textarea id="rectifyNotes" placeholder="Observações..." style="min-height:60px"></textarea>
+    </div>
+    <div class="btn-row" style="margin-top:20px">
+      <button class="btn btn-primary" onclick="saveRectification()">Confirmar retificação</button>
+      <button class="btn" onclick="closeRectifyModal()">Cancelar</button>
     </div>
   </div>
 </div>
