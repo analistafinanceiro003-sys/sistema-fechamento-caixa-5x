@@ -395,6 +395,9 @@ function renderAdminViews() {
     const diffLabel = diff === 0 ? '0,00 R$' : (diff > 0 ? '+' : '') + money(diff);
     return `<tr>
       <td>${esc(c.date)}</td><td>${esc(storeName(c.storeId))}</td><td>${esc(c.responsible || c.operator || '-')}</td>
+      <td>${money(c.initial)}</td>
+      <td>${money(c.entries)}</td>
+      <td>${money(c.expenses)}</td>
       <td>${money(esperado)}</td>
       <td>${money(informado)}</td>
       <td style="color:${diffColor};font-weight:600">${diffLabel}</td>
@@ -406,7 +409,7 @@ function renderAdminViews() {
         : '<span class="status success">✓</span>'
       }</td>
     </tr>`;
-  }).filter(Boolean).join('') || emptyRow(10));
+  }).filter(Boolean).join('') || emptyRow(13));
 
   /* Divergências — com filtro de status */
   setOptions('adminDivergenceStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
