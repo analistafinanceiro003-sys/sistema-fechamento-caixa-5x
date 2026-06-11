@@ -388,9 +388,17 @@ function renderAdminViews() {
     const receipt = receipts.find((r) => r.closingId === c.id);
     const status  = receipt ? 'Recebido' : 'Pendente';
     if (repStatus && status !== repStatus) return '';
+    const esperado  = Math.max(0, Number(c.expected ?? 0) - Number(c.standardFund ?? 0));
+    const informado = Number(c.transfer || 0);
+    const diff      = informado - esperado;
+    const diffColor = diff === 0 ? 'var(--success)' : 'var(--danger)';
+    const diffLabel = diff === 0 ? '0,00 R$' : (diff > 0 ? '+' : '') + money(diff);
     return `<tr>
       <td>${esc(c.date)}</td><td>${esc(storeName(c.storeId))}</td><td>${esc(c.responsible || c.operator || '-')}</td>
-      <td>${money(c.transfer)}</td><td>${tag(status)}</td>
+      <td>${money(esperado)}</td>
+      <td>${money(informado)}</td>
+      <td style="color:${diffColor};font-weight:600">${diffLabel}</td>
+      <td>${tag(status)}</td>
       <td>${receipt ? new Date(receipt.confirmedAt).toLocaleString('pt-BR') : '-'}</td>
       <td>${esc(receipt?.confirmedBy || '-')}</td>
       <td>${status === 'Pendente'
@@ -398,7 +406,7 @@ function renderAdminViews() {
         : '<span class="status success">✓</span>'
       }</td>
     </tr>`;
-  }).filter(Boolean).join('') || emptyRow(8));
+  }).filter(Boolean).join('') || emptyRow(10));
 
   /* Divergências — com filtro de status */
   setOptions('adminDivergenceStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
