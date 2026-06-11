@@ -182,12 +182,13 @@ function renderOperacao() {
   ).join('') || emptyRow(3));
 
   /* Configuração operacional */
-  html('operationConfigList', Object.entries(state.operationConfigs).map(([cid, c]) =>
-    `<div class="kpi-alert" style="margin-bottom:10px">
+  html('operationConfigList', Object.entries(state.operationConfigs).map(([cid, c]) => {
+    const deadline = Number(c.rectificationDeadlineDays ?? 0);
+    return `<div class="kpi-alert" style="margin-bottom:10px">
       <strong>${esc(companyName(cid))}</strong>
-      <p class="subtle">Modo: ${esc(c.mode)} | Tolerância: ${money(c.tolerance)} | Repasse: ${esc(c.receiver || '-')}</p>
-    </div>`
-  ).join('') || '<p class="subtle">Nenhuma configuração salva.</p>');
+      <p class="subtle">Modo: ${esc(c.mode)} | Tolerância: ${money(c.tolerance)} | Repasse: ${esc(c.receiver || '-')} | Retificação: ${deadline === 0 ? 'mesmo mês' : deadline + ' dias'}</p>
+    </div>`;
+  }).join('') || '<p class="subtle">Nenhuma configuração salva.</p>');
 }
 
 /* --- FECHAMENTOS (sub-abas: movimentações, extrato, divergências) --- */
@@ -440,6 +441,57 @@ function renderAdminViews() {
   html('adminMovementsBody', rows.slice(-8).reverse().map((c) =>
     `<tr><td>${esc(c.date)}</td><td>${esc(storeName(c.storeId))}</td><td>${money(c.initial)}</td><td>${money(c.entries)}</td><td>${money(c.cashBalance ?? c.finalAfterTransfer ?? 0)}</td><td>${money(c.diff)}</td><td>${tag(c.status)}</td></tr>`
   ).join('') || emptyRow(7));
+
+  /* Alerta de retificações pendentes */
+  const pendingRects = (state.rectificationRequests || []).filter((r) =>
+    r.companyId === currentUser?.companyId && r.status === 'Pendente'
+  );
+  const rectAlert = $('adminRectificationAlert');
+  if (rectAlert) {
+    rectAlert.style.display = pendingRects.length ? '' : 'none';
+    rectAlert.textContent   = `${pendingRects.length} solicitação(ões) de retificação aguardando sua aprovação.`;
+  }
+  text('adminPendingRects', pendingRects.length);
+
+  /* Tabela de retificações (sub-aba amov-retificacoes) */
+  setOptions('adminRectStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
+  const rectStoreFilter  = val('adminRectStoreFilter') || '';
+  const rectStatusFilter = val('adminRectStatusFilter') || 'Pendente';
+  const allRects = (state.rectificationRequests || []).filter((r) =>
+    r.companyId === currentUser?.companyId &&
+    (!rectStoreFilter  || r.storeId === rectStoreFilter) &&
+    (!rectStatusFilter || r.status === rectStatusFilter)
+  );
+  html('adminRectificationsBody', [...allRects].reverse().map((r) => {
+    const isPending = r.status === 'Pendente';
+    const diffRow = (label, orig, novo) => {
+      const changed = orig !== novo;
+      return `<div style="font-size:11px;${changed?'color:var(--warning);font-weight:600':''}">
+        ${label}: ${money(orig)} → ${money(novo)}${changed?' ⚠':''}
+      </div>`;
+    };
+    const repasseWarn = r.repasseChanged
+      ? `<div style="font-size:11px;color:var(--danger);font-weight:600;margin-top:4px">⚠ Repasse alterado — confirme o valor com o operador</div>` : '';
+    return `<tr>
+      <td>${esc(r.closingDate)}</td>
+      <td>${esc(storeName(r.storeId))}</td>
+      <td>${esc(r.operatorName)}</td>
+      <td>
+        ${diffRow('Inicial',  r.originalInitial,  r.newInitial)}
+        ${diffRow('Entradas', r.originalEntries,  r.newEntries)}
+        ${diffRow('Saídas',   r.originalExpenses, r.newExpenses)}
+        ${diffRow('Repasse',  r.originalTransfer, r.newTransfer)}
+        ${repasseWarn}
+      </td>
+      <td style="max-width:180px;font-size:12px">${esc(r.justification)}</td>
+      <td>${tag(r.status)}</td>
+      <td>${isPending
+        ? `<button class="btn btn-sm btn-primary" onclick="approveRectification('${r.id}')">Aprovar</button>
+           <button class="btn btn-sm" style="margin-left:4px" onclick="rejectRectification('${r.id}')">Rejeitar</button>`
+        : `<span class="subtle" style="font-size:11px">${esc(r.reviewedBy || '-')} ${r.reviewedAt ? '· ' + new Date(r.reviewedAt).toLocaleDateString('pt-BR') : ''}</span>${r.adminComment ? `<br><span style="font-size:11px">${esc(r.adminComment)}</span>` : ''}`
+      }</td>
+    </tr>`;
+  }).join('') || emptyRow(7));
 }
 
 /* --- OPERADOR --- */
@@ -453,15 +505,27 @@ function renderOperatorViews() {
           : `<span style="font-size:11px">${esc(a.name)}</span>`
         ).join('')
       : '<span class="subtle" style="font-size:11px">—</span>';
+    const req = (state.rectificationRequests || []).find((r) => r.closingId === c.id);
+    let rectCell = '';
+    if (req?.status === 'Pendente') {
+      rectCell = '<span class="status warning" style="font-size:11px">Aguardando aprovação</span>';
+    } else if (req?.status === 'Aprovada') {
+      rectCell = '<span class="status success" style="font-size:11px">Aprovada</span>';
+    } else if (req?.status === 'Rejeitada') {
+      rectCell = `<span class="status danger" style="font-size:11px" title="${esc(req.adminComment)}">Rejeitada</span>`;
+    } else if (c.type !== 'Retificado') {
+      rectCell = `<button class="btn btn-sm" onclick="openOperatorRectifyModal('${esc(c.id)}')">Solicitar</button>`;
+    }
     return `<tr>
       <td>${esc(c.date)}</td><td>${esc(storeName(c.storeId))}</td>
       <td>${money(c.entries)}</td><td>${money(c.expenses)}</td><td>${money(c.transfer)}</td>
       <td style="color:${Number(c.diff)<0?'var(--danger)':'var(--warning)'}">${money(c.diff)}</td>
       <td>${tag(c.type||'Original')}${c.type === 'Retificado' && c.originalClosingId ? `<button class="btn" style="padding:3px 8px;font-size:11px;margin-left:6px" onclick="openOriginalClosingModal('${esc(c.originalClosingId)}')">Ver original</button>` : ''}</td>
       <td>${tag(c.status)}</td>
+      <td>${rectCell}</td>
       <td>${attHtml}</td>
     </tr>`;
-  }).join('') || emptyRow(9));
+  }).join('') || emptyRow(10));
 
   /* Regras da loja — bloco no formulário de fechamento (store selecionada no form) */
   const closingStore = selectedStore();

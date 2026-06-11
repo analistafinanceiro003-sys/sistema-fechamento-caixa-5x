@@ -777,6 +777,183 @@ async function saveRectification() {
 }
 
 /* ================================================================
+   SOLICITAÇÃO DE RETIFICAÇÃO — fluxo do Operador com aprovação Admin
+================================================================ */
+let _opRectifyTargetId = null;
+
+function openOperatorRectifyModal(closingId) {
+  const closing = (state.closings || []).find((c) => c.id === closingId);
+  if (!closing) return alert('Fechamento não encontrado.');
+
+  const config = cfg(closing.companyId);
+  const deadlineDays = Number(config.rectificationDeadlineDays ?? 0);
+  const closingDate = parseBR(closing.date);
+  const today = todayISO();
+
+  if (deadlineDays === 0) {
+    const cDate = new Date(closingDate); const tDate = new Date(today);
+    if (cDate.getFullYear() !== tDate.getFullYear() || cDate.getMonth() !== tDate.getMonth())
+      return alert('Retificação permitida apenas dentro do mês atual.');
+  } else {
+    const limit = new Date(today); limit.setDate(limit.getDate() - deadlineDays);
+    if (closingDate < limit.toISOString().slice(0, 10))
+      return alert(`Retificação permitida apenas nos últimos ${deadlineDays} dias.`);
+  }
+
+  const pending = (state.rectificationRequests || []).find((r) => r.closingId === closingId && r.status === 'Pendente');
+  if (pending) return alert('Já existe uma solicitação pendente para este fechamento.');
+
+  const adjustment = (state.cashOpeningAdjustments || []).find((a) =>
+    a.storeId === closing.storeId && parseBR(a.startDate) <= closingDate
+  );
+  const initialBlocked = !!adjustment;
+  _opRectifyTargetId = closingId;
+
+  setVal('opRectifyInitial',  String(closing.initial  || 0));
+  setVal('opRectifyEntries',  String(closing.entries  || 0));
+  setVal('opRectifyExpenses', String(closing.expenses || 0));
+  setVal('opRectifyTransfer', String(closing.transfer || 0));
+  setVal('opRectifyJustification', '');
+
+  const initialField = $('opRectifyInitial');
+  if (initialField) initialField.disabled = initialBlocked;
+  const hint = $('opRectifyInitialHint');
+  if (hint) hint.style.display = initialBlocked ? '' : 'none';
+
+  const orig = $('opRectifyOriginal');
+  if (orig) orig.innerHTML = `<div class="summary" style="margin-bottom:0">
+    <div class="summary-line"><span>Loja</span><strong>${esc(storeName(closing.storeId))}</strong></div>
+    <div class="summary-line"><span>Data / Turno</span><strong>${esc(closing.date)} — ${esc(closing.shift||'Integral')}</strong></div>
+    <div class="summary-line"><span>Saldo Inicial original</span><strong>${money(closing.initial)}</strong></div>
+    <div class="summary-line"><span>Entradas originais</span><strong>${money(closing.entries)}</strong></div>
+    <div class="summary-line"><span>Saídas originais</span><strong>${money(closing.expenses)}</strong></div>
+    <div class="summary-line"><span>Repasse original</span><strong>${money(closing.transfer)}</strong></div>
+  </div>`;
+
+  const modal = $('operatorRectifyModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeOperatorRectifyModal() {
+  const modal = $('operatorRectifyModal');
+  if (modal) modal.style.display = 'none';
+  _opRectifyTargetId = null;
+}
+
+function submitRectificationRequest() {
+  const closingId = _opRectifyTargetId;
+  if (!closingId) return;
+  const closing = (state.closings || []).find((c) => c.id === closingId);
+  if (!closing) return alert('Fechamento não encontrado.');
+
+  const justification = ($('opRectifyJustification')?.value || '').trim();
+  if (!justification) return alert('A justificativa é obrigatória.');
+
+  const initialBlocked = $('opRectifyInitial')?.disabled || false;
+  const newInitial   = initialBlocked ? Number(closing.initial || 0) : safeMoneyNumber(val('opRectifyInitial'));
+  const newEntries   = safeMoneyNumber(val('opRectifyEntries'));
+  const newExpenses  = safeMoneyNumber(val('opRectifyExpenses'));
+  const newTransfer  = safeMoneyNumber(val('opRectifyTransfer'));
+  const repasseChanged = newTransfer !== Number(closing.transfer || 0);
+
+  const req = {
+    id:             uid('rect'),
+    closingId,
+    companyId:      closing.companyId,
+    storeId:        closing.storeId,
+    operatorId:     currentUser?.authId || currentUser?.id,
+    operatorName:   currentUser?.name || '',
+    closingDate:    closing.date,
+    originalInitial:  Number(closing.initial  || 0),
+    originalEntries:  Number(closing.entries  || 0),
+    originalExpenses: Number(closing.expenses || 0),
+    originalTransfer: Number(closing.transfer || 0),
+    newInitial, newEntries, newExpenses, newTransfer,
+    initialBlocked, repasseChanged, justification,
+    status: 'Pendente', adminComment: '', reviewedBy: '', reviewedAt: '',
+    createdAt: new Date().toISOString(),
+  };
+
+  saveRectificationRequest(req);
+  addAudit('Solicitação de retificação', `${storeName(closing.storeId)} / ${closing.date} — ${justification}`);
+  closeOperatorRectifyModal();
+  alert('Solicitação enviada! Aguarde a aprovação do administrador.');
+}
+
+async function approveRectification(reqId) {
+  const req = (state.rectificationRequests || []).find((r) => r.id === reqId);
+  if (!req) return alert('Solicitação não encontrada.');
+  const closing = (state.closings || []).find((c) => c.id === req.closingId);
+  if (!closing) return alert('Fechamento original não encontrado.');
+
+  const newInitial  = Number(req.newInitial  || 0);
+  const newEntries  = Number(req.newEntries  || 0);
+  const newExpenses = Number(req.newExpenses || 0);
+  const newTransfer = Number(req.newTransfer || 0);
+  const standardFund = Number(closing.standardFund || 0);
+  const expected    = newInitial + newEntries - newExpenses;
+  const finalBal    = expected - newTransfer;
+  const diff        = finalBal - standardFund;
+  const tolerance   = Number(closing.toleranceSnapshot || cfg(closing.companyId).tolerance || 5);
+  const newStatus   = Math.abs(diff) <= tolerance ? 'OK' : 'Divergência';
+
+  const now = new Date().toLocaleDateString('pt-BR');
+  const retificadoNotes = `[Retificação aprovada por ${currentUser?.name || 'admin'} em ${now}] ${req.justification} | Original: Ini ${money(req.originalInitial)} Ent ${money(req.originalEntries)} Saí ${money(req.originalExpenses)} Rep ${money(req.originalTransfer)}`;
+
+  const retificado = {
+    ...closing,
+    id:               uid('cl'),
+    type:             'Retificado',
+    originalClosingId: closing.id,
+    initial: newInitial, entries: newEntries, expenses: newExpenses, transfer: newTransfer,
+    expected, cashBeforeTransfer: expected,
+    finalAfterTransfer: finalBal, cashBalance: finalBal,
+    fundDivergence: diff, diff,
+    status: newStatus,
+    notes: retificadoNotes,
+    reviewStatus: 'Retificado',
+    createdAt: new Date().toISOString(),
+    attachments: [], entryItems: closing.entryItems || [], expenseItems: closing.expenseItems || [],
+  };
+
+  state.closings.push(retificado);
+
+  if (sb && !USE_LOCAL_FALLBACK && currentUser?.authId) {
+    try { await createClosing(retificado); }
+    catch (e) {
+      state.closings = state.closings.filter((c) => c.id !== retificado.id);
+      return alert(`Erro ao salvar retificação: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    state.closings = state.closings.filter((c) => c.id !== retificado.id);
+    return alert('Supabase obrigatório em produção.');
+  }
+
+  req.status = 'Aprovada';
+  req.reviewedBy = currentUser?.name || 'admin';
+  req.reviewedAt = new Date().toISOString();
+
+  addAudit('Retificação aprovada', `${storeName(req.storeId)} / ${req.closingDate} — ${req.justification}`);
+  save(); renderAll();
+  alert('Retificação aprovada e aplicada com sucesso!');
+}
+
+function rejectRectification(reqId) {
+  const req = (state.rectificationRequests || []).find((r) => r.id === reqId);
+  if (!req) return alert('Solicitação não encontrada.');
+  const reason = prompt('Motivo da rejeição (obrigatório):');
+  if (reason === null) return;
+  if (!reason.trim()) return alert('Informe o motivo da rejeição.');
+  req.status = 'Rejeitada';
+  req.adminComment = reason.trim();
+  req.reviewedBy   = currentUser?.name || 'admin';
+  req.reviewedAt   = new Date().toISOString();
+  addAudit('Retificação rejeitada', `${storeName(req.storeId)} / ${req.closingDate} — ${reason.trim()}`);
+  save(); renderAll();
+  alert('Solicitação rejeitada.');
+}
+
+/* ================================================================
    EXPOSIÇÃO GLOBAL
 ================================================================ */
 Object.assign(window, {
@@ -794,6 +971,8 @@ Object.assign(window, {
   confirmTransfer, handleSaveClosingClick, saveClosing, saveOpeningAdjustment, reviewDivergence, createDivergenceReviews,
   handleAttachments, renderAttachments, clearAttachmentsUI,
   confirmDeleteClosing, openRectifyModal, closeRectifyModal, saveRectification,
+  openOperatorRectifyModal, closeOperatorRectifyModal, submitRectificationRequest,
+  approveRectification, rejectRectification,
 });
 
 

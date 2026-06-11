@@ -63,6 +63,7 @@ function defaultState() {
     audit: [],
     transferReceipts: [],
     storeDocuments: [],
+    rectificationRequests: [],
   };
 }
 
@@ -161,7 +162,7 @@ async function confirmTransferReceipt(closingId) {
 
 function normalizeState() {
   state = (state && typeof state === 'object') ? state : defaultState();
-  ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit','transferReceipts','storeDocuments'].forEach((k) => {
+  ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit','transferReceipts','storeDocuments','rectificationRequests'].forEach((k) => {
     if (!Array.isArray(state[k])) state[k] = [];
   });
   /* Migração: importa recibos salvos na chave antiga (localStorage separado) */
@@ -511,8 +512,18 @@ function cfg(companyId) {
   return {
     tolerance: 5, mode: 'Diário',
     receiver: '', allowed: '', message: '',
+    rectificationDeadlineDays: 0,
     ...(state?.operationConfigs?.[companyId] || {}),
   };
+}
+
+function saveRectificationRequest(req) {
+  if (!Array.isArray(state.rectificationRequests)) state.rectificationRequests = [];
+  const idx = state.rectificationRequests.findIndex((r) => r.id === req.id);
+  if (idx >= 0) state.rectificationRequests[idx] = req;
+  else state.rectificationRequests.push(req);
+  save();
+  renderAll();
 }
 
 /* --- CRUD — Empresas --- */
@@ -1577,6 +1588,7 @@ async function saveOperationConfig() {
     receiver: val('operationReceiver'),
     allowed: val('operationAllowed'),
     message: val('operationMessage'),
+    rectificationDeadlineDays: Number(val('operationRectificationDays') ?? 0) || 0,
   };
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
     try {
@@ -2107,6 +2119,7 @@ Object.assign(window, {
   fillUserManageSelect, fillEditUserStore, toggleUserStore,
   mapStoreDocument, uploadStoreDocument, deleteStoreDocument, clearStoreDocumentsByStore,
   previewDocUpload, handleDocUpload, handleDeleteDoc, handleClearStoreDocuments,
+  saveRectificationRequest,
 });
 
 Object.defineProperty(window, 'state', {

@@ -380,6 +380,7 @@
               <div class="field"><label>Responsável pelo repasse</label><input id="operationReceiver" placeholder="Ex: Yago / Financeiro"/></div>
               <div class="field full"><label>Saídas permitidas</label><textarea id="operationAllowed" placeholder="Ex: ajuda de custo, taxa de entrega, compra emergencial."></textarea></div>
               <div class="field full"><label>Mensagem padrão para o operador</label><textarea id="operationMessage" placeholder="Informe todas as saídas com descrição e comprovante quando houver."></textarea></div>
+              <div class="field"><label>Prazo para retificação (dias) <span class="subtle">— 0 = mesmo mês</span></label><input id="operationRectificationDays" type="number" value="0" min="0" step="1"/></div>
             </div>
             <div class="btn-row"><button class="btn btn-brand" onclick="saveOperationConfig()">Salvar configuração</button></div>
           </div>
@@ -619,7 +620,9 @@
         <div class="card clickable-card" onclick="showPage('adminFechamento',document.querySelector('.nav button[data-page=adminFechamento]'));showSubTab('adminFechamento','afech-historico',document.querySelector('[data-subtab=afech-historico]'))"><div class="metric-label">Fechamentos</div><div class="metric-value" id="aClosings">0</div></div>
         <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-divergencias',document.querySelector('[data-subtab=amov-divergencias]'))"><div class="metric-label">Divergências</div><div class="metric-value" id="aDiff">0,00 R$</div></div>
         <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-repasses',document.querySelector('[data-subtab=amov-repasses]'))"><div class="metric-label">Saldo Central</div><div class="metric-value" id="aSaldoCentral">0,00 R$</div><div class="metric-hint" id="aSaldoCentralHint"></div></div>
+        <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-retificacoes',document.querySelector('[data-subtab=amov-retificacoes]'))"><div class="metric-label">Retificações</div><div class="metric-value" id="adminPendingRects">0</div><div class="metric-hint">pendentes de aprovação</div></div>
       </div>
+      <div class="kpi-alert warning" id="adminRectificationAlert" style="display:none;margin-bottom:12px"></div>
       <div class="card">
         <h3 class="section-title">Dashboard por loja</h3>
         <div class="store-dashboard-grid" id="adminStoreDashboard"></div>
@@ -702,9 +705,10 @@
     <section class="page hidden" id="adminMovimentacoes">
       <div class="inner-tabs">
         <button class="inner-tab-btn active" data-subtab="amov-extrato"      onclick="showSubTab('adminMovimentacoes','amov-extrato',this)">Extrato</button>
-        <button class="inner-tab-btn"        data-subtab="amov-repasses"     onclick="showSubTab('adminMovimentacoes','amov-repasses',this)">Repasses Recebidos</button>
-        <button class="inner-tab-btn"        data-subtab="amov-divergencias" onclick="showSubTab('adminMovimentacoes','amov-divergencias',this)">Divergências</button>
-        <button class="inner-tab-btn"        data-subtab="amov-documentos"   onclick="showSubTab('adminMovimentacoes','amov-documentos',this)">Documentos</button>
+        <button class="inner-tab-btn"        data-subtab="amov-repasses"       onclick="showSubTab('adminMovimentacoes','amov-repasses',this)">Repasses Recebidos</button>
+        <button class="inner-tab-btn"        data-subtab="amov-divergencias"   onclick="showSubTab('adminMovimentacoes','amov-divergencias',this)">Divergências</button>
+        <button class="inner-tab-btn"        data-subtab="amov-retificacoes"   onclick="showSubTab('adminMovimentacoes','amov-retificacoes',this)">Retificações</button>
+        <button class="inner-tab-btn"        data-subtab="amov-documentos"     onclick="showSubTab('adminMovimentacoes','amov-documentos',this)">Documentos</button>
       </div>
 
       <!-- Extrato com filtros -->
@@ -743,6 +747,18 @@
             <div class="field"><label>Status</label><select id="adminDivergenceStatusFilter" onchange="renderAdminViews()"><option value="Pendente">Pendentes</option><option value="">Todas</option><option value="Revisada">Revisadas</option></select></div>
           </div>
           <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Responsável</th><th>Tipo / Valor</th><th>Status revisão</th><th>Ação</th></tr></thead><tbody id="adminDivergencesReviewBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Retificações -->
+      <div class="inner-tab-panel hidden" id="amov-retificacoes">
+        <div class="card">
+          <h3 class="section-title">Solicitações de retificação</h3>
+          <div class="filter-bar-5x" style="margin-bottom:12px">
+            <div class="field"><label>Loja</label><select id="adminRectStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Status</label><select id="adminRectStatusFilter" onchange="renderAdminViews()"><option value="Pendente">Pendentes</option><option value="">Todas</option><option value="Aprovada">Aprovadas</option><option value="Rejeitada">Rejeitadas</option></select></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Operador</th><th>Valores (Original → Solicitado)</th><th>Justificativa</th><th>Status</th><th>Ação</th></tr></thead><tbody id="adminRectificationsBody"></tbody></table></div>
         </div>
       </div>
 
@@ -962,7 +978,7 @@
           <div class="field"><label>Data final</label><input id="opHistEnd" type="date" onchange="renderOperatorViews()"/></div>
         </div>
         <div class="table-wrap">
-          <table><thead><tr><th>Data</th><th>Loja</th><th>Entradas</th><th>Saídas</th><th>Repasse</th><th>Divergência</th><th>Tipo</th><th>Status</th><th>Anexos</th></tr></thead>
+          <table><thead><tr><th>Data</th><th>Loja</th><th>Entradas</th><th>Saídas</th><th>Repasse</th><th>Divergência</th><th>Tipo</th><th>Status</th><th>Retificação</th><th>Anexos</th></tr></thead>
           <tbody id="operatorHistoryBody"></tbody></table>
         </div>
       </div>
@@ -1639,6 +1655,41 @@
     <div id="origModalBody" style="margin-top:16px"></div>
     <div class="btn-row" style="margin-top:20px">
       <button class="btn" onclick="closeOriginalClosingModal()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Solicitar Retificação (Operador) -->
+<div id="operatorRectifyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center">
+  <div class="card" style="width:min(520px,96vw);max-height:92vh;overflow-y:auto;padding:28px">
+    <h3 class="section-title">Solicitar Retificação</h3>
+    <p class="subtle" style="margin-bottom:16px">Informe os valores corretos e a justificativa. O administrador precisará aprovar antes de aplicar.</p>
+    <div id="opRectifyOriginal" style="margin-bottom:16px;padding:12px;background:var(--bg-secondary,#f8fafc);border-radius:8px"></div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Saldo Inicial <span id="opRectifyInitialHint" class="subtle" style="display:none;font-size:11px">— bloqueado (definido pelo gestor)</span></label>
+        <input id="opRectifyInitial" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*"/>
+      </div>
+      <div class="field">
+        <label>Total de Entradas</label>
+        <input id="opRectifyEntries" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*"/>
+      </div>
+      <div class="field">
+        <label>Total de Saídas</label>
+        <input id="opRectifyExpenses" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*"/>
+      </div>
+      <div class="field">
+        <label>Repasse <span class="subtle" style="font-size:11px">— alteração gera alerta ao admin</span></label>
+        <input id="opRectifyTransfer" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*"/>
+      </div>
+      <div class="field full">
+        <label>Justificativa <span style="color:#dc2626">*</span></label>
+        <textarea id="opRectifyJustification" placeholder="Explique o motivo da correção..." style="min-height:80px"></textarea>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn btn-primary" onclick="submitRectificationRequest()">Enviar solicitação</button>
+      <button class="btn" onclick="closeOperatorRectifyModal()">Cancelar</button>
     </div>
   </div>
 </div>
