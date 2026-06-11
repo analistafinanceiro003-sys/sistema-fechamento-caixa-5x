@@ -276,7 +276,10 @@ function mapClosing(row, entries = [], expenses = [], attachments = []) {
     diff: Number(row.fund_divergence || 0),
     fundDivergence: Number(row.fund_divergence || 0),
     notes: row.notes || '',
-    attachments: attachments.map((a) => ({ id: a.id, name: a.file_name, url: a.file_url, type: a.file_type, size: a.file_size, uploadedBy: a.uploaded_by })),
+    attachments: attachments.map((a) => {
+      const path = a.file_path || extractStoragePath(a.file_url || '', 'closing-attachments');
+      return { id: a.id, name: a.file_name, path, url: a.file_url, type: a.file_type, size: a.file_size, uploadedBy: a.uploaded_by };
+    }),
     reviewStatus: row.review_status || 'Pendente',
     status: row.status || '',
     type: row.type || 'Original',
@@ -851,6 +854,22 @@ async function createClosingExpenses(closingId, expenses = []) {
   return expenses;
 }
 
+function extractStoragePath(url, bucket) {
+  const marker = `/${bucket}/`;
+  const idx = url.indexOf(marker);
+  return idx >= 0 ? url.slice(idx + marker.length) : url;
+}
+
+async function viewStorageFile(bucket, filePath) {
+  if (!filePath) return alert('Arquivo sem caminho definido.');
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return alert('Login necessário para visualizar o arquivo.');
+  // Abre a janela sincronamente (responde ao gesto do usuário) para evitar bloqueio de pop-up
+  const win = window.open('', '_blank', 'noopener,noreferrer');
+  const { data, error } = await sb.storage.from(bucket).createSignedUrl(filePath, 3600);
+  if (error) { if (win) win.close(); return alert('Erro ao gerar link: ' + error.message); }
+  if (win) win.location.href = data.signedUrl;
+}
+
 async function createClosingAttachments(closingId, attachments = []) {
   if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession() || !attachments.length) return [];
   const rows = [];
@@ -863,11 +882,11 @@ async function createClosingAttachments(closingId, attachments = []) {
       .from('closing-attachments')
       .upload(path, file, { upsert: false, contentType: file.type || attachment.type || 'application/octet-stream' });
     if (uploadError) throw uploadError;
-    const { data: publicData } = sb.storage.from('closing-attachments').getPublicUrl(path);
     rows.push({
       closing_id: closingId,
       file_name: file.name || attachment.name,
-      file_url: publicData?.publicUrl || path,
+      file_path: path,
+      file_url:  path,
       file_type: file.type || attachment.type || '',
       file_size: file.size || attachment.size || 0,
       uploaded_by: currentUser?.authId || null,
@@ -1947,13 +1966,12 @@ async function uploadStoreDocument({ storeId, file, description }) {
       .from('store-documents')
       .upload(filePath, file, { upsert: false, contentType: file.type || 'application/octet-stream' });
     if (uploadError) throw uploadError;
-    const { data: publicData } = sb.storage.from('store-documents').getPublicUrl(filePath);
     const row = await supabaseWrite('store_documents', 'insert', cleanPayload({
       company_id:  store.companyId,
       store_id:    storeId,
       file_name:   file.name,
       file_path:   filePath,
-      file_url:    publicData?.publicUrl || filePath,
+      file_url:    filePath,
       file_type:   file.type || '',
       file_size:   file.size || 0,
       description: description || null,
@@ -2074,6 +2092,22 @@ async function handleClearStoreDocuments(storeId, storeNameParam) {
   }
 }
 
+async function reloadStoreDocuments() {
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return toast('Offline — recarregue a página.', 'error');
+  const btn = $('reloadDocumentsBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Recarregando...'; }
+  try {
+    const rows = await selectTable('store_documents').catch(() => []);
+    state.storeDocuments = rows.map(mapStoreDocument);
+    renderAll();
+    toast('Documentos atualizados.');
+  } catch (e) {
+    alert('Erro ao recarregar documentos: ' + (e.message || 'tente novamente.'));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Recarregar'; }
+  }
+}
+
 function fillEditUserStore() {
   const uidVal = val('userManageSelect');
   const user = state.users.find((u) => u.id === uidVal);
@@ -2119,6 +2153,7 @@ Object.assign(window, {
   fillUserManageSelect, fillEditUserStore, toggleUserStore,
   mapStoreDocument, uploadStoreDocument, deleteStoreDocument, clearStoreDocumentsByStore,
   previewDocUpload, handleDocUpload, handleDeleteDoc, handleClearStoreDocuments,
+  viewStorageFile, reloadStoreDocuments,
   saveRectificationRequest,
 });
 

@@ -308,12 +308,15 @@ create table if not exists public.closing_attachments (
   id          uuid primary key default gen_random_uuid(),
   closing_id  uuid not null references public.closings(id) on delete cascade,
   file_name   text,
+  file_path   text,
   file_url    text,
   file_type   text,
   file_size   bigint,
   uploaded_by uuid references auth.users(id) on delete set null,
   created_at  timestamptz not null default now()
 );
+-- Migração: adiciona file_path se a tabela já existia sem ela
+alter table public.closing_attachments add column if not exists file_path text;
 
 create index if not exists idx_attachments_closing on public.closing_attachments(closing_id);
 

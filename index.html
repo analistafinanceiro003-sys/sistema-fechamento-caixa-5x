@@ -765,7 +765,10 @@
       <!-- Documentos por loja -->
       <div class="inner-tab-panel hidden" id="amov-documentos">
         <div class="card">
-          <h3 class="section-title">Pasta de documentos por loja</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+            <h3 class="section-title" style="margin:0">Pasta de documentos por loja</h3>
+            <button id="reloadDocumentsBtn" class="btn btn-sm" onclick="reloadStoreDocuments()">Recarregar</button>
+          </div>
           <p class="subtle" style="margin-bottom:14px">Arquivos enviados pelos operadores. Visualize, baixe ou limpe a pasta de cada loja.</p>
           <div id="adminDocFolders"></div>
         </div>
