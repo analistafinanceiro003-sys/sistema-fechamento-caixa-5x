@@ -197,7 +197,7 @@ function renderFechamentos() {
   html('movementsBody', masterFilteredClosings().map((c) => {
     const atts = c.attachments || [];
     const attHtml = atts.length
-      ? atts.map((a) => a.path ? `<button class="btn btn-sm" style="display:block;font-size:11px;margin-bottom:2px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="viewStorageFile('closing-attachments','${esc(a.path)}')" title="${esc(a.name)}">${esc(a.name)}</button>` : `<span style="font-size:11px">${esc(a.name)}</span>`).join('')
+      ? atts.map((a) => a.path ? `<button class="btn btn-sm" style="display:block;font-size:11px;margin-bottom:2px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="viewStorageFile('closing-attachments','${esc(a.path)}','${esc(a.name)}')" title="${esc(a.name)}">${esc(a.name)}</button>` : `<span style="font-size:11px">${esc(a.name)}</span>`).join('')
       : '<span class="subtle" style="font-size:11px">—</span>';
     return `<tr>
       <td>${esc(companyName(c.companyId))}</td><td>${esc(storeName(c.storeId))}</td>
@@ -501,7 +501,7 @@ function renderOperatorViews() {
     const atts = c.attachments || [];
     const attHtml = atts.length
       ? atts.map((a) => a.path
-          ? `<button class="btn btn-sm" style="font-size:11px;margin-right:4px" onclick="viewStorageFile('closing-attachments','${esc(a.path)}')" title="${esc(a.name)}">${esc(a.name)}</button>`
+          ? `<button class="btn btn-sm" style="font-size:11px;margin-right:4px" onclick="viewStorageFile('closing-attachments','${esc(a.path)}','${esc(a.name)}')" title="${esc(a.name)}">${esc(a.name)}</button>`
           : `<span style="font-size:11px">${esc(a.name)}</span>`
         ).join('')
       : '<span class="subtle" style="font-size:11px">—</span>';
@@ -627,7 +627,7 @@ function renderDocumentos() {
       </span>
       <span class="subtle" style="white-space:nowrap">${Math.round((d.size||0)/1024)} KB</span>
       <span class="subtle" style="white-space:nowrap">${esc((d.createdAt||'').slice(0,10))}</span>
-      ${d.path ? `<button class="btn btn-sm" style="white-space:nowrap" onclick="viewStorageFile('store-documents','${esc(d.path)}')">Ver</button>` : ''}
+      ${d.path ? `<button class="btn btn-sm" style="white-space:nowrap" onclick="viewStorageFile('store-documents','${esc(d.path)}','${esc(d.name)}')">Ver</button>` : ''}
       <button class="btn btn-danger btn-sm" onclick="handleDeleteDoc('${d.id}','${esc(d.path||'')}')">Remover</button>
     </div>`;
 

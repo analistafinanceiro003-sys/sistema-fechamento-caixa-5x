@@ -860,14 +860,32 @@ function extractStoragePath(url, bucket) {
   return idx >= 0 ? url.slice(idx + marker.length) : url;
 }
 
-async function viewStorageFile(bucket, filePath) {
+async function viewStorageFile(bucket, filePath, fileName) {
   if (!filePath) return alert('Arquivo sem caminho definido.');
   if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return alert('Login necessário para visualizar o arquivo.');
-  // Abre a janela sincronamente (responde ao gesto do usuário) para evitar bloqueio de pop-up
-  const win = window.open('', '_blank', 'noopener,noreferrer');
   const { data, error } = await sb.storage.from(bucket).createSignedUrl(filePath, 3600);
-  if (error) { if (win) win.close(); return alert('Erro ao gerar link: ' + error.message); }
-  if (win) win.location.href = data.signedUrl;
+  if (error) return alert('Erro ao gerar link: ' + error.message);
+  openFileViewer(data.signedUrl, fileName || filePath.split('/').pop());
+}
+
+function openFileViewer(url, fileName) {
+  const modal = $('fileViewerModal');
+  const content = $('fileViewerContent');
+  const titleEl = $('fileViewerTitle');
+  if (!modal || !content) return window.open(url, '_blank', 'noopener,noreferrer');
+  const ext = (fileName || '').split('.').pop().toLowerCase();
+  if (titleEl) titleEl.textContent = fileName || 'Arquivo';
+  content.innerHTML = ext === 'pdf'
+    ? `<iframe src="${url}" style="width:100%;height:70vh;border:none;border-radius:6px"></iframe>`
+    : `<img src="${url}" alt="${esc(fileName || 'Imagem')}" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:6px;display:block;margin:auto">`;
+  modal.style.display = 'flex';
+}
+
+function closeFileViewer() {
+  const modal = $('fileViewerModal');
+  const content = $('fileViewerContent');
+  if (modal) modal.style.display = 'none';
+  if (content) content.innerHTML = '';
 }
 
 async function createClosingAttachments(closingId, attachments = []) {
@@ -2153,7 +2171,7 @@ Object.assign(window, {
   fillUserManageSelect, fillEditUserStore, toggleUserStore,
   mapStoreDocument, uploadStoreDocument, deleteStoreDocument, clearStoreDocumentsByStore,
   previewDocUpload, handleDocUpload, handleDeleteDoc, handleClearStoreDocuments,
-  viewStorageFile, reloadStoreDocuments,
+  viewStorageFile, openFileViewer, closeFileViewer, reloadStoreDocuments,
   saveRectificationRequest,
 });
 
