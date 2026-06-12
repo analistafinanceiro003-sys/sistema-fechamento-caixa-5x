@@ -1034,9 +1034,10 @@
           <h3 class="section-title" style="margin-bottom:4px">Manual de Implantação — Conferência Caixa em Dinheiro</h3>
           <p class="subtle">Referência completa para implantação e operação do sistema. Exclusivo Gestão 5X.</p>
         </div>
-        <button class="btn btn-primary" onclick="exportManualPDF()" style="white-space:nowrap">
-          ↓ Exportar PDF
-        </button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="exportManualPDF()" style="white-space:nowrap">↓ Exportar tudo</button>
+          <button class="btn btn-secondary" onclick="exportManualTabPDF()" style="white-space:nowrap">↓ Exportar aba atual</button>
+        </div>
       </div>
 
       <!-- Abas internas -->

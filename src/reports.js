@@ -519,7 +519,7 @@ async function exportClientDivergencesPDF() {
 /* ============================================================
    MANUAL DE IMPLANTAÇÃO — PDF
 ============================================================ */
-async function exportManualPDF() {
+async function exportManualPDF(onlySection = null) {
   if (!window.jspdf) { alert('jsPDF não carregado. Aguarde a página carregar completamente.'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -528,8 +528,29 @@ async function exportManualPDF() {
   const dark  = [13, 23, 32];
   const white = [255, 255, 255];
   const light = [236, 251, 250];
-  const logo  = await _loadLogo();
   const todayStr = new Date().toLocaleDateString('pt-BR');
+
+  /* Carrega logo e calcula dimensões reais para não esticar */
+  const logoB64 = await _loadLogo();
+  let logoW = 65, logoH = 32;
+  if (logoB64) {
+    await new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const aspect = img.naturalWidth / img.naturalHeight;
+        const maxW = 78, maxH = 44;
+        if (aspect > maxW / maxH) { logoW = maxW; logoH = maxW / aspect; }
+        else { logoH = maxH; logoW = maxH * aspect; }
+        resolve();
+      };
+      img.onerror = resolve;
+      img.src = logoB64;
+    });
+  }
+  /* Tamanho do logo no cabeçalho de página (cabe em 22×12mm) */
+  const hA = logoW / logoH;
+  const hLW = hA > 22 / 12 ? 22 : 12 * hA;
+  const hLH = hA > 22 / 12 ? 22 / hA : 12;
 
   const _footer = () => {
     const n = doc.internal.getNumberOfPages();
@@ -542,7 +563,7 @@ async function exportManualPDF() {
   const _pageHeader = (subtitle) => {
     doc.setFillColor(...dark);
     doc.rect(0, 0, PW, 18, 'F');
-    if (logo) doc.addImage(logo, 'PNG', 8, 2, 26, 14);
+    if (logoB64) doc.addImage(logoB64, 'PNG', 8, (18 - hLH) / 2, hLW, hLH, '', 'FAST');
     doc.setTextColor(...white);
     doc.setFontSize(9);
     doc.setFont(undefined, 'bold');
@@ -553,35 +574,8 @@ async function exportManualPDF() {
     doc.setTextColor(0, 0, 0);
   };
 
-  /* ── CAPA ── */
-  doc.setFillColor(...dark);
-  doc.rect(0, 0, PW, PH, 'F');
-  doc.setFillColor(...teal);
-  doc.rect(0, 0, PW, 5, 'F');                           // faixa topo
-  doc.rect(0, PH - 5, PW, 5, 'F');                      // faixa rodapé
-
-  if (logo) doc.addImage(logo, 'PNG', (PW - 72) / 2, 88, 72, 38);
-
-  doc.setTextColor(...white);
-  doc.setFontSize(26);
-  doc.setFont(undefined, 'bold');
-  doc.text('Manual de Implantação', PW / 2, 155, { align: 'center' });
-
-  doc.setFillColor(...teal);
-  doc.rect(48, 160, PW - 96, 1.5, 'F');
-
-  doc.setTextColor(...teal);
-  doc.setFontSize(14);
-  doc.setFont(undefined, 'normal');
-  doc.text('Conferência Caixa em Dinheiro', PW / 2, 170, { align: 'center' });
-
-  doc.setTextColor(200, 200, 200);
-  doc.setFontSize(9);
-  doc.text(`Gestão 5X  ·  Emitido em ${todayStr}`, PW / 2, PH - 12, { align: 'center' });
-
-  /* ── HELPER: adicionar página de seção ── */
+  /* _section NÃO chama addPage() — o chamador gerencia paginação */
   const _section = (title, content) => {
-    doc.addPage();
     _pageHeader();
 
     doc.setFillColor(...teal);
@@ -643,153 +637,366 @@ async function exportManualPDF() {
     _footer();
   };
 
-  /* ── 1. VISÃO GERAL ── */
-  _section('1. Visão Geral do Sistema', [
-    { type: 'text', content: 'O Central de Fechamento de Caixa 5X é uma plataforma digital multiempresa de governança financeira diária. Substitui planilhas e anotações em papel, garantindo que cada centavo do caixa seja registrado, conferido e auditado — em tempo real, de qualquer dispositivo com internet.' },
-    { type: 'text', content: 'A Gestão 5X acompanha todos os clientes em um único painel: fechamentos, divergências, repasses e relatórios consolidados de todas as empresas implantadas.' },
-    { type: 'table',
-      headers: ['Módulo', 'O que faz', 'Perfil'],
-      rows: [
-        ['Fechamento Diário', 'Registro de saldo, entradas, saídas, repasse e cálculo automático', 'Operador / Admin'],
-        ['Histórico', 'Consulta de fechamentos anteriores com filtros de data e loja', 'Admin / Operador'],
-        ['Movimentações', 'Extrato consolidado com filtros de data e loja', 'Admin / Master'],
-        ['Repasses Recebidos', 'Confirmação dos repasses pelo gestor', 'Admin'],
-        ['Divergências', 'Listagem de fechamentos fora da tolerância', 'Admin / Master'],
-        ['Relatórios', 'Exportação PDF/CSV por loja, consolidado, repasses, saídas', 'Admin / Master'],
-        ['Módulos', 'Controle do que cada perfil pode ver por empresa', 'Master'],
-        ['Auditoria', 'Log completo de todas as ações realizadas', 'Master'],
+  /* ── Definição de todas as seções ── */
+  const allSections = [
+    {
+      key: 'overview',
+      title: '1. Visão Geral do Sistema',
+      content: [
+        { type: 'text', content: 'O Central de Fechamento de Caixa 5X é uma plataforma digital multiempresa de governança financeira diária. Substitui planilhas e anotações em papel, garantindo que cada centavo do caixa seja registrado, conferido e auditado — em tempo real, de qualquer dispositivo com internet.' },
+        { type: 'text', content: 'A Gestão 5X acompanha todos os clientes em um único painel: fechamentos, divergências, repasses e relatórios consolidados de todas as empresas implantadas.' },
+        { type: 'table',
+          headers: ['Módulo', 'O que faz', 'Perfil'],
+          rows: [
+            ['Fechamento Diário', 'Registro de saldo, entradas, saídas, repasse e cálculo automático', 'Operador / Admin'],
+            ['Histórico', 'Consulta de fechamentos anteriores com filtros de data e loja', 'Admin / Operador'],
+            ['Movimentações', 'Extrato consolidado com filtros de data e loja', 'Admin / Master'],
+            ['Repasses', 'Confirmação dos repasses pelo gestor', 'Admin'],
+            ['Divergências', 'Listagem de fechamentos fora da tolerância', 'Admin / Master'],
+            ['Relatórios', 'Exportação PDF/CSV por loja, consolidado, repasses, saídas', 'Admin / Master'],
+            ['Módulos', 'Controle do que cada perfil pode ver por empresa', 'Master'],
+            ['Auditoria', 'Log completo de todas as ações realizadas', 'Master'],
+          ],
+          colStyles: { 0: { cellWidth: 38 }, 1: { cellWidth: 100 } },
+        },
       ],
-      colStyles: { 0: { cellWidth: 38 }, 1: { cellWidth: 100 } },
     },
-  ]);
+    {
+      key: 'perfis',
+      title: '2. Perfis de Acesso',
+      content: [
+        { type: 'table',
+          headers: ['Perfil', 'Quem é', 'Pode fazer', 'Não pode'],
+          rows: [
+            ['Master\n(Gestão 5X)', 'Equipe interna Gestão 5X', 'Acesso total: todas as empresas, criar usuários, módulos, auditorias, retificações', 'N/A'],
+            ['Admin\n(Gestor cliente)', 'Sócio ou gerente do cliente', 'Ver fechamentos da empresa, histórico, movimentações, confirmar repasses, exportar relatórios', 'Não vê outras empresas. Módulos dependem do Master.'],
+            ['Operador\n(Caixa)', 'Funcionário que opera o caixa', 'Registrar fechamento diário, consultar próprio histórico, ver regras (se liberado)', 'Não vê outras lojas, não confirma repasses, não altera configurações'],
+          ],
+          colStyles: { 0: { cellWidth: 28 }, 1: { cellWidth: 30 }, 2: { cellWidth: 68 } },
+        },
+        { type: 'label', content: 'Como criar usuários:' },
+        { type: 'text', content: 'Cadastros → Usuários → selecionar empresa → perfil (Admin ou Operador) → nome, e-mail e senha. Para Operador, vincular à loja correta. Use sempre e-mail real — é o canal de recuperação de senha.' },
+      ],
+    },
+    {
+      key: 'fechamento',
+      title: '3. Fechamento Diário',
+      content: [
+        { type: 'formula',
+          title: 'Fórmula 5X — cálculo automático',
+          lines: [
+            'Saldo antes do repasse  =  Saldo inicial  +  Entradas  −  Saídas',
+            'Saldo após o repasse    =  Saldo antes do repasse  −  Repasse',
+            'Divergência do fundo    =  Saldo após repasse  −  Fundo padrão  (ideal = 0,00 R$)',
+          ],
+        },
+        { type: 'table',
+          headers: ['Campo', 'O que é', 'Dica prática'],
+          rows: [
+            ['Data', 'Data do fechamento', 'Confirme antes de salvar — sem edição após salvar (requer retificação)'],
+            ['Turno', 'Manhã / Tarde / Noite / Integral', 'Use "Integral" para operação com turno único'],
+            ['Responsável', 'Operador que faz o fechamento', 'Identifica quem é responsável pelo caixa naquele turno'],
+            ['Saldo inicial', 'Dinheiro no caixa no início do turno', 'Deve ser igual ao saldo final do turno anterior'],
+            ['Entradas', 'Todo dinheiro que entrou no caixa', 'Informe cada tipo separado com descrição clara'],
+            ['Saídas', 'Retiradas autorizadas do caixa', 'Informe categoria e descrição. Anexe comprovante'],
+            ['Repasse', 'Valor enviado ao caixa central', 'Transferência de custódia — gestor confirma o recebimento'],
+            ['Fundo padrão', 'Valor que deve permanecer no caixa', 'Configurado pelo gestor para cada loja'],
+            ['Divergência', 'Diferença calculada automaticamente', '0,00 R$ ideal. Fora da tolerância gera alerta'],
+            ['Observações', 'Justificativas de ocorrências', 'Obrigatório ao explicar divergências'],
+            ['Anexos', 'Comprovantes em arquivo', 'Aceita JPG, PNG e PDF. Máx. 10 MB por arquivo'],
+          ],
+          colStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 65 } },
+        },
+      ],
+    },
+    {
+      key: 'transacoes',
+      title: '4. Transações — Entradas, Saídas e Repasse',
+      content: [
+        { type: 'label', content: 'Tipos de Entrada:' },
+        { type: 'table',
+          headers: ['Tipo', 'Descrição', 'Exemplo de descrição'],
+          rows: [
+            ['Vendas em dinheiro', 'Pagamentos de clientes em espécie', '"Vendas dinheiro 08h–14h"'],
+            ['Sangria recebida', 'Reforço de outro caixa ou cofre', '"Reforço do cofre"'],
+            ['Troco de fornecedor', 'Troco de pagamento que voltou ao caixa', '"Troco NF Distribuidora X"'],
+            ['Recebimento avulso', 'Qualquer outro valor recebido em dinheiro', '"Recebimento aluguel de equipamento"'],
+          ],
+        },
+        { type: 'label', content: 'Categorias de Saída:' },
+        { type: 'table',
+          headers: ['Categoria', 'O que inclui', 'Comprovante'],
+          rows: [
+            ['Ajuda de custo', 'Vale transporte, refeição ou auxílio pago em dinheiro', 'Recomendado — assinatura do recebedor'],
+            ['Taxa de entrega', 'Pagamento a entregadores/motoboys em dinheiro', 'Sim — recibo ou comprovante'],
+            ['Compra de mercadoria', 'Compra emergencial de insumos com dinheiro do caixa', 'Obrigatório — nota fiscal'],
+            ['Outras saídas', 'Qualquer retirada autorizada não categorizada acima', 'Sempre descrever o motivo detalhadamente'],
+          ],
+        },
+        { type: 'text', content: 'Repasse: valor enviado ao caixa central ao fim do turno. Não é uma saída — é transferência de custódia. O operador informa no fechamento e o gestor confirma em "Repasses".' },
+        { type: 'text', content: 'Fundo padrão: valor pré-configurado que deve permanecer no caixa para o próximo turno. Divergência de abertura ocorre quando o saldo inicial informado difere do saldo final do fechamento anterior.' },
+      ],
+    },
+    {
+      key: 'implantacao',
+      title: '5. Implantação Passo a Passo',
+      content: [
+        { type: 'table',
+          headers: ['Etapa', 'O que fazer', 'Onde', 'Ponto de atenção'],
+          rows: [
+            ['1. Empresa', 'Cadastrar empresa: nome, CNPJ, segmento, plano. Status: Implantação.', 'Cadastros → Cadastro Guiado', 'Use o Cadastro Guiado para criar empresa + loja em um único formulário'],
+            ['2. Lojas', 'Criar cada loja: nome, código, tipo de caixa, fundo padrão. Status: Ativa.', 'Cadastros → Lojas e Caixas', 'Confirme o fundo padrão com o gestor antes de ativar — erro aqui distorce toda a divergência'],
+            ['3. Usuários', 'Criar Admin (gestor) e Operador(es) vinculados à empresa e loja correta.', 'Cadastros → Usuários', 'Use e-mail real. Jamais e-mail genérico — dificulta recuperação de senha'],
+            ['4. Regras', 'Cadastrar regras: saídas permitidas, limite de repasse, checklist de conferência.', 'Operação → Regras', 'Regras por loja são visíveis apenas ao operador daquela loja'],
+            ['5. Config', 'Definir tolerâncias (divergência e repasse), divergência crítica, receptor do repasse.', 'Operação → Configurações', 'Tolerância divergência: 5,00 R$. Tolerância repasse: conforme acordo com gestor'],
+            ['6. Módulos', 'Liberar apenas módulos necessários para Admin e Operador. Menos módulos = menos confusão.', 'Operação → Módulos', 'Comece conservador. Libere mais módulos conforme o cliente aprende'],
+            ['7. Ativação', 'Fazer fechamento teste com o operador. Verificar cálculos. Alterar status para Ativa.', 'Login operador → Fechamento', 'Acompanhe os primeiros 5 fechamentos reais para ajustar tolerâncias se necessário'],
+          ],
+          colStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 55 }, 2: { cellWidth: 40 } },
+        },
+      ],
+    },
+    {
+      key: 'checklist',
+      title: '6. Checklist de Ativação',
+      content: [
+        { type: 'label', content: 'Checklist técnico — responsabilidade da Gestão 5X:' },
+        { type: 'table',
+          headers: ['✓', 'Item', 'Como verificar'],
+          rows: [
+            ['☐', 'DEV_LOCAL_MODE = false', 'Confirmar false em src/db.js linha 12'],
+            ['☐', 'Supabase URL e chave corretos', 'Variáveis em src/supabaseClient.js apontam para projeto de produção'],
+            ['☐', 'CORS das Edge Functions', 'ALLOWED_ORIGINS com domínio de produção real, sem wildcard'],
+            ['☐', 'RLS ativo em todas as tabelas', '14 tabelas com Row Level Security habilitado no painel Supabase'],
+            ['☐', 'Bucket Storage criado', 'closing-attachments com política de acesso autenticado'],
+            ['☐', 'Edge Functions deployadas', 'create-user e delete-user com secrets PROJECT_URL e SERVICE_ROLE_KEY'],
+            ['☐', 'Usuário Master criado', 'role = master na tabela profiles, usuário ativo no Supabase Auth'],
+            ['☐', 'Empresa demo removida', 'Inativar ou excluir empresa demo antes de apresentar ao cliente'],
+            ['☐', 'Fluxo completo testado', 'Login → fechamento → histórico → logout sem erros'],
+          ],
+          colStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: 65 } },
+        },
+        { type: 'label', content: 'Checklist operacional — por cliente:' },
+        { type: 'table',
+          headers: ['✓', 'Item', 'Onde configurar'],
+          rows: [
+            ['☐', 'Empresa cadastrada corretamente', 'Cadastros → Cadastro Guiado'],
+            ['☐', 'Todas as lojas criadas e ativas', 'Cadastros → Lojas e Caixas'],
+            ['☐', 'Fundo padrão definido por loja', 'Cadastros → Lojas e Caixas'],
+            ['☐', 'Admin criado e testado', 'Cadastros → Usuários'],
+            ['☐', 'Operadores criados e vinculados às lojas', 'Cadastros → Usuários'],
+            ['☐', 'Tolerância de divergência configurada', 'Operação → Configurações'],
+            ['☐', 'Tolerância de repasse configurada (se aplicável)', 'Operação → Configurações'],
+            ['☐', 'Receptor do repasse informado', 'Operação → Configurações'],
+            ['☐', 'Regras operacionais cadastradas', 'Operação → Regras'],
+            ['☐', 'Módulos configurados para Admin e Operador', 'Operação → Módulos'],
+            ['☐', 'Fechamento teste realizado com operador', 'Login operador → Fechamento Diário'],
+            ['☐', 'Gestor orientado sobre o painel', 'Login admin → demonstrar histórico e confirmação de repasses'],
+            ['☐', 'Status da empresa alterado para Ativa', 'Cadastros → Empresas → editar status'],
+          ],
+          colStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: 80 } },
+        },
+      ],
+    },
+    {
+      key: 'gestor',
+      title: '7. Manual do Gestor (Admin)',
+      content: [
+        { type: 'text', content: 'Este manual explica como acompanhar os fechamentos dos seus operadores, o que validar todo dia e o que fazer quando aparecer uma divergência.' },
+        { type: 'formula',
+          title: 'Fórmulas do caixa',
+          lines: [
+            'Repasse esperado     =  Saldo de caixa  −  Fundo padrão',
+            'Divergência de fundo =  Saldo após repasse  −  Fundo padrão  (ideal = 0,00)',
+            'Div. de abertura     =  Saldo inicial informado  −  Saldo final do turno anterior',
+          ],
+        },
+        { type: 'label', content: 'O que conferir todo dia:' },
+        { type: 'table',
+          headers: ['O que verificar', 'Onde ver', 'O que esperar'],
+          rows: [
+            ['Fechamentos do dia', 'Movimentações → Histórico', 'Todas as lojas com fechamento. Status OK na maioria.'],
+            ['Status dos fechamentos', 'Resumo por Fechamento', 'Coluna "Recebimento": confirmado ou pendente. "Diferença": próximo de zero.'],
+            ['Repasses recebidos', 'Repasses', 'Confirmar o valor físico recebido clicando em "Confirmar". Registra quem confirmou e quando.'],
+            ['Divergências pendentes', 'Divergências', 'Toda divergência acima da tolerância aparece aqui. Revisar e comentar cada uma.'],
+          ],
+          colStyles: { 0: { cellWidth: 40 }, 1: { cellWidth: 40 } },
+        },
+        { type: 'label', content: 'Badges de Recebimento — o que significa cada um:' },
+        { type: 'table',
+          headers: ['Badge', 'Significado', 'Ação'],
+          rows: [
+            ['Confirmado', 'Repasse recebido e confirmado por você.', 'Nenhuma — situação ideal.'],
+            ['Pendente confirmação', 'Operador informou repasse, você ainda não confirmou.', 'Acesse Repasses e clique em confirmar.'],
+            ['Não repassado', 'Caixa superou o fundo mas operador não informou repasse.', 'Verificar com o operador o destino do dinheiro.'],
+            ['Dentro da tolerância', 'Valor a repassar é pequeno (abaixo da tolerância configurada).', 'Nenhuma — configuração automática.'],
+            ['Sem repasse — fundo OK', 'Caixa ficou exatamente com o fundo padrão.', 'Nenhuma.'],
+          ],
+          colStyles: { 0: { cellWidth: 42 }, 1: { cellWidth: 80 } },
+        },
+        { type: 'formula',
+          title: 'Divergência de Fundo padrão — o que fazer',
+          lines: [
+            'Positiva (+): sobrou mais que o fundo — operador não repassou o suficiente.',
+            'Negativa (−): faltou dinheiro — erro na contagem ou saída não registrada.',
+            'Ação: solicitar justificativa no campo Observações. Erro de lançamento → pedir retificação.',
+          ],
+        },
+        { type: 'formula',
+          title: 'Divergência de Abertura — o que fazer',
+          lines: [
+            'Positiva (+): caixa aberto com mais dinheiro — alguém colocou dinheiro entre turnos.',
+            'Negativa (−): caixa aberto com menos — retirada entre turnos ou erro de contagem.',
+            'Ação: verificar troca de fundo entre turnos. Recorrente = falha no processo.',
+          ],
+        },
+        { type: 'label', content: 'Rotina recomendada:' },
+        { type: 'table',
+          headers: ['Frequência', 'Ação'],
+          rows: [
+            ['Diariamente', 'Acessar o Histórico, confirmar repasses pendentes e verificar divergências novas.'],
+            ['2× por semana', 'Revisar a aba Divergências e comentar todas as pendentes.'],
+            ['Semanalmente', 'Verificar o Resumo por Fechamento — identificar padrões de divergência recorrente.'],
+            ['Mensalmente', 'Exportar relatório consolidado (PDF ou CSV) para conferência com o financeiro.'],
+          ],
+          colStyles: { 0: { cellWidth: 38 } },
+        },
+      ],
+    },
+    {
+      key: 'operador',
+      title: '8. Manual do Operador de Caixa',
+      content: [
+        { type: 'text', content: 'Este manual explica como fazer o fechamento de caixa corretamente. Leia com atenção antes do primeiro fechamento e consulte sempre que tiver dúvida.' },
+        { type: 'label', content: 'Como fazer o fechamento — passo a passo:' },
+        { type: 'table',
+          headers: ['Passo', 'O que fazer', 'Ponto de atenção'],
+          rows: [
+            ['1. Contar o caixa', 'Antes de abrir o sistema, conte fisicamente todo o dinheiro. Separe por denominação, conte duas vezes. Esse é o Saldo Inicial.', 'Deve ser igual ao saldo que ficou do fechamento anterior. Se diferente, registre o real e explique nas Observações.'],
+            ['2. Informar entradas', 'Registre todo dinheiro que entrou durante o turno. Clique em "Adicionar entrada", informe descrição e valor.', 'Exemplos: "Vendas em dinheiro", "Troco do fornecedor", "Complemento de fundo".'],
+            ['3. Informar saídas', 'Registre todo dinheiro retirado de forma autorizada. Informe a categoria e a descrição.', 'Toda saída precisa de descrição real. "Saída diversa" não é aceito. Consulte as Regras Operacionais.'],
+            ['4. Calcular repasse', 'O sistema sugere o repasse automaticamente. Verifique o campo "Repasse sugerido" e informe o valor entregue.', 'Repasse não é saída — é transferência de custódia. O valor que fica é o fundo padrão.'],
+            ['5. Verificar e salvar', 'Confira o Saldo de Caixa e a Divergência antes de salvar. O ideal é divergência = 0,00.', 'Se aparecer divergência, confira seus lançamentos. Se persistir, salve e preencha as Observações.'],
+            ['6. Entregar o repasse', 'Entregue o valor físico ao gestor. Ele confirmará o recebimento no sistema.', 'Guarde o comprovante se houver.'],
+          ],
+          colStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 75 } },
+        },
+        { type: 'label', content: 'Erros mais comuns — e como evitar:' },
+        { type: 'table',
+          headers: ['Erro', 'Consequência', 'Como evitar'],
+          rows: [
+            ['Saldo inicial errado', 'Gera divergência de abertura no próximo fechamento', 'Conte o dinheiro físico antes de digitar'],
+            ['Esquecer uma saída', 'O caixa sobra — gera divergência positiva', 'Anote as saídas no momento em que acontecem'],
+            ['Repasse diferente do entregue', 'O gestor não consegue confirmar — valor não bate', 'Informe o valor exato que está entregando fisicamente'],
+            ['Salvar duas vezes', 'Duplicidade no histórico, difícil de corrigir', 'Verifique se já há fechamento do dia antes de salvar'],
+            ['Sem observação na divergência', 'O gestor não consegue revisar sem justificativa', 'Sempre explique o motivo no campo Observações'],
+          ],
+          colStyles: { 0: { cellWidth: 40 }, 1: { cellWidth: 65 } },
+        },
+        { type: 'label', content: 'Dúvidas frequentes:' },
+        { type: 'table',
+          headers: ['Dúvida', 'Resposta'],
+          rows: [
+            ['Posso fazer o fechamento no dia seguinte?', 'Não é recomendado. Faça ao fim do turno, com o dinheiro físico em mãos. Correções exigem retificação pelo gestor.'],
+            ['O que é o fundo padrão?', 'Valor configurado pelo gestor que deve sempre ficar no caixa. O sistema desconta no repasse sugerido — você não calcula.'],
+            ['Abri o caixa com valor diferente. O que faço?', 'Informe o valor real. Explique nas Observações (ex: "fundo complementado pelo gestor"). O sistema registra a divergência de abertura.'],
+            ['Preciso repassar tudo acima do fundo?', 'Sim, a menos que o gestor oriente diferente. Valores muito pequenos podem ter tolerância configurada.'],
+            ['Errei o fechamento. Posso apagar e refazer?', 'Não é possível apagar. Avise o gestor, que solicita Retificação à Gestão 5X. O original é mantido para auditoria.'],
+          ],
+          colStyles: { 0: { cellWidth: 65 } },
+        },
+      ],
+    },
+  ];
 
-  /* ── 2. PERFIS ── */
-  _section('2. Perfis de Acesso', [
-    { type: 'table',
-      headers: ['Perfil', 'Quem é', 'Pode fazer', 'Não pode'],
-      rows: [
-        ['Master\n(Gestão 5X)', 'Equipe interna Gestão 5X', 'Acesso total: todas as empresas, criar usuários, módulos, auditorias, retificações', 'N/A'],
-        ['Admin\n(Gestor cliente)', 'Sócio ou gerente do cliente', 'Ver fechamentos da empresa, histórico, movimentações, confirmar repasses, exportar relatórios', 'Não vê outras empresas. Módulos dependem do Master.'],
-        ['Operador\n(Caixa)', 'Funcionário que opera o caixa', 'Registrar fechamento diário, consultar próprio histórico, ver regras (se liberado)', 'Não vê outras lojas, não confirma repasses, não altera configurações'],
-      ],
-      colStyles: { 0: { cellWidth: 28 }, 1: { cellWidth: 30 }, 2: { cellWidth: 68 } },
-    },
-    { type: 'label', content: 'Como criar usuários:' },
-    { type: 'text', content: 'Cadastros → Usuários → selecionar empresa → perfil (Admin ou Operador) → nome, e-mail e senha. Para Operador, vincular à loja correta. Use sempre e-mail real — é o canal de recuperação de senha.' },
-  ]);
+  /* ── Renderização ── */
+  if (!onlySection) {
+    /* ── CAPA ── */
+    doc.setFillColor(...dark);
+    doc.rect(0, 0, PW, PH, 'F');
 
-  /* ── 3. FECHAMENTO DIÁRIO ── */
-  _section('3. Fechamento Diário', [
-    { type: 'formula',
-      title: 'Fórmula 5X — cálculo automático',
-      lines: [
-        'Saldo antes do repasse  =  Saldo inicial  +  Entradas  −  Saídas',
-        'Saldo após o repasse    =  Saldo antes do repasse  −  Repasse',
-        'Divergência do fundo    =  Saldo após repasse  −  Fundo padrão  (ideal = 0,00 R$)',
-      ],
-    },
-    { type: 'table',
-      headers: ['Campo', 'O que é', 'Dica prática'],
-      rows: [
-        ['Data', 'Data do fechamento', 'Confirme antes de salvar — sem edição após salvar (requer retificação)'],
-        ['Turno', 'Manhã / Tarde / Noite / Integral', 'Use "Integral" para operação com turno único'],
-        ['Responsável', 'Operador que faz o fechamento', 'Identifica quem é responsável pelo caixa naquele turno'],
-        ['Saldo inicial', 'Dinheiro no caixa no início do turno', 'Deve ser igual ao saldo final do turno anterior'],
-        ['Entradas', 'Todo dinheiro que entrou no caixa', 'Informe cada tipo separado com descrição clara'],
-        ['Saídas', 'Retiradas autorizadas do caixa', 'Informe categoria e descrição. Anexe comprovante'],
-        ['Repasse', 'Valor enviado ao caixa central', 'Transferência de custódia — gestor confirma o recebimento'],
-        ['Fundo padrão', 'Valor que deve permanecer no caixa', 'Configurado pelo gestor para cada loja'],
-        ['Divergência', 'Diferença calculada automaticamente', '0,00 R$ ideal. Fora da tolerância gera alerta'],
-        ['Observações', 'Justificativas de ocorrências', 'Obrigatório ao explicar divergências'],
-        ['Anexos', 'Comprovantes em arquivo', 'Aceita JPG, PNG e PDF. Máx. 10 MB por arquivo'],
-      ],
-      colStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 65 } },
-    },
-  ]);
+    /* Barra teal superior com logo centralizado */
+    doc.setFillColor(...teal);
+    doc.rect(0, 0, PW, 62, 'F');
+    if (logoB64) {
+      const lx = (PW - logoW) / 2;
+      const ly = (62 - logoH) / 2;
+      doc.addImage(logoB64, 'PNG', lx, ly, logoW, logoH, '', 'FAST');
+    }
 
-  /* ── 4. TRANSAÇÕES ── */
-  _section('4. Transações — Entradas, Saídas e Repasse', [
-    { type: 'label', content: 'Tipos de Entrada:' },
-    { type: 'table',
-      headers: ['Tipo', 'Descrição', 'Exemplo de descrição'],
-      rows: [
-        ['Vendas em dinheiro', 'Pagamentos de clientes em espécie', '"Vendas dinheiro 08h–14h"'],
-        ['Sangria recebida', 'Reforço de outro caixa ou cofre', '"Reforço do cofre"'],
-        ['Troco de fornecedor', 'Troco de pagamento que voltou ao caixa', '"Troco NF Distribuidora X"'],
-        ['Recebimento avulso', 'Qualquer outro valor recebido em dinheiro', '"Recebimento aluguel de equipamento"'],
-      ],
-    },
-    { type: 'label', content: 'Categorias de Saída:' },
-    { type: 'table',
-      headers: ['Categoria', 'O que inclui', 'Comprovante'],
-      rows: [
-        ['Ajuda de custo', 'Vale transporte, refeição ou auxílio pago em dinheiro', 'Recomendado — assinatura do recebedor'],
-        ['Taxa de entrega', 'Pagamento a entregadores/motoboys em dinheiro', 'Sim — recibo ou comprovante'],
-        ['Compra de mercadoria', 'Compra emergencial de insumos com dinheiro do caixa', 'Obrigatório — nota fiscal'],
-        ['Outras saídas', 'Qualquer retirada autorizada não categorizada acima', 'Sempre descrever o motivo detalhadamente'],
-      ],
-    },
-    { type: 'text', content: 'Repasse: valor enviado ao caixa central ao fim do turno. Não é uma saída — é transferência de custódia. O operador informa no fechamento e o gestor confirma em "Repasses Recebidos".' },
-    { type: 'text', content: 'Fundo padrão: valor pré-configurado que deve permanecer no caixa para o próximo turno. Divergência de abertura ocorre quando o saldo inicial informado difere do saldo final do fechamento anterior.' },
-  ]);
+    /* Separador escuro */
+    doc.setFillColor(...dark);
+    doc.rect(0, 62, PW, PH - 62, 'F');
+    doc.setFillColor(...teal);
+    doc.rect(0, 62, PW, 2, 'F');
 
-  /* ── 5. IMPLANTAÇÃO ── */
-  _section('5. Implantação Passo a Passo', [
-    { type: 'table',
-      headers: ['Etapa', 'O que fazer', 'Onde', 'Ponto de atenção'],
-      rows: [
-        ['1. Empresa', 'Cadastrar empresa: nome, CNPJ, segmento, plano. Status: Implantação.', 'Cadastros → Cadastro Guiado', 'Use o Cadastro Guiado para criar empresa + loja em um único formulário'],
-        ['2. Lojas', 'Criar cada loja: nome, código, tipo de caixa, fundo padrão. Status: Ativa.', 'Cadastros → Lojas e Caixas', 'Confirme o fundo padrão com o gestor antes de ativar — erro aqui distorce toda a divergência'],
-        ['3. Usuários', 'Criar Admin (gestor) e Operador(es) vinculados à empresa e loja correta.', 'Cadastros → Usuários', 'Use e-mail real. Jamais e-mail genérico — dificulta recuperação de senha'],
-        ['4. Regras', 'Cadastrar regras: saídas permitidas, limite de repasse, checklist de conferência.', 'Operação → Regras', 'Regras por loja são visíveis apenas ao operador daquela loja'],
-        ['5. Config', 'Definir tolerância de divergência, divergência crítica, receptor do repasse e mensagem ao operador.', 'Operação → Configurações', 'Tolerância recomendada: 5,00 R$. Divergência crítica: 20,00 R$'],
-        ['6. Módulos', 'Liberar apenas módulos necessários para Admin e Operador. Menos módulos = menos confusão.', 'Operação → Módulos', 'Comece conservador. Libere mais módulos conforme o cliente aprende'],
-        ['7. Ativação', 'Fazer fechamento teste com o operador. Verificar cálculos. Alterar status para Ativa.', 'Login operador → Fechamento', 'Acompanhe os primeiros 5 fechamentos reais para ajustar tolerâncias se necessário'],
-      ],
-      colStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 55 }, 2: { cellWidth: 40 } },
-    },
-  ]);
+    /* Título principal */
+    doc.setTextColor(...white);
+    doc.setFontSize(28);
+    doc.setFont(undefined, 'bold');
+    doc.text('Manual de Implantação', PW / 2, 110, { align: 'center' });
 
-  /* ── 6. CHECKLIST ── */
-  _section('6. Checklist de Ativação', [
-    { type: 'label', content: 'Checklist técnico — responsabilidade da Gestão 5X:' },
-    { type: 'table',
-      headers: ['✓', 'Item', 'Como verificar'],
-      rows: [
-        ['☐', 'DEV_LOCAL_MODE = false', 'Confirmar false em src/db.js linha 12'],
-        ['☐', 'Supabase URL e chave corretos', 'Variáveis em src/supabaseClient.js apontam para projeto de produção'],
-        ['☐', 'CORS das Edge Functions', 'ALLOWED_ORIGINS com domínio de produção real, sem wildcard'],
-        ['☐', 'RLS ativo em todas as tabelas', '14 tabelas com Row Level Security habilitado no painel Supabase'],
-        ['☐', 'Bucket Storage criado', 'closing-attachments com política de acesso autenticado'],
-        ['☐', 'Edge Functions deployadas', 'create-user e delete-user com secrets PROJECT_URL e SERVICE_ROLE_KEY'],
-        ['☐', 'Usuário Master criado', 'role = master na tabela profiles, usuário ativo no Supabase Auth'],
-        ['☐', 'Empresa demo removida', 'Inativar ou excluir empresa demo antes de apresentar ao cliente'],
-        ['☐', 'Fluxo completo testado', 'Login → fechamento → histórico → logout sem erros'],
-      ],
-      colStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: 65 } },
-    },
-    { type: 'label', content: 'Checklist operacional — por cliente:' },
-    { type: 'table',
-      headers: ['✓', 'Item', 'Onde configurar'],
-      rows: [
-        ['☐', 'Empresa cadastrada corretamente', 'Cadastros → Cadastro Guiado'],
-        ['☐', 'Todas as lojas criadas e ativas', 'Cadastros → Lojas e Caixas'],
-        ['☐', 'Fundo padrão definido por loja', 'Cadastros → Lojas e Caixas'],
-        ['☐', 'Admin criado e testado', 'Cadastros → Usuários'],
-        ['☐', 'Operadores criados e vinculados às lojas', 'Cadastros → Usuários'],
-        ['☐', 'Tolerância e divergência crítica configuradas', 'Operação → Configurações'],
-        ['☐', 'Receptor do repasse informado', 'Operação → Configurações'],
-        ['☐', 'Regras operacionais cadastradas', 'Operação → Regras'],
-        ['☐', 'Módulos configurados para Admin e Operador', 'Operação → Módulos'],
-        ['☐', 'Fechamento teste realizado com operador', 'Login operador → Fechamento Diário'],
-        ['☐', 'Gestor orientado sobre o painel', 'Login admin → demonstrar histórico e confirmação de repasses'],
-        ['☐', 'Status da empresa alterado para Ativa', 'Cadastros → Empresas → editar status'],
-      ],
-      colStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: 80 } },
-    },
-  ]);
+    doc.setFillColor(...teal);
+    doc.rect(40, 116, PW - 80, 1.5, 'F');
 
-  doc.save('manual_implantacao_gestao5x.pdf');
+    doc.setTextColor(...teal);
+    doc.setFontSize(13);
+    doc.setFont(undefined, 'normal');
+    doc.text('Conferência Caixa em Dinheiro', PW / 2, 127, { align: 'center' });
+
+    /* Grade de seções (8 boxes, 4 por linha) */
+    const sectionLabels = ['Visão Geral', 'Perfis de Acesso', 'Fechamento Diário', 'Transações', 'Implantação', 'Checklist', 'Manual do Gestor', 'Manual do Operador'];
+    const boxW = (PW - 32) / 4, boxH = 20;
+    sectionLabels.forEach((lbl, i) => {
+      const col = i % 4, row = Math.floor(i / 4);
+      const bx = 16 + col * (boxW + 2.5), by = 148 + row * (boxH + 6);
+      doc.setFillColor(22, 34, 48);
+      doc.roundedRect(bx, by, boxW, boxH, 2, 2, 'F');
+      doc.setFillColor(...teal);
+      doc.roundedRect(bx, by, 3, boxH, 1, 1, 'F');
+      doc.setTextColor(...white);
+      doc.setFontSize(8);
+      const lines = doc.splitTextToSize(`${i + 1}. ${lbl}`, boxW - 8);
+      const textY = by + (boxH - lines.length * 4) / 2 + 4;
+      doc.text(lines, bx + 7, textY);
+    });
+
+    /* Rodapé da capa */
+    doc.setFillColor(8, 14, 22);
+    doc.rect(0, 254, PW, 38, 'F');
+    doc.setFillColor(...teal);
+    doc.rect(0, PH - 5, PW, 5, 'F');
+    doc.setTextColor(130, 145, 160);
+    doc.setFontSize(9);
+    doc.text('Sistema de Fechamento de Caixa em Dinheiro', PW / 2, 266, { align: 'center' });
+    doc.setTextColor(...teal);
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text('Gestão 5X', PW / 2, 277, { align: 'center' });
+    doc.setTextColor(130, 145, 160);
+    doc.setFontSize(8.5);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Emitido em ${todayStr}`, PW / 2, 286, { align: 'center' });
+
+    /* Seções nas páginas seguintes */
+    allSections.forEach(s => { doc.addPage(); _section(s.title, s.content); });
+    doc.save('manual_implantacao_gestao5x.pdf');
+
+  } else {
+    /* Exportação de aba única — seção direto na página 1 */
+    const target = allSections.find(s => s.key === onlySection);
+    if (!target) { alert('Seção não encontrada.'); return; }
+    _section(target.title, target.content);
+    const nameMap = { overview: 'visao_geral', perfis: 'perfis', fechamento: 'fechamento', transacoes: 'transacoes', implantacao: 'implantacao', checklist: 'checklist', gestor: 'manual_gestor', operador: 'manual_operador' };
+    doc.save(`manual_${nameMap[onlySection] || onlySection}_gestao5x.pdf`);
+  }
+}
+
+async function exportManualTabPDF() {
+  const btn = document.querySelector('#manualImplantacao .inner-tab-btn.active');
+  const tabId = btn?.dataset?.subtab || 'man-overview';
+  const map = { 'man-overview': 'overview', 'man-perfis': 'perfis', 'man-fechamento': 'fechamento', 'man-transacoes': 'transacoes', 'man-implantacao': 'implantacao', 'man-checklist': 'checklist', 'man-gestor': 'gestor', 'man-operador': 'operador' };
+  await exportManualPDF(map[tabId] || 'overview');
 }
 
 Object.assign(window, {
@@ -801,7 +1008,7 @@ Object.assign(window, {
   exportCSV, exportDivergencesCSV, exportTransfersCSV, exportExpensesCSV,
   exportAuditCSV, exportClientMovementsCSV, exportClientDivergencesCSV,
   exportContaAzulCSV, exportConsolidadoCSV,
-  generatePDF, exportManualPDF,
+  generatePDF, exportManualPDF, exportManualTabPDF,
   exportFechamentoPDF, exportDivergencesPDF, exportTransfersPDF, exportExpensesPDF,
   exportConsolidadoPDF, exportAuditPDF, exportClientMovementsPDF, exportClientDivergencesPDF,
 });
