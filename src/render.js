@@ -235,12 +235,15 @@ function buildResumoRow(c, receipt, includeEmpresa) {
   }
   const infoBtn = `<button class="info-tip-btn" data-tooltip="${esc(recMotivo)}" onmouseenter="showInfoTooltip(this)" onmouseleave="hideInfoTooltip()">ⓘ</button>`;
   const regTime = c.createdAt ? new Date(c.createdAt).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
+  const aberturaTag = !c.previousClosingId
+    ? `<span class="info-tip-btn" data-tooltip="Saldo inicial definido pelo master ao ativar o sistema — não herdado de fechamento anterior." onmouseenter="showInfoTooltip(this)" onmouseleave="hideInfoTooltip()" style="display:inline-block;font-size:10px;color:#94a3b8;margin-left:4px;cursor:help;font-style:italic">Abertura</span>`
+    : '';
   const empresaCol = includeEmpresa ? `<td>${esc(companyName(c.companyId))}</td>` : '';
   return `<tr>
     ${empresaCol}<td>${esc(storeName(c.storeId))}</td>
     <td>${esc(c.date)}<br><span class="subtle">${esc(c.shift || 'Integral')}</span>${regTime ? `<br><span class="subtle" style="font-size:10px;color:#94a3b8">${regTime}</span>` : ''}</td>
     <td>${esc(c.responsible || '-')}</td>
-    <td>${money(c.initial)}</td><td>${money(c.entries)}</td><td>${money(c.expenses)}</td>
+    <td>${money(c.initial)}${aberturaTag}</td><td>${money(c.entries)}</td><td>${money(c.expenses)}</td>
     <td>${money(saldoCaixa)}</td><td>${money(esperado)}</td><td>${money(transfer)}</td>
     <td>${difHtml}</td><td style="white-space:nowrap">${recTag}${infoBtn}</td>
   </tr>`;
@@ -432,12 +435,15 @@ function renderAdminViews() {
   html('adminMovementsDetailBody', [...histClosings].reverse().map((c) => {
     const salFinal = Number(c.cashBalance ?? c.finalAfterTransfer ?? 0);
     const div = Number(c.fundDivergence ?? c.diff ?? 0);
+    const aberturaTag = !c.previousClosingId
+      ? `<span class="info-tip-btn" data-tooltip="Saldo inicial definido pelo master ao ativar o sistema — não herdado de fechamento anterior." onmouseenter="showInfoTooltip(this)" onmouseleave="hideInfoTooltip()" style="display:inline-block;font-size:10px;color:#94a3b8;margin-left:4px;cursor:help;font-style:italic">Abertura</span>`
+      : '';
     return `<tr>
       <td>${esc(c.date)}</td>
       <td>${esc(storeName(c.storeId))}</td>
       <td>${esc(c.shift || 'Integral')}</td>
       <td>${esc(c.responsible || c.operator || '-')}</td>
-      <td>${money(c.initial)}</td>
+      <td>${money(c.initial)}${aberturaTag}</td>
       <td>${money(c.entries)}</td>
       <td>${money(c.expenses)}</td>
       <td>${money(c.transfer)}</td>
