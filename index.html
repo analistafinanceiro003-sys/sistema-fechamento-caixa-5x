@@ -1047,6 +1047,8 @@
         <button class="inner-tab-btn"        data-subtab="man-transacoes"  onclick="showSubTab('manualImplantacao','man-transacoes',this)">Transações</button>
         <button class="inner-tab-btn"        data-subtab="man-implantacao" onclick="showSubTab('manualImplantacao','man-implantacao',this)">Implantação</button>
         <button class="inner-tab-btn"        data-subtab="man-checklist"   onclick="showSubTab('manualImplantacao','man-checklist',this)">Checklist</button>
+        <button class="inner-tab-btn"        data-subtab="man-gestor"      onclick="showSubTab('manualImplantacao','man-gestor',this)">Manual do Gestor</button>
+        <button class="inner-tab-btn"        data-subtab="man-operador"    onclick="showSubTab('manualImplantacao','man-operador',this)">Manual do Operador</button>
       </div>
 
       <!-- ── ABA 1: VISÃO GERAL ── -->
@@ -1100,8 +1102,8 @@
                 <tr><td><strong>Histórico</strong></td><td>Consulta de fechamentos anteriores com filtros por data e loja</td><td>Admin / Operador</td></tr>
                 <tr><td><strong>Regras Operacionais</strong></td><td>Regras visíveis ao operador: saídas permitidas, checklist de conferência</td><td>Admin (cadastra) / Operador (lê)</td></tr>
                 <tr><td><strong>Movimentações</strong></td><td>Extrato consolidado de entradas, saídas e repasses com filtros de data e loja</td><td>Admin / Master</td></tr>
-                <tr><td><strong>Repasses Recebidos</strong></td><td>Confirmação dos valores de repasse enviados pelo operador ao caixa central</td><td>Admin</td></tr>
-                <tr><td><strong>Divergências</strong></td><td>Listagem de fechamentos com divergência acima da tolerância para revisão</td><td>Admin / Master</td></tr>
+                <tr><td><strong>Repasses</strong></td><td>Confirmação dos valores de repasse enviados pelo operador. Mostra status: Confirmado, Pendente, Não repassado ou Dentro da tolerância</td><td>Admin</td></tr>
+                <tr><td><strong>Divergências</strong></td><td>Listagem de divergências de fundo padrão e de abertura, com valor esperado, encontrado e diferença</td><td>Admin / Master</td></tr>
                 <tr><td><strong>Relatórios</strong></td><td>Exportação PDF e CSV: fechamento por loja, consolidado, repasses, saídas, Conta Azul</td><td>Admin / Master</td></tr>
                 <tr><td><strong>Módulos</strong></td><td>Controle do que cada perfil pode ver em cada empresa</td><td>Master</td></tr>
                 <tr><td><strong>Auditoria</strong></td><td>Log completo de todas as ações realizadas no sistema</td><td>Master</td></tr>
@@ -1149,7 +1151,7 @@
                 <li>Visualizar fechamentos de todas as lojas da empresa</li>
                 <li>Consultar histórico com filtros de data e loja</li>
                 <li>Ver movimentações (entradas, saídas, repasses)</li>
-                <li>Confirmar repasses recebidos do operador</li>
+                <li>Confirmar repasses recebidos do operador (aba Repasses)</li>
                 <li>Revisar divergências e adicionar comentários</li>
                 <li>Exportar relatórios da empresa</li>
               </ul>
@@ -1251,7 +1253,7 @@
                 <tr>
                   <td><strong>Repasse</strong></td>
                   <td>Valor enviado ao caixa central ou cofre ao fim do turno. Não é uma saída — é uma transferência de custódia.</td>
-                  <td>O gestor irá confirmar o recebimento deste valor na aba "Repasses Recebidos".</td>
+                  <td>O gestor irá confirmar o recebimento deste valor na aba "Repasses".</td>
                 </tr>
                 <tr>
                   <td><strong>Fundo padrão</strong></td>
@@ -1281,11 +1283,11 @@
         <div class="card" style="margin-top:14px">
           <h3 class="section-title">O que acontece após salvar</h3>
           <ol style="padding-left:18px;line-height:2;color:#374151;font-size:13px;margin-top:8px">
-            <li>O fechamento é salvo com status <strong>OK</strong> (divergência dentro da tolerância) ou <strong>Divergência</strong> (fora da tolerância).</li>
+            <li>O fechamento é salvo com status <strong>OK</strong> ou <strong>Divergência</strong>, calculado automaticamente pela regra: divergência de fundo dentro da tolerância de caixa → OK; excesso positivo dentro da tolerância de repasse → OK (valor intencionalmente mantido); acima de ambas as tolerâncias → Divergência.</li>
             <li>O gestor (Admin) recebe o fechamento no painel de histórico em tempo real.</li>
-            <li>Se houver divergência acima do limite crítico, aparece um alerta no painel da Gestão 5X.</li>
-            <li>O gestor pode confirmar o repasse na aba <strong>Repasses Recebidos</strong>.</li>
-            <li>Fechamentos com divergência entram na fila de revisão e podem receber comentário do gestor.</li>
+            <li>O gestor pode confirmar o repasse na aba <strong>Repasses</strong>. O status do recebimento mostra: Confirmado, Pendente confirmação, Não repassado, Dentro da tolerância ou Sem repasse — fundo OK.</li>
+            <li>Fechamentos com divergência entram na fila de revisão (aba Divergências) e podem receber comentário do gestor.</li>
+            <li>Registros do primeiro fechamento de cada loja mostram indicador <em>Abertura manual</em> no saldo inicial, sinalizando que foi definido pelo master ao ativar o sistema.</li>
           </ol>
           <div style="margin-top:12px;background:#fef3c7;border-radius:10px;padding:12px;font-size:13px;color:#92400e">
             <strong>Importante:</strong> Um fechamento salvo não pode ser excluído. Se houver erro, o gestor pode fazer uma <strong>Retificação</strong>, que substitui o fechamento incorreto e preserva o original para auditoria.
@@ -1367,7 +1369,7 @@
             </div>
             <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:12px">
               <p style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:6px">Gestor confirma:</p>
-              <p style="font-size:13px;color:#374151;line-height:1.6">Acessa a aba "Repasses Recebidos" e confirma que recebeu o dinheiro fisicamente.</p>
+              <p style="font-size:13px;color:#374151;line-height:1.6">Acessa a aba "Repasses" e confirma que recebeu o dinheiro fisicamente.</p>
             </div>
           </div>
         </div>
@@ -1493,8 +1495,8 @@
                 <table class="table">
                   <thead><tr><th>Campo</th><th>O que define</th><th>Valor sugerido</th></tr></thead>
                   <tbody>
-                    <tr><td><strong>Tolerância</strong></td><td>Divergência máxima considerada aceitável (status OK)</td><td>5,00 R$</td></tr>
-                    <tr><td><strong>Divergência crítica</strong></td><td>Acima deste valor, aparece alerta vermelho</td><td>20,00 R$</td></tr>
+                    <tr><td><strong>Tolerância de divergência</strong></td><td>Diferença máxima entre saldo final e fundo padrão considerada aceitável (status OK)</td><td>5,00 R$</td></tr>
+                    <tr><td><strong>Tolerância de repasse</strong></td><td>Valor mínimo de repasse abaixo do qual não gera alerta "Não repassado". Também isenta o status de Divergência quando o excesso é intencional.</td><td>Definir com o cliente — ex: 20,00 R$</td></tr>
                     <tr><td><strong>Modo de operação</strong></td><td>Diário, Por turno ou Por operador</td><td>Diário</td></tr>
                     <tr><td><strong>Receptor do repasse</strong></td><td>Nome de quem recebe o dinheiro fisicamente</td><td>"Gerente Ana"</td></tr>
                     <tr><td><strong>Mensagem ao operador</strong></td><td>Texto exibido na tela de fechamento do operador</td><td>"Conte o caixa duas vezes antes de registrar."</td></tr>
@@ -1575,10 +1577,12 @@
               <tbody>
                 <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Empresa cadastrada com dados corretos</strong></td><td>Cadastros → Cadastro Guiado</td></tr>
                 <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Todas as lojas criadas e ativas</strong></td><td>Cadastros → Lojas e Caixas</td></tr>
-                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Fundo padrão definido por loja</strong></td><td>Cadastros → Lojas e Caixas</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Fundo padrão definido por loja</strong> — confirmar com o cliente o valor real que fica no caixa entre turnos</td><td>Cadastros → Lojas e Caixas</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Saldo inicial inserido pelo master</strong> (abertura do sistema) e registrado como ajuste de abertura</td><td>Operação → Ajuste de Abertura</td></tr>
                 <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Usuário Admin criado e testado</strong></td><td>Cadastros → Usuários</td></tr>
                 <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Operador(es) criado(s) e vinculado(s) às lojas</strong></td><td>Cadastros → Usuários</td></tr>
-                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Tolerância e divergência crítica configuradas</strong></td><td>Operação → Configurações</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Tolerância de divergência configurada</strong> — diferença aceitável no saldo do caixa</td><td>Operação → Configurações</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Tolerância de repasse configurada</strong> — valor mínimo de repasse abaixo do qual não gera alerta</td><td>Operação → Configurações</td></tr>
                 <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Receptor do repasse informado</strong></td><td>Operação → Configurações</td></tr>
                 <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Regras operacionais cadastradas</strong></td><td>Operação → Regras</td></tr>
                 <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td><strong>Módulos configurados (Admin e Operador)</strong></td><td>Operação → Módulos</td></tr>
@@ -1599,18 +1603,298 @@
               <tbody>
                 <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Fazer login com e-mail e senha</td></tr>
                 <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Acessar o Fechamento Diário</td></tr>
-                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Informar o saldo inicial corretamente (igual ao saldo final do turno anterior)</td></tr>
-                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Adicionar entradas com descrição clara</td></tr>
-                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Registrar saídas com categoria e descrição</td></tr>
-                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Informar o valor do repasse ao gestor</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Saber qual é o fundo padrão da loja (valor que deve ficar no caixa após o repasse)</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Contar o dinheiro fisicamente antes de informar o saldo inicial</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Informar o saldo inicial corretamente — deve bater com o saldo final do turno anterior</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Adicionar entradas com descrição clara (uma linha por tipo)</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Registrar saídas com categoria e descrição real (sem "outros" ou "diversa")</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Verificar o repasse sugerido pelo sistema e separar o valor físico antes de informar</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Informar o valor exato do repasse entregue ao gestor</td></tr>
                 <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Salvar o fechamento e verificar o status (OK ou Divergência)</td></tr>
-                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Em caso de divergência: preencher o campo Observações com a justificativa</td></tr>
+                <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Em caso de Divergência: preencher o campo Observações com a justificativa antes de sair</td></tr>
                 <tr><td><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td><td>Saber fazer logout ao sair do sistema</td></tr>
               </tbody>
             </table>
           </div>
         </div>
       </div>
+
+      <!-- ── ABA 7: MANUAL DO GESTOR ── -->
+      <div id="man-gestor" class="inner-tab-panel hidden">
+
+        <div class="card" style="background:var(--soft);border:1px solid var(--brand)">
+          <h3 class="section-title">Para o gestor (Admin)</h3>
+          <p style="line-height:1.7;color:#374151;font-size:13px">Este manual explica como acompanhar os fechamentos dos seus operadores, o que validar todo dia e o que fazer quando aparecer uma divergência.</p>
+        </div>
+
+        <!-- BLOCO 1: Lógica do caixa -->
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Como funciona o caixa</h3>
+          <p style="line-height:1.7;color:#374151;font-size:13px;margin-bottom:14px">Cada loja opera com um <strong>fundo padrão</strong> — um valor fixo que deve ficar sempre no caixa para o próximo turno. No fechamento, o operador transfere o dinheiro que exceder esse fundo.</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+            <div style="background:#f0fdf4;border-radius:10px;padding:14px;border:1px solid #bbf7d0">
+              <p style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px">FÓRMULA DO REPASSE</p>
+              <p style="font-size:13px;color:#374151;line-height:1.6">Repasse = Saldo de caixa − Fundo padrão</p>
+              <p style="font-size:11px;color:#6b7280;margin-top:6px">Exemplo: caixa com R$350 e fundo de R$180 → repasse de R$170</p>
+            </div>
+            <div style="background:#fef3c7;border-radius:10px;padding:14px;border:1px solid #fde68a">
+              <p style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:6px">DIVERGÊNCIA DE FUNDO</p>
+              <p style="font-size:13px;color:#374151;line-height:1.6">= Saldo que ficou no caixa − Fundo padrão</p>
+              <p style="font-size:11px;color:#6b7280;margin-top:6px">Positivo = sobrou mais que o fundo. Negativo = faltou dinheiro.</p>
+            </div>
+            <div style="background:#eff6ff;border-radius:10px;padding:14px;border:1px solid #bfdbfe">
+              <p style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:6px">DIVERGÊNCIA DE ABERTURA</p>
+              <p style="font-size:13px;color:#374151;line-height:1.6">= Saldo inicial informado − Saldo final do turno anterior</p>
+              <p style="font-size:11px;color:#6b7280;margin-top:6px">Indica se o operador abriu o caixa com o valor correto.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- BLOCO 2: O que conferir todo dia -->
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">O que conferir todo dia</h3>
+          <div class="table-wrap" style="margin-top:10px">
+            <table class="table">
+              <thead><tr><th>O que verificar</th><th>Onde ver</th><th>O que esperar</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><strong>Fechamentos do dia</strong></td>
+                  <td>Movimentações → Histórico</td>
+                  <td>Todas as lojas com fechamento registrado. Status OK na maioria.</td>
+                </tr>
+                <tr>
+                  <td><strong>Status dos fechamentos</strong></td>
+                  <td>Resumo por Fechamento</td>
+                  <td>Coluna "Recebimento": confirmado ou pendente. Coluna "Diferença": próximo de zero.</td>
+                </tr>
+                <tr>
+                  <td><strong>Repasses recebidos</strong></td>
+                  <td>Repasses</td>
+                  <td>Confirmar o valor físico recebido clicando em "Confirmar". Isso registra quem confirmou e quando.</td>
+                </tr>
+                <tr>
+                  <td><strong>Divergências pendentes</strong></td>
+                  <td>Divergências</td>
+                  <td>Toda divergência acima da tolerância aparece aqui. Revisar e comentar cada uma.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- BLOCO 3: Entendendo os badges de Recebimento -->
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">O que significa cada badge no "Recebimento"</h3>
+          <div style="display:grid;gap:10px;margin-top:10px">
+            <div style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:#f8fafc;border-radius:8px">
+              <span style="background:#dcfce7;color:#166534;padding:2px 10px;border-radius:4px;font-size:12px;white-space:nowrap;margin-top:2px">✓ Confirmado</span>
+              <p style="font-size:13px;color:#374151;line-height:1.5">O repasse foi recebido e você confirmou. Situação ideal.</p>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:#f8fafc;border-radius:8px">
+              <span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:4px;font-size:12px;white-space:nowrap;margin-top:2px">Pendente confirmação</span>
+              <p style="font-size:13px;color:#374151;line-height:1.5">O operador informou o repasse mas você ainda não confirmou. Acesse a aba <strong>Repasses</strong> e clique em confirmar.</p>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:#f8fafc;border-radius:8px">
+              <span style="background:#fef9c3;color:#854d0e;padding:2px 10px;border-radius:4px;font-size:12px;white-space:nowrap;margin-top:2px">⚠ Não repassado</span>
+              <p style="font-size:13px;color:#374151;line-height:1.5">O saldo do caixa superou o fundo padrão mas o operador não informou repasse. Verificar com o operador o que aconteceu com o dinheiro.</p>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:#f8fafc;border-radius:8px">
+              <span style="background:#f1f5f9;color:#64748b;padding:2px 10px;border-radius:4px;font-size:12px;white-space:nowrap;margin-top:2px">Dentro da tolerância</span>
+              <p style="font-size:13px;color:#374151;line-height:1.5">O valor a repassar é pequeno (abaixo da tolerância configurada) e foi intencionalmente deixado no caixa. Não requer ação.</p>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:#f8fafc;border-radius:8px">
+              <span style="background:#e0f2fe;color:#0369a1;padding:2px 10px;border-radius:4px;font-size:12px;white-space:nowrap;margin-top:2px">Sem repasse — fundo OK</span>
+              <p style="font-size:13px;color:#374151;line-height:1.5">O caixa ficou exatamente com o fundo padrão. Nenhum repasse era necessário.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- BLOCO 4: Tipos de divergência -->
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Tipos de divergência e o que fazer</h3>
+          <div style="display:grid;gap:12px;margin-top:10px">
+            <div style="border-left:4px solid #f87171;padding:12px 14px;background:#fff5f5;border-radius:0 8px 8px 0">
+              <p style="font-weight:700;color:#991b1b;font-size:13px;margin-bottom:4px">Divergência de Fundo padrão</p>
+              <p style="font-size:13px;color:#374151;line-height:1.6">O saldo que ficou no caixa após o repasse é diferente do fundo padrão configurado. <strong>Positiva (+)</strong>: sobrou mais do que deveria — o operador não repassou o suficiente. <strong>Negativa (−)</strong>: faltou dinheiro no caixa — pode indicar erro na contagem ou saída não registrada.</p>
+              <p style="font-size:12px;color:#6b7280;margin-top:6px"><strong>O que fazer:</strong> solicite a justificativa ao operador pelo campo Observações. Se for erro de lançamento, solicite retificação à Gestão 5X.</p>
+            </div>
+            <div style="border-left:4px solid #fbbf24;padding:12px 14px;background:#fffbeb;border-radius:0 8px 8px 0">
+              <p style="font-weight:700;color:#92400e;font-size:13px;margin-bottom:4px">Divergência de Abertura</p>
+              <p style="font-size:13px;color:#374151;line-height:1.6">O operador abriu o caixa com um valor diferente do que ficou no fechamento anterior. <strong>Positiva (+)</strong>: o caixa foi aberto com mais dinheiro do que deveria — alguém colocou dinheiro. <strong>Negativa (−)</strong>: o caixa foi aberto com menos — pode indicar retirada entre turnos ou erro de contagem.</p>
+              <p style="font-size:12px;color:#6b7280;margin-top:6px"><strong>O que fazer:</strong> verifique se houve troca de fundo entre turnos. Divergências de abertura recorrentes indicam falha no processo de transição.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- BLOCO 5: Rotina semanal -->
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Rotina semanal recomendada</h3>
+          <ol style="padding-left:18px;line-height:2.2;color:#374151;font-size:13px;margin-top:8px">
+            <li><strong>Diariamente:</strong> acessar o Histórico, confirmar repasses pendentes e verificar divergências novas.</li>
+            <li><strong>2× por semana:</strong> revisar a aba Divergências e comentar todas que estiverem pendentes.</li>
+            <li><strong>Semanalmente:</strong> verificar o Resumo por Fechamento com filtro da semana — identificar operadores com padrão de divergência recorrente.</li>
+            <li><strong>Mensalmente:</strong> exportar o relatório consolidado (PDF ou CSV) para conferência com o financeiro.</li>
+          </ol>
+        </div>
+
+      </div><!-- fim man-gestor -->
+
+      <!-- ── ABA 8: MANUAL DO OPERADOR ── -->
+      <div id="man-operador" class="inner-tab-panel hidden">
+
+        <div class="card" style="background:#f0fdf4;border:1px solid #bbf7d0">
+          <h3 class="section-title">Para o operador de caixa</h3>
+          <p style="line-height:1.7;color:#374151;font-size:13px">Este manual explica como fazer o fechamento de caixa corretamente. Leia com atenção antes do primeiro fechamento e consulte sempre que tiver dúvida.</p>
+        </div>
+
+        <!-- BLOCO 1: Passo a passo -->
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Como fazer o fechamento — passo a passo</h3>
+          <div style="margin-top:10px">
+
+            <div style="border-left:3px solid var(--brand);padding-left:14px;margin-bottom:18px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">PASSO 1</span>
+                <strong style="font-size:14px;color:#0d1720">Conte o dinheiro do caixa</strong>
+              </div>
+              <p style="font-size:13px;color:#374151;line-height:1.6">Antes de abrir o sistema, <strong>conte fisicamente</strong> todo o dinheiro que está no caixa. Separe por denominação. Conte duas vezes para ter certeza. Esse valor será o <strong>Saldo Inicial</strong>.</p>
+              <div style="background:#fef3c7;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#92400e">
+                <strong>Importante:</strong> O saldo inicial deve ser exatamente igual ao saldo que ficou no caixa desde o fechamento anterior. Se você encontrar um valor diferente, registre o que realmente está no caixa e explique no campo Observações.
+              </div>
+            </div>
+
+            <div style="border-left:3px solid var(--brand);padding-left:14px;margin-bottom:18px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">PASSO 2</span>
+                <strong style="font-size:14px;color:#0d1720">Informe as entradas</strong>
+              </div>
+              <p style="font-size:13px;color:#374151;line-height:1.6">Registre <strong>todo dinheiro que entrou no caixa</strong> durante o turno. Clique em "Adicionar entrada", informe a descrição e o valor. Adicione uma linha por tipo de entrada.</p>
+              <div style="background:#f0fdf4;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#166534">
+                <strong>Exemplos de entrada:</strong> "Vendas em dinheiro", "Troco recebido do fornecedor", "Complemento de fundo autorizado pelo gestor".
+              </div>
+            </div>
+
+            <div style="border-left:3px solid var(--brand);padding-left:14px;margin-bottom:18px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">PASSO 3</span>
+                <strong style="font-size:14px;color:#0d1720">Informe as saídas</strong>
+              </div>
+              <p style="font-size:13px;color:#374151;line-height:1.6">Registre <strong>todo dinheiro retirado do caixa de forma autorizada</strong> durante o turno. Exemplos: ajuda de custo, taxa de entrega, compra de material. Informe a categoria e a descrição.</p>
+              <div style="background:#fee2e2;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#991b1b">
+                <strong>Atenção:</strong> Toda saída precisa ter descrição real. "Saída diversa" ou "outros" não é aceito. Em caso de dúvida sobre o que pode ser retirado, consulte as Regras Operacionais da loja.
+              </div>
+            </div>
+
+            <div style="border-left:3px solid var(--brand);padding-left:14px;margin-bottom:18px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">PASSO 4</span>
+                <strong style="font-size:14px;color:#0d1720">Calcule e informe o repasse</strong>
+              </div>
+              <p style="font-size:13px;color:#374151;line-height:1.6">O sistema sugere automaticamente o valor do repasse (o que excede o fundo padrão). Verifique o campo <strong>"Repasse sugerido"</strong>. Separe fisicamente esse valor do caixa e informe no campo Repasse.</p>
+              <div style="background:#eff6ff;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#1d4ed8">
+                <strong>O repasse não é saída:</strong> é o dinheiro que você entrega ao gestor. O valor que fica no caixa é o fundo padrão, que será o saldo inicial do próximo turno.
+              </div>
+            </div>
+
+            <div style="border-left:3px solid var(--brand);padding-left:14px;margin-bottom:18px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">PASSO 5</span>
+                <strong style="font-size:14px;color:#0d1720">Verifique o resultado e salve</strong>
+              </div>
+              <p style="font-size:13px;color:#374151;line-height:1.6">Antes de salvar, confira na tela o <strong>Saldo de Caixa</strong> e a <strong>Divergência</strong>. O ideal é divergência = 0,00. Se aparecer divergência, confira seus lançamentos antes de salvar.</p>
+            </div>
+
+            <div style="border-left:3px solid #10b981;padding-left:14px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                <span style="background:#10b981;color:#fff;font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">PASSO 6</span>
+                <strong style="font-size:14px;color:#0d1720">Entregue o repasse ao gestor</strong>
+              </div>
+              <p style="font-size:13px;color:#374151;line-height:1.6">Entregue o valor físico do repasse ao gestor ou responsável. O gestor irá confirmar o recebimento no sistema. Guarde o comprovante se houver.</p>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- BLOCO 2: O que fazer quando der divergência -->
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">O que fazer quando aparecer "Divergência"</h3>
+          <ol style="padding-left:18px;line-height:2.2;color:#374151;font-size:13px;margin-top:8px">
+            <li><strong>Não entre em pânico.</strong> Divergências acontecem. O importante é registrar com honestidade.</li>
+            <li><strong>Confira seus lançamentos</strong> antes de salvar — verifique se todas as entradas e saídas estão corretas.</li>
+            <li><strong>Recontei o caixa?</strong> Conte o dinheiro físico novamente e compare com o saldo que o sistema mostra.</li>
+            <li><strong>Se a divergência persistir:</strong> salve o fechamento e preencha o campo <strong>Observações</strong> explicando o que pode ter causado a diferença.</li>
+            <li><strong>Nunca ajuste o valor para "fechar".</strong> Não invente um número para zerar a divergência. Registre o que realmente está no caixa.</li>
+          </ol>
+          <div style="margin-top:12px;background:#fef3c7;border-radius:10px;padding:12px;font-size:13px;color:#92400e">
+            <strong>Lembre-se:</strong> uma divergência com explicação é muito melhor do que um número forjado. O gestor vai revisar e entender.
+          </div>
+        </div>
+
+        <!-- BLOCO 3: Erros comuns -->
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Erros mais comuns — e como evitar</h3>
+          <div class="table-wrap" style="margin-top:10px">
+            <table class="table">
+              <thead><tr><th>Erro</th><th>Consequência</th><th>Como evitar</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>Informar saldo inicial errado</td>
+                  <td>Gera divergência de abertura no próximo fechamento</td>
+                  <td>Conte o dinheiro físico antes de digitar. O sistema sugere o valor correto.</td>
+                </tr>
+                <tr>
+                  <td>Esquecer de registrar uma saída</td>
+                  <td>O caixa "sobra" dinheiro — gera divergência positiva</td>
+                  <td>Anote as saídas no momento em que acontecem, não no final do turno.</td>
+                </tr>
+                <tr>
+                  <td>Informar repasse diferente do entregue</td>
+                  <td>O gestor não consegue confirmar — valor não bate</td>
+                  <td>Informe o valor exato que você está entregando fisicamente.</td>
+                </tr>
+                <tr>
+                  <td>Salvar duas vezes o mesmo fechamento</td>
+                  <td>Duplicidade no histórico, difícil de corrigir</td>
+                  <td>Verifique se já há um fechamento do dia antes de salvar um novo.</td>
+                </tr>
+                <tr>
+                  <td>Não preencher as Observações em caso de divergência</td>
+                  <td>O gestor não consegue revisar sem justificativa</td>
+                  <td>Sempre explique o motivo da divergência no campo Observações.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- BLOCO 4: Perguntas frequentes -->
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Dúvidas frequentes</h3>
+          <div style="display:grid;gap:10px;margin-top:10px">
+            <div style="background:#f8fafc;border-radius:8px;padding:12px">
+              <p style="font-weight:700;color:#0d1720;font-size:13px;margin-bottom:4px">Posso fazer o fechamento no dia seguinte?</p>
+              <p style="font-size:13px;color:#374151;line-height:1.5">Não é recomendado. O fechamento deve ser feito ao fim do turno, com o dinheiro físico em mãos. Se precisar corrigir algo, o gestor faz a retificação.</p>
+            </div>
+            <div style="background:#f8fafc;border-radius:8px;padding:12px">
+              <p style="font-weight:700;color:#0d1720;font-size:13px;margin-bottom:4px">O que é o fundo padrão?</p>
+              <p style="font-size:13px;color:#374151;line-height:1.5">É o valor configurado pelo gestor que deve sempre ficar no caixa para iniciar o próximo turno. Você não precisa calcular — o sistema mostra o repasse sugerido já descontando o fundo.</p>
+            </div>
+            <div style="background:#f8fafc;border-radius:8px;padding:12px">
+              <p style="font-weight:700;color:#0d1720;font-size:13px;margin-bottom:4px">Abri o caixa com um valor diferente do esperado. O que faço?</p>
+              <p style="font-size:13px;color:#374151;line-height:1.5">Informe o valor que realmente está no caixa (não invente). Explique no campo Observações por que o valor é diferente (ex: "fundo complementado pelo gestor", "retirada antes do início do turno"). O sistema registra a divergência de abertura para revisão.</p>
+            </div>
+            <div style="background:#f8fafc;border-radius:8px;padding:12px">
+              <p style="font-weight:700;color:#0d1720;font-size:13px;margin-bottom:4px">Preciso repassar todo o dinheiro acima do fundo?</p>
+              <p style="font-size:13px;color:#374151;line-height:1.5">Sim, a menos que o gestor oriente diferente. O sistema calcula automaticamente o repasse sugerido. Valores muito pequenos podem ter uma tolerância configurada pelo gestor.</p>
+            </div>
+            <div style="background:#f8fafc;border-radius:8px;padding:12px">
+              <p style="font-weight:700;color:#0d1720;font-size:13px;margin-bottom:4px">Errei o fechamento. Posso apagar e refazer?</p>
+              <p style="font-size:13px;color:#374151;line-height:1.5">Não é possível apagar. Avise o gestor, que solicitará uma <strong>Retificação</strong> à Gestão 5X. O fechamento original é mantido para auditoria e o corrigido fica visível como "Retificado".</p>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- fim man-operador -->
 
     </section>
 
