@@ -383,7 +383,10 @@
               <div class="field full"><label>Mensagem padrão para o operador</label><textarea id="operationMessage" placeholder="Informe todas as saídas com descrição e comprovante quando houver."></textarea></div>
               <div class="field"><label>Prazo para retificação (dias) <span class="subtle">— 0 = mesmo mês</span></label><input id="operationRectificationDays" type="number" value="0" min="0" step="1"/></div>
             </div>
-            <div class="btn-row"><button class="btn btn-brand" onclick="saveOperationConfig()">Salvar configuração</button></div>
+            <div class="btn-row">
+              <button class="btn btn-brand" onclick="saveOperationConfig()">Salvar configuração</button>
+              <button class="btn" onclick="handleRecalculateStatuses()" title="Recalcular status de fechamentos já salvos usando a tolerância de repasse atual" style="margin-left:8px">Recalcular status existentes</button>
+            </div>
           </div>
           <div class="card">
             <h3 class="section-title">Configurações salvas</h3>

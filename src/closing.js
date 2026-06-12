@@ -109,9 +109,13 @@ function getClosingCalculation() {
   const standardFund       = safeMoneyNumber(store?.standardFund);
   const fundDivergence     = finalAT - standardFund;
   const tolerance          = safeMoneyNumber(cfgC?.tolerance ?? 5);
+  const transferTolerance  = safeMoneyNumber(cfgC?.transferTolerance ?? 0);
 
-  /* Status oficial — sem Crítico */
-  const status = Math.abs(fundDivergence) <= tolerance ? 'OK' : 'Divergência';
+  /* Status oficial: OK se divergência dentro da tolerância de caixa, OU se o
+     excesso positivo for ≤ tolerância de repasse (valor intencionalmente mantido) */
+  const status = Math.abs(fundDivergence) <= tolerance
+    || (fundDivergence > 0 && transferTolerance > 0 && fundDivergence <= transferTolerance)
+    ? 'OK' : 'Divergência';
 
   const openRef    = openingReference();
   const openingDiv = initialCash - Number(openRef.amount || 0);
@@ -127,6 +131,7 @@ function getClosingCalculation() {
     standardFund,
     fundDivergence,
     tolerance,
+    transferTolerance,
     status,
     openingDivergence: openingDiv,
     openingRef: openRef,
@@ -142,10 +147,12 @@ function suggestedTransfer()  { return getClosingCalculation().suggestedTransfer
 function openingDivergence()  { return getClosingCalculation().openingDivergence; }
 
 function closingStatus(diff, companyId) {
-  const c   = cfg(companyId);
-  const abs = Math.abs(diff);
-  const tolerance = Math.abs(safeMoneyNumber(c.tolerance));
-  return abs <= tolerance ? 'OK' : 'Divergência';
+  const c = cfg(companyId);
+  const tolerance         = Math.abs(safeMoneyNumber(c.tolerance));
+  const transferTolerance = safeMoneyNumber(c.transferTolerance ?? 0);
+  return Math.abs(diff) <= tolerance
+    || (diff > 0 && transferTolerance > 0 && diff <= transferTolerance)
+    ? 'OK' : 'Divergência';
 }
 
 /* ================================================================
@@ -311,11 +318,18 @@ function ensureExpenseCategories(root = document) {
    DIVERGENCE REVIEWS — criação em state local
 ================================================================ */
 function createDivergenceReviews(closing) {
-  const tol = Math.abs(Number(closing.toleranceSnapshot || cfg(closing.companyId).tolerance || 0));
+  const tol         = Math.abs(Number(closing.toleranceSnapshot || cfg(closing.companyId).tolerance || 0));
+  const transferTol = Number(cfg(closing.companyId)?.transferTolerance || 0);
+  const fundDiv     = Number(closing.fundDivergence ?? closing.diff ?? 0);
   const items = [
     ['Divergência de abertura',         closing.openingDivergence],
-    ['Divergência contra fundo padrão', closing.fundDivergence ?? closing.diff],
-  ].filter(([, v]) => Math.abs(Number(v || 0)) > tol);
+    ['Divergência contra fundo padrão', fundDiv],
+  ].filter(([type, v]) => {
+    const abs = Math.abs(Number(v || 0));
+    if (abs <= tol) return false;
+    if (type === 'Divergência contra fundo padrão' && Number(v) > 0 && transferTol > 0 && Number(v) <= transferTol) return false;
+    return true;
+  });
   state.divergenceReviews = state.divergenceReviews || [];
   items.forEach(([type, amount]) => {
     state.divergenceReviews.push({
@@ -894,8 +908,11 @@ async function approveRectification(reqId) {
   const expected    = newInitial + newEntries - newExpenses;
   const finalBal    = expected - newTransfer;
   const diff        = finalBal - standardFund;
-  const tolerance   = Number(closing.toleranceSnapshot || cfg(closing.companyId).tolerance || 5);
-  const newStatus   = Math.abs(diff) <= tolerance ? 'OK' : 'Divergência';
+  const tolerance      = Number(closing.toleranceSnapshot || cfg(closing.companyId).tolerance || 5);
+  const transferTol    = Number(cfg(closing.companyId)?.transferTolerance || 0);
+  const newStatus      = Math.abs(diff) <= tolerance
+    || (diff > 0 && transferTol > 0 && diff <= transferTol)
+    ? 'OK' : 'Divergência';
 
   const now = new Date().toLocaleDateString('pt-BR');
   const retificadoNotes = `[Retificação aprovada por ${currentUser?.name || 'admin'} em ${now}] ${req.justification} | Original: Ini ${money(req.originalInitial)} Ent ${money(req.originalEntries)} Saí ${money(req.originalExpenses)} Rep ${money(req.originalTransfer)}`;
@@ -954,6 +971,41 @@ function rejectRectification(reqId) {
 }
 
 /* ================================================================
+   RECALCULAÇÃO DE STATUS DOS FECHAMENTOS EXISTENTES
+================================================================ */
+async function recalculateClosingStatuses() {
+  const updated = [];
+  for (const c of (state.closings || [])) {
+    if (c.type === 'Excluído') continue;
+    const tol         = Number(c.toleranceSnapshot || cfg(c.companyId)?.tolerance || 5);
+    const transferTol = Number(cfg(c.companyId)?.transferTolerance || 0);
+    const fundDiv     = Number(c.fundDivergence ?? c.diff ?? 0);
+    const newStatus   = Math.abs(fundDiv) <= tol
+      || (fundDiv > 0 && transferTol > 0 && fundDiv <= transferTol)
+      ? 'OK' : 'Divergência';
+    if (newStatus !== c.status) {
+      c.status = newStatus;
+      if (newStatus === 'OK') c.reviewStatus = 'Sem divergência';
+      updated.push(c);
+    }
+  }
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    for (const c of updated) {
+      try { await updateClosing(c.id, c); } catch (e) { console.warn('recalc err', c.id, e); }
+    }
+  }
+  save();
+  renderAll();
+  return updated.length;
+}
+
+async function handleRecalculateStatuses() {
+  if (!confirm(`Recalcular status de todos os fechamentos usando a tolerância de repasse atual?\n\nFechamentos marcados como "Divergência" por valores dentro da tolerância passarão para "OK".`)) return;
+  const n = await recalculateClosingStatuses();
+  alert(n > 0 ? `${n} fechamento(s) recalculado(s) com sucesso.` : 'Nenhum fechamento precisou de ajuste.');
+}
+
+/* ================================================================
    EXPOSIÇÃO GLOBAL
 ================================================================ */
 Object.assign(window, {
@@ -969,6 +1021,7 @@ Object.assign(window, {
   addEntry, addExpense, removeLaunchRow,
   ensureExpenseCategories,
   confirmTransfer, handleSaveClosingClick, saveClosing, saveOpeningAdjustment, reviewDivergence, createDivergenceReviews,
+  recalculateClosingStatuses, handleRecalculateStatuses,
   handleAttachments, renderAttachments, clearAttachmentsUI,
   confirmDeleteClosing, openRectifyModal, closeRectifyModal, saveRectification,
   openOperatorRectifyModal, closeOperatorRectifyModal, submitRectificationRequest,
