@@ -468,7 +468,20 @@
             <div class="field"><label>Data final</label><input id="masterResumoEnd" type="date" onchange="renderFechamentos()"/></div>
           </div>
           <div class="table-wrap">
-            <table><thead><tr><th>Empresa</th><th>Loja</th><th>Data / Turno</th><th>Responsável</th><th>Saldo Inicial</th><th>Entradas</th><th>Saídas</th><th>Saldo de Caixa</th><th>Repasse Esperado</th><th>Repasse Op.</th><th>Diferença</th><th>Recebimento</th></tr></thead>
+            <table><thead><tr>
+              <th class="th-sort" onclick="sortResumo('store','master')">Empresa<span id="rs-m-store"></span></th>
+              <th class="th-sort" onclick="sortResumo('store','master')">Loja<span id="rs-m-store2"></span></th>
+              <th class="th-sort" onclick="sortResumo('date','master')">Data / Turno<span id="rs-m-date"></span></th>
+              <th class="th-sort" onclick="sortResumo('responsible','master')">Responsável<span id="rs-m-responsible"></span></th>
+              <th class="th-sort" onclick="sortResumo('initial','master')">Saldo Inicial<span id="rs-m-initial"></span></th>
+              <th class="th-sort" onclick="sortResumo('entries','master')">Entradas<span id="rs-m-entries"></span></th>
+              <th class="th-sort" onclick="sortResumo('expenses','master')">Saídas<span id="rs-m-expenses"></span></th>
+              <th class="th-sort" onclick="sortResumo('saldoCaixa','master')">Saldo de Caixa<span id="rs-m-saldoCaixa"></span></th>
+              <th class="th-sort" onclick="sortResumo('repEsperado','master')">Repasse Esperado<span id="rs-m-repEsperado"></span></th>
+              <th class="th-sort" onclick="sortResumo('transfer','master')">Repasse Confirmado<span id="rs-m-transfer"></span></th>
+              <th class="th-sort" onclick="sortResumo('saldoFinal','master')">Saldo Final<span id="rs-m-saldoFinal"></span></th>
+              <th>Diferença</th><th>Recebimento</th>
+            </tr></thead>
             <tbody id="fechResumoBody"></tbody></table>
           </div>
         </div>
@@ -743,7 +756,19 @@
             <div class="field"><label>Data inicial</label><input id="adminResumoStart" type="date" onchange="renderAdminViews()"/></div>
             <div class="field"><label>Data final</label><input id="adminResumoEnd" type="date" onchange="renderAdminViews()"/></div>
           </div>
-          <div class="table-wrap"><table><thead><tr><th>Loja</th><th>Data / Turno</th><th>Responsável</th><th>Saldo Inicial</th><th>Entradas</th><th>Saídas</th><th>Saldo de Caixa</th><th>Repasse Esperado</th><th>Repasse Op.</th><th>Diferença</th><th>Recebimento</th></tr></thead><tbody id="adminResumoBody"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr>
+            <th class="th-sort" onclick="sortResumo('store','admin')">Loja<span id="rs-a-store"></span></th>
+            <th class="th-sort" onclick="sortResumo('date','admin')">Data / Turno<span id="rs-a-date"></span></th>
+            <th class="th-sort" onclick="sortResumo('responsible','admin')">Responsável<span id="rs-a-responsible"></span></th>
+            <th class="th-sort" onclick="sortResumo('initial','admin')">Saldo Inicial<span id="rs-a-initial"></span></th>
+            <th class="th-sort" onclick="sortResumo('entries','admin')">Entradas<span id="rs-a-entries"></span></th>
+            <th class="th-sort" onclick="sortResumo('expenses','admin')">Saídas<span id="rs-a-expenses"></span></th>
+            <th class="th-sort" onclick="sortResumo('saldoCaixa','admin')">Saldo de Caixa<span id="rs-a-saldoCaixa"></span></th>
+            <th class="th-sort" onclick="sortResumo('repEsperado','admin')">Repasse Esperado<span id="rs-a-repEsperado"></span></th>
+            <th class="th-sort" onclick="sortResumo('transfer','admin')">Repasse Confirmado<span id="rs-a-transfer"></span></th>
+            <th class="th-sort" onclick="sortResumo('saldoFinal','admin')">Saldo Final<span id="rs-a-saldoFinal"></span></th>
+            <th>Diferença</th><th>Recebimento</th>
+          </tr></thead><tbody id="adminResumoBody"></tbody></table></div>
         </div>
       </div>
 
@@ -1632,15 +1657,20 @@
         <div class="card" style="margin-top:14px">
           <h3 class="section-title">Como funciona o caixa</h3>
           <p style="line-height:1.7;color:#374151;font-size:13px;margin-bottom:14px">Cada loja opera com um <strong>fundo padrão</strong> — um valor fixo que deve ficar sempre no caixa para o próximo turno. No fechamento, o operador transfere o dinheiro que exceder esse fundo.</p>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
             <div style="background:#f0fdf4;border-radius:10px;padding:14px;border:1px solid #bbf7d0">
               <p style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px">FÓRMULA DO REPASSE</p>
               <p style="font-size:13px;color:#374151;line-height:1.6">Repasse = Saldo de caixa − Fundo padrão</p>
               <p style="font-size:11px;color:#6b7280;margin-top:6px">Exemplo: caixa com R$350 e fundo de R$180 → repasse de R$170</p>
             </div>
+            <div style="background:#ecfdf5;border-radius:10px;padding:14px;border:1px solid #a7f3d0">
+              <p style="font-size:12px;font-weight:700;color:#065f46;margin-bottom:6px">SALDO FINAL</p>
+              <p style="font-size:13px;color:#374151;line-height:1.6">= Saldo de caixa − Repasse confirmado</p>
+              <p style="font-size:11px;color:#6b7280;margin-top:6px">Quanto ficou fisicamente no caixa. Deve ser igual ao fundo padrão.</p>
+            </div>
             <div style="background:#fef3c7;border-radius:10px;padding:14px;border:1px solid #fde68a">
               <p style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:6px">DIVERGÊNCIA DE FUNDO</p>
-              <p style="font-size:13px;color:#374151;line-height:1.6">= Saldo que ficou no caixa − Fundo padrão</p>
+              <p style="font-size:13px;color:#374151;line-height:1.6">= Saldo final − Fundo padrão</p>
               <p style="font-size:11px;color:#6b7280;margin-top:6px">Positivo = sobrou mais que o fundo. Negativo = faltou dinheiro.</p>
             </div>
             <div style="background:#eff6ff;border-radius:10px;padding:14px;border:1px solid #bfdbfe">
@@ -1666,7 +1696,7 @@
                 <tr>
                   <td><strong>Status dos fechamentos</strong></td>
                   <td>Resumo por Fechamento</td>
-                  <td>Coluna "Recebimento": confirmado ou pendente. Coluna "Diferença": próximo de zero.</td>
+                  <td>Coluna "Saldo Final": deve ser igual ao fundo padrão da loja. Coluna "Recebimento": confirmado ou pendente. Coluna "Diferença": próximo de zero. Clique nos cabeçalhos para ordenar.</td>
                 </tr>
                 <tr>
                   <td><strong>Repasses recebidos</strong></td>

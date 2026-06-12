@@ -607,3 +607,12 @@ body.role-operator #closing .panel-grid{grid-template-columns:1fr}
   transition: color 0.15s;
 }
 .info-tip-btn:hover { color: #64748b; }
+
+/* Cabeçalhos ordenáveis */
+.th-sort {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.th-sort:hover { background: rgba(54,199,189,0.10); }
+.th-sort span { font-size: 11px; color: var(--brand); font-weight: 700; }

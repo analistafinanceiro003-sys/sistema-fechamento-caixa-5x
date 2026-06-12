@@ -191,12 +191,54 @@ function renderOperacao() {
   }).join('') || '<p class="subtle">Nenhuma configuração salva.</p>');
 }
 
+/* --- Ordenação do Resumo por Fechamento --- */
+const _resumoSort = { master: { col: 'date', dir: -1 }, admin: { col: 'date', dir: -1 } };
+
+function _sortResumo(closings, s) {
+  if (!s.col) return closings;
+  return [...closings].sort((a, b) => {
+    switch (s.col) {
+      case 'store':      return s.dir * (storeName(a.storeId)||'').localeCompare(storeName(b.storeId)||'', 'pt-BR');
+      case 'date':       return s.dir * ((a.date+(a.shift||'')).localeCompare(b.date+(b.shift||'')));
+      case 'responsible':return s.dir * ((a.responsible||'').localeCompare(b.responsible||'', 'pt-BR'));
+      case 'initial':    return s.dir * (Number(a.initial||0) - Number(b.initial||0));
+      case 'entries':    return s.dir * (Number(a.entries||0) - Number(b.entries||0));
+      case 'expenses':   return s.dir * (Number(a.expenses||0) - Number(b.expenses||0));
+      case 'saldoCaixa': return s.dir * (Number(a.expected||0) - Number(b.expected||0));
+      case 'repEsperado':{
+        const ea = Math.max(0, Number(a.expected||0)-Number(a.standardFund||0));
+        const eb = Math.max(0, Number(b.expected||0)-Number(b.standardFund||0));
+        return s.dir * (ea - eb);
+      }
+      case 'transfer':   return s.dir * (Number(a.transfer||0) - Number(b.transfer||0));
+      case 'saldoFinal': return s.dir * ((Number(a.expected||0)-Number(a.transfer||0)) - (Number(b.expected||0)-Number(b.transfer||0)));
+      default: return 0;
+    }
+  });
+}
+
+function sortResumo(col, view) {
+  const s = _resumoSort[view];
+  if (s.col === col) s.dir *= -1; else { s.col = col; s.dir = -1; }
+  if (view === 'master') renderFechamentos(); else renderAdminViews();
+}
+
+function _updateResumoSortUI(view) {
+  const s = _resumoSort[view];
+  const p = view === 'master' ? 'rs-m-' : 'rs-a-';
+  ['store','date','responsible','initial','entries','expenses','saldoCaixa','repEsperado','transfer','saldoFinal'].forEach(col => {
+    const el = document.getElementById(p + col);
+    if (el) el.textContent = s.col === col ? (s.dir > 0 ? ' ↑' : ' ↓') : '';
+  });
+}
+
 /* --- HELPER: linha de resumo por fechamento (master + admin) --- */
 function buildResumoRow(c, receipt, includeEmpresa) {
   const transfer    = Number(c.transfer || 0);
   const saldoCaixa  = Number(c.expected || 0);
   const fundoPadrao = Number(c.standardFund || 0);
   const esperado    = Math.max(0, saldoCaixa - fundoPadrao);
+  const saldoFinal  = saldoCaixa - transfer;
   const diferenca   = transfer - esperado;
   let difHtml;
   if (esperado === 0 && transfer === 0) {
@@ -238,6 +280,10 @@ function buildResumoRow(c, receipt, includeEmpresa) {
   const aberturaTag = !c.previousClosingId
     ? `<span class="info-tip-btn" data-tooltip="Saldo inicial definido pelo master ao ativar o sistema — não herdado de fechamento anterior." onmouseenter="showInfoTooltip(this)" onmouseleave="hideInfoTooltip()" style="display:inline-block;font-size:10px;color:#94a3b8;margin-left:4px;cursor:help;font-style:italic">Abertura</span>`
     : '';
+  /* Cor do saldo final vs fundo padrão */
+  const sfDiff = saldoFinal - fundoPadrao;
+  const sfColor = Math.abs(sfDiff) <= 0.01 ? 'var(--success)' : sfDiff > 0 ? 'var(--warning)' : 'var(--danger)';
+  const sfHtml = `<span style="color:${sfColor};font-weight:600">${money(saldoFinal)}</span>`;
   const empresaCol = includeEmpresa ? `<td>${esc(companyName(c.companyId))}</td>` : '';
   return `<tr>
     ${empresaCol}<td>${esc(storeName(c.storeId))}</td>
@@ -245,6 +291,7 @@ function buildResumoRow(c, receipt, includeEmpresa) {
     <td>${esc(c.responsible || '-')}</td>
     <td>${money(c.initial)}${aberturaTag}</td><td>${money(c.entries)}</td><td>${money(c.expenses)}</td>
     <td>${money(saldoCaixa)}</td><td>${money(esperado)}</td><td>${money(transfer)}</td>
+    <td>${sfHtml}</td>
     <td>${difHtml}</td><td style="white-space:nowrap">${recTag}${infoBtn}</td>
   </tr>`;
 }
@@ -292,9 +339,11 @@ function renderFechamentos() {
 
   /* Resumo por Fechamento */
   const allReceipts = getTransferReceipts();
-  html('fechResumoBody', fechResumoFilteredClosings().map((c) =>
+  const fechResumoClos = _sortResumo(fechResumoFilteredClosings(), _resumoSort.master);
+  html('fechResumoBody', fechResumoClos.map((c) =>
     buildResumoRow(c, allReceipts.find((r) => r.closingId === c.id), true)
-  ).join('') || emptyRow(12));
+  ).join('') || emptyRow(13));
+  _updateResumoSortUI('master');
 
   /* Divergências */
   const divRows = divergenceFilteredClosings();
@@ -473,10 +522,11 @@ function renderAdminViews() {
 
   /* Resumo por Fechamento (amov-resumo) */
   setOptions('adminResumoStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
-  const resumoClos = adminResumoFilteredClosings();
+  const resumoClos = _sortResumo(adminResumoFilteredClosings(), _resumoSort.admin);
   html('adminResumoBody', resumoClos.map((c) =>
     buildResumoRow(c, receipts.find((r) => r.closingId === c.id), false)
-  ).join('') || emptyRow(11));
+  ).join('') || emptyRow(12));
+  _updateResumoSortUI('admin');
 
   /* Repasses Recebidos */
   setOptions('adminRepasseStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
@@ -810,5 +860,5 @@ Object.assign(window, {
   renderAll, renderMetrics, renderMasterDashboard, renderCadastros,
   renderUsersByCompany, renderOperacao, renderFechamentos, renderSistema,
   renderAdminViews, renderOperatorViews, renderModuleManager, switchCentral,
-  renderDocumentos,
+  renderDocumentos, sortResumo,
 });
