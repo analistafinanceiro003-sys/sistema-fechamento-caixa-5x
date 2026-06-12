@@ -1896,7 +1896,7 @@ function fillSelects() {
   [
     'storeCompany','opCompany','ruleCompany','implantCompanyFilter','operationCompany',
     'ruleFilterCompany','moduleCompany','reportCompany','masterExtractCompany',
-    'masterMovementCompanyFilter','masterDivergenceCompanyFilter',
+    'masterMovementCompanyFilter','masterDivergenceCompanyFilter','masterResumoCompany',
     'userManageCompany','usersCompanyFilter',
   ].forEach((id) => setOptions(id, companies));
 
@@ -1906,6 +1906,7 @@ function fillSelects() {
   fillMasterExtractStore();
   fillMasterMovementStore();
   fillMasterDivergenceStore();
+  fillMasterResumoStore();
   fillUserManageSelect();
   fillClientReportStore();
 }
@@ -1950,6 +1951,7 @@ function fillClientReportStore() { setOptions('clientReportStore', storeOptionsF
 function fillMasterExtractStore() { setOptions('masterExtractStore', storeOptionsForCompany(val('masterExtractCompany')), 'Todas'); }
 function fillMasterMovementStore() { setOptions('masterMovementStoreFilter', storeOptionsForCompany(val('masterMovementCompanyFilter')), 'Todas'); }
 function fillMasterDivergenceStore() { setOptions('masterDivergenceStoreFilter', storeOptionsForCompany(val('masterDivergenceCompanyFilter')), 'Todas'); }
+function fillMasterResumoStore() { setOptions('masterResumoStore', storeOptionsForCompany(val('masterResumoCompany')), 'Todas'); }
 function fillUserManageSelect() {
   const cid = val('userManageCompany');
   setOptions('userManageSelect', state.users.filter((u) => !cid || u.companyId === cid).map((u) => [u.id, `${u.name} — ${u.login}`]));
@@ -2167,7 +2169,7 @@ Object.assign(window, {
   storeOptionsForCompany, setOptions, fillSelects,
   fillStoreSelect, fillClosingStoreSelect, fillClosingResponsible5X,
   fillReportStore, fillClientReportStore, fillMasterExtractStore,
-  fillMasterMovementStore, fillMasterDivergenceStore,
+  fillMasterMovementStore, fillMasterDivergenceStore, fillMasterResumoStore,
   fillUserManageSelect, fillEditUserStore, toggleUserStore,
   mapStoreDocument, uploadStoreDocument, deleteStoreDocument, clearStoreDocumentsByStore,
   previewDocUpload, handleDocUpload, handleDeleteDoc, handleClearStoreDocuments,

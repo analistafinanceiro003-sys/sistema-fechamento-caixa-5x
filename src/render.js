@@ -191,6 +191,44 @@ function renderOperacao() {
   }).join('') || '<p class="subtle">Nenhuma configuração salva.</p>');
 }
 
+/* --- HELPER: linha de resumo por fechamento (master + admin) --- */
+function buildResumoRow(c, receipt, includeEmpresa) {
+  const transfer    = Number(c.transfer || 0);
+  const saldoCaixa  = Number(c.expected || 0);
+  const fundoPadrao = Number(c.standardFund || 0);
+  const esperado    = Math.max(0, saldoCaixa - fundoPadrao);
+  const diferenca   = transfer - esperado;
+  let difHtml;
+  if (esperado === 0 && transfer === 0) {
+    difHtml = '<span class="subtle">—</span>';
+  } else if (diferenca === 0) {
+    difHtml = '<span style="color:var(--success)">—</span>';
+  } else {
+    const col = diferenca < 0 ? 'var(--danger)' : 'var(--warning)';
+    const sig = diferenca > 0 ? '+' : '';
+    difHtml = `<span style="color:${col};font-weight:600">${sig}${money(diferenca)}</span>`;
+  }
+  let recTag;
+  if (esperado === 0 && transfer === 0) {
+    recTag = `<span style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">Sem repasse — fundo OK</span>`;
+  } else if (transfer === 0) {
+    recTag = `<span style="background:#fef9c3;color:#854d0e;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">⚠ Não repassado</span>`;
+  } else if (receipt) {
+    recTag = `<span style="background:#dcfce7;color:#166534;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">✓ Confirmado</span>`;
+  } else {
+    recTag = `<span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">Pendente confirmação</span>`;
+  }
+  const empresaCol = includeEmpresa ? `<td>${esc(companyName(c.companyId))}</td>` : '';
+  return `<tr>
+    ${empresaCol}<td>${esc(storeName(c.storeId))}</td>
+    <td>${esc(c.date)}<br><span class="subtle">${esc(c.shift || 'Integral')}</span></td>
+    <td>${esc(c.responsible || '-')}</td>
+    <td>${money(c.initial)}</td><td>${money(c.entries)}</td><td>${money(c.expenses)}</td>
+    <td>${money(saldoCaixa)}</td><td>${money(esperado)}</td><td>${money(transfer)}</td>
+    <td>${difHtml}</td><td>${recTag}</td>
+  </tr>`;
+}
+
 /* --- FECHAMENTOS (sub-abas: movimentações, extrato, divergências) --- */
 function renderFechamentos() {
   /* Movimentações */
@@ -229,19 +267,53 @@ function renderFechamentos() {
     </tr>`
   ).join('') || emptyRow(7));
 
+  /* Resumo por Fechamento */
+  const allReceipts = getTransferReceipts();
+  html('fechResumoBody', fechResumoFilteredClosings().map((c) =>
+    buildResumoRow(c, allReceipts.find((r) => r.closingId === c.id), true)
+  ).join('') || emptyRow(12));
+
   /* Divergências */
   const divRows = divergenceFilteredClosings();
   html('divergenceSummary',
     `<div class="kpi-alert"><strong>${divRows.length} divergência(s)</strong>
     <p class="subtle">Valor absoluto total: ${money(divRows.reduce((a,c)=>a+Math.abs(Number(c.diff||0)),0))}</p></div>`
   );
-  html('divergencesBody', divRows.map((c) =>
-    `<tr>
-      <td>${esc(companyName(c.companyId))}</td><td>${esc(storeName(c.storeId))}</td>
-      <td>${esc(c.date)}</td><td style="color:${Number(c.diff)<0?'var(--danger)':'var(--warning)'}">${money(c.diff)}</td>
-      <td>${esc(diffRead(c))}</td><td>${esc(diffAction(c))}</td>
-    </tr>`
-  ).join('') || emptyRow(6));
+  html('divergencesBody', divRows.flatMap((c) => {
+    const tolerance = Number(c.toleranceSnapshot ?? cfg(c.companyId).tolerance ?? 5);
+    const fundDiv   = Number(c.fundDivergence ?? c.diff ?? 0);
+    const openDiv   = Number(c.openingDivergence || 0);
+    const items = [];
+    if (Math.abs(fundDiv) > tolerance) {
+      items.push({
+        tipo: '<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:11px">Fundo padrão</span>',
+        esperado:   Number(c.standardFund || 0),
+        encontrado: Number(c.cashBalance ?? c.finalAfterTransfer ?? 0),
+        diferenca:  fundDiv,
+      });
+    }
+    if (Math.abs(openDiv) > tolerance) {
+      items.push({
+        tipo: '<span style="background:#fef9c3;color:#854d0e;padding:1px 6px;border-radius:3px;font-size:11px">Abertura</span>',
+        esperado:   Number(c.previousFinalAfterTransfer || 0),
+        encontrado: Number(c.initial || 0),
+        diferenca:  openDiv,
+      });
+    }
+    return items.map((item) => {
+      const col = item.diferenca < 0 ? 'var(--danger)' : 'var(--warning)';
+      const sig = item.diferenca > 0 ? '+' : '';
+      return `<tr>
+        <td>${esc(companyName(c.companyId))}</td><td>${esc(storeName(c.storeId))}</td>
+        <td>${esc(c.date)}</td><td>${esc(c.responsible || '-')}</td>
+        <td>${item.tipo}</td>
+        <td>${money(item.esperado)}</td>
+        <td>${money(item.encontrado)}</td>
+        <td style="color:${col};font-weight:600">${sig}${money(item.diferenca)}</td>
+        <td>${tag(c.reviewStatus || 'Pendente de revisão')}</td>
+      </tr>`;
+    });
+  }).join('') || emptyRow(9));
 }
 
 /* --- SISTEMA (sub-abas: config, backup, logs) --- */
@@ -373,6 +445,13 @@ function renderAdminViews() {
      <td style="color:${Number(r.Valor)>=0?'var(--success)':'var(--danger)'}">${money(r.Valor)}</td><td>${esc(r.Responsável)}</td></tr>`
   ).join('') || emptyRow(6));
 
+  /* Resumo por Fechamento (amov-resumo) */
+  setOptions('adminResumoStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
+  const resumoClos = adminResumoFilteredClosings();
+  html('adminResumoBody', resumoClos.map((c) =>
+    buildResumoRow(c, receipts.find((r) => r.closingId === c.id), false)
+  ).join('') || emptyRow(11));
+
   /* Repasses Recebidos */
   setOptions('adminRepasseStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
   const repStore  = val('adminRepasseStoreFilter');
@@ -422,11 +501,27 @@ function renderAdminViews() {
     (!divStatusFilter || (r.reviewStatus || 'Pendente') === divStatusFilter)
   );
   html('adminDivergencesReviewBody', allReviews.map((r) => {
-    const c = state.closings.find((x) => x.id === r.closingId) || {};
-    const isOpen = (r.reviewStatus || 'Pendente') === 'Pendente';
+    const c       = state.closings.find((x) => x.id === r.closingId) || {};
+    const isOpen  = (r.reviewStatus || 'Pendente') === 'Pendente';
+    const isFundo = (r.divergenceType || '').toLowerCase().includes('fundo');
+    const tipoBadge = isFundo
+      ? `<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:11px">Fundo padrão</span>`
+      : `<span style="background:#fef9c3;color:#854d0e;padding:1px 6px;border-radius:3px;font-size:11px">Abertura</span>`;
+    const esperado   = isFundo
+      ? Number(c.standardFund || 0)
+      : Number(c.previousFinalAfterTransfer || 0);
+    const encontrado = isFundo
+      ? Number(c.cashBalance ?? c.finalAfterTransfer ?? 0)
+      : Number(c.initial || 0);
+    const amount  = Number(r.divergenceAmount || 0);
+    const col     = amount < 0 ? 'var(--danger)' : 'var(--warning)';
+    const sig     = amount > 0 ? '+' : '';
     return `<tr>
       <td>${esc(c.date || '-')}</td><td>${esc(storeName(r.storeId))}</td><td>${esc(c.responsible || '-')}</td>
-      <td>${esc(r.divergenceType)}<br><strong>${money(r.divergenceAmount)}</strong></td>
+      <td>${tipoBadge}</td>
+      <td>${money(esperado)}</td>
+      <td>${money(encontrado)}</td>
+      <td style="color:${col};font-weight:600">${sig}${money(amount)}</td>
       <td>${tag(r.reviewStatus || 'Pendente')}</td>
       <td>${isOpen
         ? `<button class="btn btn-sm" onclick="reviewDivergence('${r.id}','Revisada')">Revisada</button>
@@ -435,7 +530,7 @@ function renderAdminViews() {
         : `<span class="subtle">${esc(r.adminComment || '-')}</span>`
       }</td>
     </tr>`;
-  }).join('') || emptyRow(6));
+  }).join('') || emptyRow(9));
 
   /* Últimas movimentações (dashboard) */
   html('adminMovementsBody', rows.slice(-8).reverse().map((c) =>

@@ -100,6 +100,28 @@ function adminMovFilteredClosings() {
   });
 }
 
+function fechResumoFilteredClosings() {
+  const { startISO, endISO, error } = readDateRange('masterResumoStart', 'masterResumoEnd');
+  if (error) { flash(error); return []; }
+  return getScopedClosings({
+    companyId: val('masterResumoCompany'),
+    storeId:   val('masterResumoStore'),
+    startDate: startISO,
+    endDate:   endISO,
+  });
+}
+
+function adminResumoFilteredClosings() {
+  const { startISO, endISO, error } = readDateRange('adminResumoStart', 'adminResumoEnd');
+  if (error) { flash(error); return []; }
+  return getScopedClosings({
+    scope:     'admin',
+    storeId:   val('adminResumoStoreFilter'),
+    startDate: startISO,
+    endDate:   endISO,
+  });
+}
+
 function operatorHistoryClosings() {
   const { startISO, endISO, error } = readDateRange('opHistStart', 'opHistEnd');
   if (error) { flash(error); return []; }

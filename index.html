@@ -414,6 +414,7 @@
       <div class="inner-tabs">
         <button class="inner-tab-btn active" onclick="showSubTab('fechamentos','fech-movimentacoes',this)">Movimentações</button>
         <button class="inner-tab-btn" onclick="showSubTab('fechamentos','fech-extrato',this)">Extrato</button>
+        <button class="inner-tab-btn" onclick="showSubTab('fechamentos','fech-resumo',this)">Resumo por Fechamento</button>
         <button class="inner-tab-btn" onclick="showSubTab('fechamentos','fech-divergencias',this)">Divergências</button>
       </div>
 
@@ -452,6 +453,23 @@
         </div>
       </div>
 
+      <!-- Resumo por Fechamento -->
+      <div class="inner-tab-panel hidden" id="fech-resumo">
+        <div class="card">
+          <h3 class="section-title">Resumo por Fechamento</h3>
+          <div class="filter-bar-5x">
+            <div class="field"><label>Empresa</label><select id="masterResumoCompany" onchange="fillMasterResumoStore();renderFechamentos()"></select></div>
+            <div class="field"><label>Loja</label><select id="masterResumoStore" onchange="renderFechamentos()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Data inicial</label><input id="masterResumoStart" type="date" onchange="renderFechamentos()"/></div>
+            <div class="field"><label>Data final</label><input id="masterResumoEnd" type="date" onchange="renderFechamentos()"/></div>
+          </div>
+          <div class="table-wrap">
+            <table><thead><tr><th>Empresa</th><th>Loja</th><th>Data / Turno</th><th>Responsável</th><th>Saldo Inicial</th><th>Entradas</th><th>Saídas</th><th>Saldo de Caixa</th><th>Repasse Esperado</th><th>Repasse Op.</th><th>Diferença</th><th>Recebimento</th></tr></thead>
+            <tbody id="fechResumoBody"></tbody></table>
+          </div>
+        </div>
+      </div>
+
       <!-- Divergências -->
       <div class="inner-tab-panel hidden" id="fech-divergencias">
         <div class="card">
@@ -464,7 +482,7 @@
           </div>
           <div id="divergenceSummary" style="margin-bottom:16px"></div>
           <div class="table-wrap">
-            <table><thead><tr><th>Empresa</th><th>Loja</th><th>Data</th><th>Divergência</th><th>Leitura 5X</th><th>Ação sugerida</th></tr></thead>
+            <table><thead><tr><th>Empresa</th><th>Loja</th><th>Data</th><th>Responsável</th><th>Tipo</th><th>Esperado</th><th>Encontrado</th><th>Diferença</th><th>Status</th></tr></thead>
             <tbody id="divergencesBody"></tbody></table>
           </div>
         </div>
@@ -704,15 +722,29 @@
     ============================================================ -->
     <section class="page hidden" id="adminMovimentacoes">
       <div class="inner-tabs">
-        <button class="inner-tab-btn active" data-subtab="amov-extrato"      onclick="showSubTab('adminMovimentacoes','amov-extrato',this)">Extrato</button>
-        <button class="inner-tab-btn"        data-subtab="amov-repasses"       onclick="showSubTab('adminMovimentacoes','amov-repasses',this)">Repasses Recebidos</button>
-        <button class="inner-tab-btn"        data-subtab="amov-divergencias"   onclick="showSubTab('adminMovimentacoes','amov-divergencias',this)">Divergências</button>
-        <button class="inner-tab-btn"        data-subtab="amov-retificacoes"   onclick="showSubTab('adminMovimentacoes','amov-retificacoes',this)">Retificações</button>
-        <button class="inner-tab-btn"        data-subtab="amov-documentos"     onclick="showSubTab('adminMovimentacoes','amov-documentos',this)">Documentos</button>
+        <button class="inner-tab-btn active" data-subtab="amov-resumo"        onclick="showSubTab('adminMovimentacoes','amov-resumo',this)">Resumo por Fechamento</button>
+        <button class="inner-tab-btn"        data-subtab="amov-extrato"       onclick="showSubTab('adminMovimentacoes','amov-extrato',this)">Extrato</button>
+        <button class="inner-tab-btn"        data-subtab="amov-repasses"      onclick="showSubTab('adminMovimentacoes','amov-repasses',this)">Repasses Recebidos</button>
+        <button class="inner-tab-btn"        data-subtab="amov-divergencias"  onclick="showSubTab('adminMovimentacoes','amov-divergencias',this)">Divergências</button>
+        <button class="inner-tab-btn"        data-subtab="amov-retificacoes"  onclick="showSubTab('adminMovimentacoes','amov-retificacoes',this)">Retificações</button>
+        <button class="inner-tab-btn"        data-subtab="amov-documentos"    onclick="showSubTab('adminMovimentacoes','amov-documentos',this)">Documentos</button>
+      </div>
+
+      <!-- Resumo por Fechamento (Admin) -->
+      <div class="inner-tab-panel active" id="amov-resumo">
+        <div class="card">
+          <h3 class="section-title">Resumo por Fechamento</h3>
+          <div class="filter-bar-5x" style="margin-bottom:12px">
+            <div class="field"><label>Loja</label><select id="adminResumoStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Data inicial</label><input id="adminResumoStart" type="date" onchange="renderAdminViews()"/></div>
+            <div class="field"><label>Data final</label><input id="adminResumoEnd" type="date" onchange="renderAdminViews()"/></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Loja</th><th>Data / Turno</th><th>Responsável</th><th>Saldo Inicial</th><th>Entradas</th><th>Saídas</th><th>Saldo de Caixa</th><th>Repasse Esperado</th><th>Repasse Op.</th><th>Diferença</th><th>Recebimento</th></tr></thead><tbody id="adminResumoBody"></tbody></table></div>
+        </div>
       </div>
 
       <!-- Extrato com filtros -->
-      <div class="inner-tab-panel active" id="amov-extrato">
+      <div class="inner-tab-panel hidden" id="amov-extrato">
         <div class="card">
           <h3 class="section-title">Movimentações da empresa</h3>
           <div class="filter-bar-5x" style="margin-bottom:12px">
@@ -746,7 +778,7 @@
             <div class="field"><label>Loja</label><select id="adminDivergenceStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
             <div class="field"><label>Status</label><select id="adminDivergenceStatusFilter" onchange="renderAdminViews()"><option value="Pendente">Pendentes</option><option value="">Todas</option><option value="Revisada">Revisadas</option></select></div>
           </div>
-          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Responsável</th><th>Tipo / Valor</th><th>Status revisão</th><th>Ação</th></tr></thead><tbody id="adminDivergencesReviewBody"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Responsável</th><th>Tipo</th><th>Esperado</th><th>Encontrado</th><th>Diferença</th><th>Status</th><th>Ação</th></tr></thead><tbody id="adminDivergencesReviewBody"></tbody></table></div>
         </div>
       </div>
 
