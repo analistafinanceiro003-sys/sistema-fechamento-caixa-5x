@@ -257,13 +257,16 @@ function renderFechamentos() {
     const attHtml = atts.length
       ? atts.map((a) => a.path ? `<button class="btn btn-sm" style="display:block;font-size:11px;margin-bottom:2px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="viewStorageFile('closing-attachments','${esc(a.path)}','${esc(a.name)}')" title="${esc(a.name)}">${esc(a.name)}</button>` : `<span style="font-size:11px">${esc(a.name)}</span>`).join('')
       : '<span class="subtle" style="font-size:11px">—</span>';
+    const movAberturaTag = !c.previousClosingId
+      ? `<br><span class="info-tip-btn" data-tooltip="Saldo inicial definido pelo master ao ativar o sistema — não herdado de fechamento anterior." onmouseenter="showInfoTooltip(this)" onmouseleave="hideInfoTooltip()" style="display:inline-block;font-size:10px;color:#94a3b8;cursor:help;font-style:italic">↑ Abertura manual</span>`
+      : '';
     return `<tr>
       <td>${esc(companyName(c.companyId))}</td><td>${esc(storeName(c.storeId))}</td>
       <td>${esc(c.date)}<br><span class="subtle">${esc(c.shift || 'Integral')}</span></td><td>${esc(c.responsible)}</td>
-      <td>${money(c.initial)}</td><td>${money(c.entries)}</td><td>${money(c.expenses)}</td>
+      <td>${money(c.initial)}${movAberturaTag}</td><td>${money(c.entries)}</td><td>${money(c.expenses)}</td>
       <td>${money(c.expected)}</td><td>${money(c.transfer)}</td>
       <td>${money(c.cashBalance ?? c.finalAfterTransfer)}</td>
-      <td>${money(c.fundDivergence ?? c.diff)}<br><span class="subtle">Abertura: ${money(c.openingDivergence || 0)}</span></td>
+      <td>${money(c.fundDivergence ?? c.diff)}<br><span class="subtle">Div. abertura: ${money(c.openingDivergence || 0)}</span></td>
       <td>${tag(c.type || 'Original')}${c.type === 'Retificado' && c.originalClosingId ? `<button class="btn" style="padding:3px 8px;font-size:11px;margin-left:6px" onclick="openOriginalClosingModal('${esc(c.originalClosingId)}')">Ver original</button>` : ''}</td>
       <td>${tag(c.status)}</td>
       <td style="min-width:100px">${attHtml}</td>
