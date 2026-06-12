@@ -723,10 +723,10 @@
     <section class="page hidden" id="adminMovimentacoes">
       <div class="inner-tabs">
         <button class="inner-tab-btn active" data-subtab="amov-resumo"        onclick="showSubTab('adminMovimentacoes','amov-resumo',this)">Resumo por Fechamento</button>
-        <button class="inner-tab-btn"        data-subtab="amov-extrato"       onclick="showSubTab('adminMovimentacoes','amov-extrato',this)">Extrato</button>
-        <button class="inner-tab-btn"        data-subtab="amov-repasses"      onclick="showSubTab('adminMovimentacoes','amov-repasses',this)">Repasses Recebidos</button>
+        <button class="inner-tab-btn"        data-subtab="amov-repasses"      onclick="showSubTab('adminMovimentacoes','amov-repasses',this)">Repasses</button>
         <button class="inner-tab-btn"        data-subtab="amov-divergencias"  onclick="showSubTab('adminMovimentacoes','amov-divergencias',this)">Divergências</button>
         <button class="inner-tab-btn"        data-subtab="amov-retificacoes"  onclick="showSubTab('adminMovimentacoes','amov-retificacoes',this)">Retificações</button>
+        <button class="inner-tab-btn"        data-subtab="amov-extrato"       onclick="showSubTab('adminMovimentacoes','amov-extrato',this)">Extrato</button>
         <button class="inner-tab-btn"        data-subtab="amov-documentos"    onclick="showSubTab('adminMovimentacoes','amov-documentos',this)">Documentos</button>
       </div>
 
@@ -759,7 +759,7 @@
       <!-- Repasses Recebidos -->
       <div class="inner-tab-panel hidden" id="amov-repasses">
         <div class="card">
-          <h3 class="section-title">Repasses recebidos das lojas</h3>
+          <h3 class="section-title">Repasses das lojas</h3>
           <div class="filter-bar-5x" style="margin-bottom:12px">
             <div class="field"><label>Loja</label><select id="adminRepasseStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
             <div class="field"><label>Data inicial</label><input id="adminRepasseStart" type="date" onchange="renderAdminViews()"/></div>

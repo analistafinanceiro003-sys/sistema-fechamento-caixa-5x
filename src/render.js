@@ -208,24 +208,36 @@ function buildResumoRow(c, receipt, includeEmpresa) {
     const sig = diferenca > 0 ? '+' : '';
     difHtml = `<span style="color:${col};font-weight:600">${sig}${money(diferenca)}</span>`;
   }
-  let recTag;
+  const recMotivos = {
+    semRepasse: 'Repasse e fundo estão equilibrados — nenhum repasse era necessário neste fechamento.',
+    naoRepassado: 'Nenhum repasse foi informado pelo operador, mas havia um valor esperado a ser repassado.',
+    confirmado: 'Repasse recebido e confirmado pela gestão.',
+    pendente: 'Repasse informado pelo operador, aguardando confirmação da gestão.',
+  };
+  let recTag, recMotivo;
   if (esperado === 0 && transfer === 0) {
+    recMotivo = recMotivos.semRepasse;
     recTag = `<span style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">Sem repasse — fundo OK</span>`;
   } else if (transfer === 0) {
+    recMotivo = recMotivos.naoRepassado;
     recTag = `<span style="background:#fef9c3;color:#854d0e;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">⚠ Não repassado</span>`;
   } else if (receipt) {
+    recMotivo = recMotivos.confirmado;
     recTag = `<span style="background:#dcfce7;color:#166534;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">✓ Confirmado</span>`;
   } else {
+    recMotivo = recMotivos.pendente;
     recTag = `<span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">Pendente confirmação</span>`;
   }
+  const infoBtn = `<button onclick="event.stopPropagation();alert('${recMotivo.replace(/'/g, "\\'")}')" title="${recMotivo}" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:12px;padding:0 2px;line-height:1;vertical-align:middle;margin-left:3px">ⓘ</button>`;
+  const regTime = c.createdAt ? new Date(c.createdAt).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
   const empresaCol = includeEmpresa ? `<td>${esc(companyName(c.companyId))}</td>` : '';
   return `<tr>
     ${empresaCol}<td>${esc(storeName(c.storeId))}</td>
-    <td>${esc(c.date)}<br><span class="subtle">${esc(c.shift || 'Integral')}</span></td>
+    <td>${esc(c.date)}<br><span class="subtle">${esc(c.shift || 'Integral')}</span>${regTime ? `<br><span class="subtle" style="font-size:10px;color:#94a3b8">${regTime}</span>` : ''}</td>
     <td>${esc(c.responsible || '-')}</td>
     <td>${money(c.initial)}</td><td>${money(c.entries)}</td><td>${money(c.expenses)}</td>
     <td>${money(saldoCaixa)}</td><td>${money(esperado)}</td><td>${money(transfer)}</td>
-    <td>${difHtml}</td><td>${recTag}</td>
+    <td>${difHtml}</td><td style="white-space:nowrap">${recTag}${infoBtn}</td>
   </tr>`;
 }
 
