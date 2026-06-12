@@ -587,35 +587,49 @@ async function exportManualPDF(onlySection = null) {
     doc.setFont(undefined, 'normal');
     doc.setTextColor(0, 0, 0);
 
+    /* Sanitiza chars Unicode que jsPDF/Helvetica não suporta (fora do Windows-1252) */
+    const _safe = (s) => String(s ?? '')
+      .replace(/−/g, '-').replace(/→/g, '->').replace(/←/g, '<-')
+      .replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/≠/g, '!=')
+      .replace(/×/g, 'x').replace(/÷/g, '/');
+
     let y = 37;
 
     for (const item of content) {
       if (item.type === 'text') {
         doc.setFontSize(9.5);
-        const lines = doc.splitTextToSize(item.content, PW - 28);
+        const lines = doc.splitTextToSize(_safe(item.content), PW - 28);
         doc.text(lines, 14, y);
         y += lines.length * 4.8 + 3;
 
       } else if (item.type === 'label') {
         doc.setFontSize(9);
         doc.setFont(undefined, 'bold');
-        doc.text(item.content, 14, y);
+        doc.text(_safe(item.content), 14, y);
         doc.setFont(undefined, 'normal');
         y += 6;
 
       } else if (item.type === 'formula') {
-        doc.setFillColor(...light);
-        doc.roundedRect(14, y, PW - 28, 8 + item.lines.length * 5, 2, 2, 'F');
-        doc.setFillColor(...teal);
-        doc.roundedRect(14, y, 3, 8 + item.lines.length * 5, 1, 1, 'F');
-        doc.setTextColor(...dark);
+        const availW = PW - 28 - 10;
         doc.setFontSize(9);
+        const titleLines = doc.splitTextToSize(_safe(item.title), availW);
+        /* Pré-calcula todas as linhas de conteúdo já com wrap */
+        const contentLines = item.lines.flatMap(l => doc.splitTextToSize(_safe(l), availW));
+        const fH = 5 + titleLines.length * 5.5 + contentLines.length * 4.8 + 4;
+        doc.setFillColor(...light);
+        doc.roundedRect(14, y, PW - 28, fH, 2, 2, 'F');
+        doc.setFillColor(...teal);
+        doc.roundedRect(14, y, 3, fH, 1, 1, 'F');
+        doc.setTextColor(...dark);
         doc.setFont(undefined, 'bold');
-        doc.text(item.title, 20, y + 6);
+        doc.text(titleLines, 20, y + 6);
         doc.setFont(undefined, 'normal');
-        item.lines.forEach((l, i) => doc.text(l, 20, y + 12 + i * 5));
+        doc.setFontSize(8.5);
+        let lineY = y + 6 + titleLines.length * 5.5 + 0.5;
+        contentLines.forEach(l => { doc.text(l, 20, lineY); lineY += 4.8; });
+        doc.setFontSize(9);
         doc.setTextColor(0, 0, 0);
-        y += 12 + item.lines.length * 5 + 4;
+        y += fH + 4;
 
       } else if (item.type === 'table') {
         doc.autoTable({
@@ -909,57 +923,57 @@ async function exportManualPDF(onlySection = null) {
     },
   ];
 
-  /* ── Renderização ── */
-  if (!onlySection) {
-    /* ── CAPA ── */
+  /* ── Capa reutilizável ── */
+  const _renderCover = (subtitle) => {
     doc.setFillColor(...dark);
     doc.rect(0, 0, PW, PH, 'F');
 
-    /* Barra teal superior com logo centralizado */
+    /* Barra teal superior com logo proporcional */
     doc.setFillColor(...teal);
     doc.rect(0, 0, PW, 62, 'F');
     if (logoB64) {
-      const lx = (PW - logoW) / 2;
-      const ly = (62 - logoH) / 2;
-      doc.addImage(logoB64, 'PNG', lx, ly, logoW, logoH, '', 'FAST');
+      doc.addImage(logoB64, 'PNG', (PW - logoW) / 2, (62 - logoH) / 2, logoW, logoH, '', 'FAST');
     }
 
-    /* Separador escuro */
+    /* Corpo escuro */
     doc.setFillColor(...dark);
     doc.rect(0, 62, PW, PH - 62, 'F');
     doc.setFillColor(...teal);
     doc.rect(0, 62, PW, 2, 'F');
 
-    /* Título principal */
+    /* Título */
     doc.setTextColor(...white);
     doc.setFontSize(28);
     doc.setFont(undefined, 'bold');
-    doc.text('Manual de Implantação', PW / 2, 110, { align: 'center' });
+    doc.text('Manual de Implantação', PW / 2, 108, { align: 'center' });
 
     doc.setFillColor(...teal);
-    doc.rect(40, 116, PW - 80, 1.5, 'F');
+    doc.rect(40, 114, PW - 80, 1.5, 'F');
 
+    /* Subtítulo: nome da seção ou tagline */
     doc.setTextColor(...teal);
-    doc.setFontSize(13);
+    doc.setFontSize(12);
     doc.setFont(undefined, 'normal');
-    doc.text('Conferência Caixa em Dinheiro', PW / 2, 127, { align: 'center' });
+    const subLines = doc.splitTextToSize(subtitle, PW - 60);
+    subLines.forEach((l, i) => doc.text(l, PW / 2, 124 + i * 7, { align: 'center' }));
 
-    /* Grade de seções (8 boxes, 4 por linha) */
-    const sectionLabels = ['Visão Geral', 'Perfis de Acesso', 'Fechamento Diário', 'Transações', 'Implantação', 'Checklist', 'Manual do Gestor', 'Manual do Operador'];
-    const boxW = (PW - 32) / 4, boxH = 20;
-    sectionLabels.forEach((lbl, i) => {
-      const col = i % 4, row = Math.floor(i / 4);
-      const bx = 16 + col * (boxW + 2.5), by = 148 + row * (boxH + 6);
-      doc.setFillColor(22, 34, 48);
-      doc.roundedRect(bx, by, boxW, boxH, 2, 2, 'F');
-      doc.setFillColor(...teal);
-      doc.roundedRect(bx, by, 3, boxH, 1, 1, 'F');
-      doc.setTextColor(...white);
-      doc.setFontSize(8);
-      const lines = doc.splitTextToSize(`${i + 1}. ${lbl}`, boxW - 8);
-      const textY = by + (boxH - lines.length * 4) / 2 + 4;
-      doc.text(lines, bx + 7, textY);
-    });
+    /* Grade de seções apenas no manual completo */
+    if (!onlySection) {
+      const sectionLabels = ['Visão Geral', 'Perfis de Acesso', 'Fechamento Diário', 'Transações', 'Implantação', 'Checklist', 'Manual do Gestor', 'Manual do Operador'];
+      const bW = (PW - 32) / 4, bH = 20;
+      sectionLabels.forEach((lbl, i) => {
+        const col = i % 4, row = Math.floor(i / 4);
+        const bx = 16 + col * (bW + 2.5), by = 152 + row * (bH + 6);
+        doc.setFillColor(22, 34, 48);
+        doc.roundedRect(bx, by, bW, bH, 2, 2, 'F');
+        doc.setFillColor(...teal);
+        doc.roundedRect(bx, by, 3, bH, 1, 1, 'F');
+        doc.setTextColor(...white);
+        doc.setFontSize(8);
+        const ls = doc.splitTextToSize(`${i + 1}. ${lbl}`, bW - 8);
+        doc.text(ls, bx + 7, by + (bH - ls.length * 4) / 2 + 4);
+      });
+    }
 
     /* Rodapé da capa */
     doc.setFillColor(8, 14, 22);
@@ -977,17 +991,22 @@ async function exportManualPDF(onlySection = null) {
     doc.setFontSize(8.5);
     doc.setFont(undefined, 'normal');
     doc.text(`Emitido em ${todayStr}`, PW / 2, 286, { align: 'center' });
+  };
 
-    /* Seções nas páginas seguintes */
+  /* ── Renderização ── */
+  const nameMap = { overview: 'visao_geral', perfis: 'perfis', fechamento: 'fechamento', transacoes: 'transacoes', implantacao: 'implantacao', checklist: 'checklist', gestor: 'manual_gestor', operador: 'manual_operador' };
+
+  if (!onlySection) {
+    _renderCover('Conferência Caixa em Dinheiro');
     allSections.forEach(s => { doc.addPage(); _section(s.title, s.content); });
     doc.save('manual_implantacao_gestao5x.pdf');
-
   } else {
-    /* Exportação de aba única — seção direto na página 1 */
     const target = allSections.find(s => s.key === onlySection);
     if (!target) { alert('Seção não encontrada.'); return; }
+    /* Capa com o título da seção + seção na página seguinte */
+    _renderCover(target.title);
+    doc.addPage();
     _section(target.title, target.content);
-    const nameMap = { overview: 'visao_geral', perfis: 'perfis', fechamento: 'fechamento', transacoes: 'transacoes', implantacao: 'implantacao', checklist: 'checklist', gestor: 'manual_gestor', operador: 'manual_operador' };
     doc.save(`manual_${nameMap[onlySection] || onlySection}_gestao5x.pdf`);
   }
 }
