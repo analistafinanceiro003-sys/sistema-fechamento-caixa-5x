@@ -177,7 +177,7 @@ function normalizeState() {
   state.stores.forEach((s) => { s.standardFund = Number(s.standardFund || 0); });
   state.companies.forEach((c) => {
     if (!state.operationConfigs[c.id]) {
-      state.operationConfigs[c.id] = { tolerance: 5, criticalDivergence: 20, mode: 'Diário', receiver: '', allowed: '', message: '' };
+      state.operationConfigs[c.id] = { tolerance: 5, criticalDivergence: 20, transferTolerance: 0, mode: 'Diário', receiver: '', allowed: '', message: '' };
     }
     if (!state.modules[c.id]) state.modules[c.id] = {};
     state.modules[c.id].admin    = mergeModuleConfig('admin',    state.modules[c.id].admin);
@@ -240,6 +240,7 @@ function mapOperationConfig(row) {
   return {
     tolerance: Number(row.tolerance || 5),
     criticalDivergence: Number(row.critical_divergence || 20),
+    transferTolerance: Number(row.transfer_tolerance || 0),
     mode: row.operation_mode || 'Diário',
     receiver: row.transfer_receiver || '',
     allowed: row.allowed_expenses || '',
@@ -780,6 +781,7 @@ async function saveOperationConfigToSupabase(companyId, config) {
     company_id: companyId,
     tolerance: Number(config.tolerance || 5),
     critical_divergence: Number(config.criticalDivergence || 20),
+    transfer_tolerance: Number(config.transferTolerance || 0),
     operation_mode: config.mode || 'Diário',
     transfer_receiver: config.receiver || '',
     allowed_expenses: config.allowed || '',
@@ -1085,7 +1087,7 @@ async function saveClientSetup() {
       segment: val('setupSegment'), plan: val('setupPlan'),
       status: val('setupStatus') || 'Implantação', notes: val('setupNotes'),
     };
-    const operationConfig = { tolerance: 5, criticalDivergence: 20, mode: 'Diário', receiver: '', allowed: '', message: '' };
+    const operationConfig = { tolerance: 5, criticalDivergence: 20, transferTolerance: 0, mode: 'Diário', receiver: '', allowed: '', message: '' };
     const moduleConfig = {
       admin: { ...defaultModuleConfig('admin'), adminClosing: false },
       operator: defaultModuleConfig('operator'),
@@ -1159,7 +1161,7 @@ async function saveClientSetup() {
       role: 'operator', status: 'Ativo',
     });
   }
-  state.operationConfigs[companyId] = { tolerance: 5, criticalDivergence: 20, mode: 'Diário', receiver: '', allowed: '', message: '' };
+  state.operationConfigs[companyId] = { tolerance: 5, criticalDivergence: 20, transferTolerance: 0, mode: 'Diário', receiver: '', allowed: '', message: '' };
   state.modules[companyId] = {
     admin: { ...defaultModuleConfig('admin'), adminClosing: false },
     operator: defaultModuleConfig('operator'),
@@ -1621,6 +1623,7 @@ async function saveOperationConfig() {
   if (!cid) return alert('Selecione a empresa.');
   const config = {
     tolerance: Number(val('operationTolerance')) || 5,
+    transferTolerance: Number(val('operationTransferTolerance')) || 0,
     mode: val('operationMode') || 'Diário',
     receiver: val('operationReceiver'),
     allowed: val('operationAllowed'),

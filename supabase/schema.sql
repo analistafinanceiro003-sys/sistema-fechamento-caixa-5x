@@ -207,6 +207,7 @@ create table if not exists public.operation_configs (
   company_id           uuid not null references public.companies(id) on delete cascade unique,
   tolerance            numeric not null default 5,
   critical_divergence  numeric not null default 20,
+  transfer_tolerance   numeric not null default 0,
   operation_mode       text not null default 'Diário',
   transfer_receiver    text,
   allowed_expenses     text,

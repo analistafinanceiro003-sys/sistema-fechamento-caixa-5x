@@ -244,6 +244,14 @@ create policy "store_docs_storage_op"
 
 
 -- ============================================================
+-- TOLERÂNCIA DE REPASSE — 2026-06-12
+-- Nova coluna para configurar valor mínimo de repasse antes de gerar alerta.
+-- ============================================================
+alter table public.operation_configs
+  add column if not exists transfer_tolerance numeric not null default 0;
+
+
+-- ============================================================
 -- FIM DA MIGRAÇÃO
 -- Após executar com sucesso, o sistema estará pronto para o lançamento.
 -- ============================================================

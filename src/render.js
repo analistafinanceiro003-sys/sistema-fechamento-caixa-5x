@@ -186,7 +186,7 @@ function renderOperacao() {
     const deadline = Number(c.rectificationDeadlineDays ?? 0);
     return `<div class="kpi-alert" style="margin-bottom:10px">
       <strong>${esc(companyName(cid))}</strong>
-      <p class="subtle">Modo: ${esc(c.mode)} | Tolerância: ${money(c.tolerance)} | Repasse: ${esc(c.receiver || '-')} | Retificação: ${deadline === 0 ? 'mesmo mês' : deadline + ' dias'}</p>
+      <p class="subtle">Modo: ${esc(c.mode)} | Tolerância div.: ${money(c.tolerance)} | Tolerância repasse: ${money(c.transferTolerance || 0)} | Repasse: ${esc(c.receiver || '-')} | Retificação: ${deadline === 0 ? 'mesmo mês' : deadline + ' dias'}</p>
     </div>`;
   }).join('') || '<p class="subtle">Nenhuma configuração salva.</p>');
 }
@@ -208,8 +208,10 @@ function buildResumoRow(c, receipt, includeEmpresa) {
     const sig = diferenca > 0 ? '+' : '';
     difHtml = `<span style="color:${col};font-weight:600">${sig}${money(diferenca)}</span>`;
   }
+  const transferTolerance = Number(cfg(c.companyId)?.transferTolerance || 0);
   const recMotivos = {
     semRepasse: 'Repasse e fundo estão equilibrados — nenhum repasse era necessário neste fechamento.',
+    tolerancia: `Valor a repassar (${money(esperado)}) está dentro da tolerância de repasse configurada (${money(transferTolerance)}). Não gera alerta.`,
     naoRepassado: 'O saldo de caixa superou o fundo padrão da loja, mas nenhum repasse foi informado. O valor esperado já desconta o fundo mínimo — se o saldo não ultrapassar o fundo, nenhum aviso é gerado.',
     confirmado: 'Repasse recebido e confirmado pela gestão.',
     pendente: 'Repasse informado pelo operador, aguardando confirmação da gestão.',
@@ -218,6 +220,9 @@ function buildResumoRow(c, receipt, includeEmpresa) {
   if (esperado === 0 && transfer === 0) {
     recMotivo = recMotivos.semRepasse;
     recTag = `<span style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">Sem repasse — fundo OK</span>`;
+  } else if (transfer === 0 && transferTolerance > 0 && esperado <= transferTolerance) {
+    recMotivo = recMotivos.tolerancia;
+    recTag = `<span style="background:#f1f5f9;color:#64748b;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">Dentro da tolerância</span>`;
   } else if (transfer === 0) {
     recMotivo = recMotivos.naoRepassado;
     recTag = `<span style="background:#fef9c3;color:#854d0e;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">⚠ Não repassado</span>`;
