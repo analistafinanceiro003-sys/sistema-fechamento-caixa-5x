@@ -233,7 +233,7 @@ function buildResumoRow(c, receipt, includeEmpresa) {
     recMotivo = recMotivos.pendente;
     recTag = `<span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">Pendente confirmação</span>`;
   }
-  const infoBtn = `<button onclick="event.stopPropagation();alert('${recMotivo.replace(/'/g, "\\'")}')" title="${recMotivo}" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:12px;padding:0 2px;line-height:1;vertical-align:middle;margin-left:3px">ⓘ</button>`;
+  const infoBtn = `<button class="info-tip-btn" data-tooltip="${esc(recMotivo)}" onmouseenter="showInfoTooltip(this)" onmouseleave="hideInfoTooltip()">ⓘ</button>`;
   const regTime = c.createdAt ? new Date(c.createdAt).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
   const empresaCol = includeEmpresa ? `<td>${esc(companyName(c.companyId))}</td>` : '';
   return `<tr>

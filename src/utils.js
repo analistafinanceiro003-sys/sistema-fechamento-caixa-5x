@@ -218,6 +218,27 @@ function showSubTab(pageId, tabId, btn) {
   btn?.classList.add('active');
 }
 
+/* Tooltip flutuante — usado pelo botão ⓘ nas tabelas */
+function showInfoTooltip(el) {
+  const tip = document.getElementById('infoTooltip');
+  if (!tip) return;
+  tip.textContent = el.dataset.tooltip || '';
+  tip.style.display = 'block';
+  const rect = el.getBoundingClientRect();
+  const tipRect = tip.getBoundingClientRect();
+  let left = rect.left + rect.width / 2 - tipRect.width / 2;
+  if (left < 8) left = 8;
+  if (left + tipRect.width > window.innerWidth - 8) left = window.innerWidth - tipRect.width - 8;
+  let top = rect.top - tipRect.height - 10;
+  if (top < 8) top = rect.bottom + 10;
+  tip.style.left = left + 'px';
+  tip.style.top  = top + 'px';
+}
+function hideInfoTooltip() {
+  const tip = document.getElementById('infoTooltip');
+  if (tip) tip.style.display = 'none';
+}
+
 /* Exposição global */
 Object.assign(window, {
   $, all, val, setVal, html, text, clear, num,
@@ -228,4 +249,5 @@ Object.assign(window, {
   validateDateRange, readDateRange,
   uid, esc, emptyRow, tag, flash, toast, downloadFile,
   csvCell, buildCSV, exportGenericCSV, showSubTab,
+  showInfoTooltip, hideInfoTooltip,
 });
