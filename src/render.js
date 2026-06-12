@@ -210,7 +210,7 @@ function buildResumoRow(c, receipt, includeEmpresa) {
   }
   const recMotivos = {
     semRepasse: 'Repasse e fundo estão equilibrados — nenhum repasse era necessário neste fechamento.',
-    naoRepassado: 'Nenhum repasse foi informado pelo operador, mas havia um valor esperado a ser repassado.',
+    naoRepassado: 'O saldo de caixa superou o fundo padrão da loja, mas nenhum repasse foi informado. O valor esperado já desconta o fundo mínimo — se o saldo não ultrapassar o fundo, nenhum aviso é gerado.',
     confirmado: 'Repasse recebido e confirmado pela gestão.',
     pendente: 'Repasse informado pelo operador, aguardando confirmação da gestão.',
   };
