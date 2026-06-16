@@ -451,7 +451,15 @@
             <div class="field"><label>Data final</label><input id="masterExtractEnd" type="date" onchange="renderFechamentos()"/></div>
           </div>
           <div class="table-wrap">
-            <table><thead><tr><th>Empresa</th><th>Data</th><th>Loja</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Responsável</th></tr></thead>
+            <table><thead><tr>
+              <th class="th-sort" onclick="sortExtrato('empresa','master')">Empresa<span id="ex-m-empresa"></span></th>
+              <th class="th-sort" onclick="sortExtrato('date','master')">Data<span id="ex-m-date"></span></th>
+              <th class="th-sort" onclick="sortExtrato('store','master')">Loja<span id="ex-m-store"></span></th>
+              <th class="th-sort" onclick="sortExtrato('type','master')">Tipo<span id="ex-m-type"></span></th>
+              <th class="th-sort" onclick="sortExtrato('desc','master')">Descrição<span id="ex-m-desc"></span></th>
+              <th class="th-sort" onclick="sortExtrato('value','master')">Valor<span id="ex-m-value"></span></th>
+              <th class="th-sort" onclick="sortExtrato('resp','master')">Responsável<span id="ex-m-resp"></span></th>
+            </tr></thead>
             <tbody id="masterMovementsExtractBody"></tbody></table>
           </div>
         </div>
@@ -461,6 +469,7 @@
       <div class="inner-tab-panel hidden" id="fech-resumo">
         <div class="card">
           <h3 class="section-title">Resumo por Fechamento</h3>
+          <div id="resumoSaldoDashboard" style="margin-bottom:14px"></div>
           <div class="filter-bar-5x">
             <div class="field"><label>Empresa</label><select id="masterResumoCompany" onchange="fillMasterResumoStore();renderFechamentos()"></select></div>
             <div class="field"><label>Loja</label><select id="masterResumoStore" onchange="renderFechamentos()"><option value="">Todas</option></select></div>
@@ -751,6 +760,7 @@
       <div class="inner-tab-panel active" id="amov-resumo">
         <div class="card">
           <h3 class="section-title">Resumo por Fechamento</h3>
+          <div id="adminResumoSaldoDashboard" style="margin-bottom:14px"></div>
           <div class="filter-bar-5x" style="margin-bottom:12px">
             <div class="field"><label>Loja</label><select id="adminResumoStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
             <div class="field"><label>Data inicial</label><input id="adminResumoStart" type="date" onchange="renderAdminViews()"/></div>
@@ -781,7 +791,14 @@
             <div class="field"><label>Data inicial</label><input id="adminExtratStart" type="date" onchange="renderAdminViews()"/></div>
             <div class="field"><label>Data final</label><input id="adminExtratEnd" type="date" onchange="renderAdminViews()"/></div>
           </div>
-          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Responsável</th></tr></thead><tbody id="adminMovementsDetailBody2"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr>
+            <th class="th-sort" onclick="sortExtrato('date','admin')">Data<span id="ex-a-date"></span></th>
+            <th class="th-sort" onclick="sortExtrato('store','admin')">Loja<span id="ex-a-store"></span></th>
+            <th class="th-sort" onclick="sortExtrato('type','admin')">Tipo<span id="ex-a-type"></span></th>
+            <th class="th-sort" onclick="sortExtrato('desc','admin')">Descrição<span id="ex-a-desc"></span></th>
+            <th class="th-sort" onclick="sortExtrato('value','admin')">Valor<span id="ex-a-value"></span></th>
+            <th class="th-sort" onclick="sortExtrato('resp','admin')">Responsável<span id="ex-a-resp"></span></th>
+          </tr></thead><tbody id="adminMovementsDetailBody2"></tbody></table></div>
         </div>
       </div>
 
@@ -789,6 +806,7 @@
       <div class="inner-tab-panel hidden" id="amov-repasses">
         <div class="card">
           <h3 class="section-title">Repasses das lojas</h3>
+          <div id="adminRepassesDashboard" style="margin-bottom:14px"></div>
           <div class="filter-bar-5x" style="margin-bottom:12px">
             <div class="field"><label>Loja</label><select id="adminRepasseStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
             <div class="field"><label>Data inicial</label><input id="adminRepasseStart" type="date" onchange="renderAdminViews()"/></div>

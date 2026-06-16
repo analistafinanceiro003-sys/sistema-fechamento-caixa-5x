@@ -160,6 +160,30 @@ async function confirmTransferReceipt(closingId) {
   renderAll();
 }
 
+async function cancelTransferReceipt(closingId) {
+  const receipt = (state.transferReceipts || []).find((r) => r.closingId === closingId);
+  if (!receipt) return;
+  const c = (state.closings || []).find((x) => x.id === closingId);
+  const lojaStr  = storeName(receipt.storeId);
+  const valorStr = money(receipt.amount);
+  if (!confirm(`Desconfirmar o repasse de ${valorStr} da loja "${lojaStr}"?\n\nO status voltará para "Pendente confirmação".`)) return;
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      const { error } = await sb.from('transfer_receipts').delete().eq('id', receipt.id);
+      if (error) throw error;
+    } catch (e) {
+      return alert(`Erro ao desconfirmar repasse: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase obrigatório em produção para desconfirmar repasse.');
+  }
+  state.transferReceipts = (state.transferReceipts || []).filter((r) => r.id !== receipt.id);
+  addAudit('Repasse desconfirmado (Master)', `${lojaStr} — ${valorStr}${c ? ' em ' + c.date : ''}`);
+  save();
+  renderAll();
+  toast('Repasse desconfirmado. Status voltou para pendente.');
+}
+
 function normalizeState() {
   state = (state && typeof state === 'object') ? state : defaultState();
   ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit','transferReceipts','storeDocuments','rectificationRequests'].forEach((k) => {
@@ -2178,6 +2202,7 @@ Object.assign(window, {
   previewDocUpload, handleDocUpload, handleDeleteDoc, handleClearStoreDocuments,
   viewStorageFile, openFileViewer, closeFileViewer, reloadStoreDocuments,
   saveRectificationRequest,
+  confirmTransferReceipt, cancelTransferReceipt,
 });
 
 Object.defineProperty(window, 'state', {

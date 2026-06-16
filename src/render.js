@@ -232,6 +232,40 @@ function _updateResumoSortUI(view) {
   });
 }
 
+/* --- Ordenação do Extrato --- */
+const _extratSort = { master: { col: 'date', dir: -1 }, admin: { col: 'date', dir: -1 } };
+
+function _sortExtrat(rows, s) {
+  if (!s.col) return rows;
+  return [...rows].sort((a, b) => {
+    switch (s.col) {
+      case 'empresa': return s.dir * (a.Empresa||'').localeCompare(b.Empresa||'', 'pt-BR');
+      case 'date':    return s.dir * (a.Data||'').localeCompare(b.Data||'');
+      case 'store':   return s.dir * (a.Loja||'').localeCompare(b.Loja||'', 'pt-BR');
+      case 'type':    return s.dir * (a.Tipo||'').localeCompare(b.Tipo||'', 'pt-BR');
+      case 'desc':    return s.dir * (a.Descrição||'').localeCompare(b.Descrição||'', 'pt-BR');
+      case 'value':   return s.dir * (Number(a.Valor||0) - Number(b.Valor||0));
+      case 'resp':    return s.dir * (a.Responsável||'').localeCompare(b.Responsável||'', 'pt-BR');
+      default: return 0;
+    }
+  });
+}
+
+function sortExtrato(col, view) {
+  const s = _extratSort[view];
+  if (s.col === col) s.dir *= -1; else { s.col = col; s.dir = -1; }
+  if (view === 'master') renderFechamentos(); else renderAdminViews();
+}
+
+function _updateExtratSortUI(view) {
+  const s = _extratSort[view];
+  const p = view === 'master' ? 'ex-m-' : 'ex-a-';
+  ['empresa','date','store','type','desc','value','resp'].forEach(col => {
+    const el = document.getElementById(p + col);
+    if (el) el.textContent = s.col === col ? (s.dir > 0 ? ' ↑' : ' ↓') : '';
+  });
+}
+
 /* --- HELPER: linha de resumo por fechamento (master + admin) --- */
 function buildResumoRow(c, receipt, includeEmpresa) {
   const transfer    = Number(c.transfer || 0);
@@ -270,7 +304,10 @@ function buildResumoRow(c, receipt, includeEmpresa) {
     recTag = `<span style="background:#fef9c3;color:#854d0e;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">⚠ Não repassado</span>`;
   } else if (receipt) {
     recMotivo = recMotivos.confirmado;
-    recTag = `<span style="background:#dcfce7;color:#166534;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">✓ Confirmado</span>`;
+    recTag = `<span style="background:#dcfce7;color:#166534;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">✓ Confirmado</span>`
+      + (role === 'master'
+        ? ` <button class="btn btn-danger btn-sm" style="font-size:10px;padding:2px 6px;margin-left:4px" onclick="cancelTransferReceipt('${esc(c.id)}')" title="Desfazer confirmação deste repasse">Desconfirmar</button>`
+        : '');
   } else {
     recMotivo = recMotivos.pendente;
     recTag = `<span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">Pendente confirmação</span>`;
@@ -328,6 +365,7 @@ function renderFechamentos() {
   const type = val('masterExtractType');
   let extractRows = allMovementRows(extractFilteredClosings());
   if (type) extractRows = extractRows.filter((r) => r.Tipo === type);
+  extractRows = _sortExtrat(extractRows, _extratSort.master);
   html('masterMovementsExtractBody', extractRows.map((r) =>
     `<tr>
       <td>${esc(r.Empresa)}</td><td>${esc(r.Data)}</td><td>${esc(r.Loja)}</td>
@@ -336,10 +374,33 @@ function renderFechamentos() {
       <td>${esc(r.Responsável)}</td>
     </tr>`
   ).join('') || emptyRow(7));
+  _updateExtratSortUI('master');
 
   /* Resumo por Fechamento */
   const allReceipts = getTransferReceipts();
-  const fechResumoClos = _sortResumo(fechResumoFilteredClosings(), _resumoSort.master);
+  const fechResumoClos_filtered = fechResumoFilteredClosings();
+  /* Dashboard: saldo atual de cada loja (último fechamento por loja no período) */
+  const _mResumoStoreIds = [...new Set(fechResumoClos_filtered.map((c) => c.storeId))];
+  html('resumoSaldoDashboard', _mResumoStoreIds.length ? `
+    <div class="exec-stats" style="flex-wrap:wrap;gap:10px;margin-bottom:4px">
+      ${_mResumoStoreIds.map((sid) => {
+        const s = state.stores.find((st) => st.id === sid);
+        if (!s) return '';
+        const cls = fechResumoClos_filtered.filter((c) => c.storeId === sid)
+          .sort((a, b) => (a.date+(a.shift||'')).localeCompare(b.date+(b.shift||'')));
+        const last = cls[cls.length - 1];
+        const saldoAtual = last ? Number(last.expected||0) - Number(last.transfer||0) : null;
+        const sfDiff = saldoAtual !== null ? saldoAtual - Number(s.standardFund||0) : 0;
+        const sfColor = saldoAtual === null ? '' : Math.abs(sfDiff) <= 0.01 ? 'var(--success)' : sfDiff > 0 ? 'var(--warning)' : 'var(--danger)';
+        return `<div class="exec-stat" style="min-width:160px">
+          <span style="font-size:12px">${esc(companyName(s.companyId))} / ${esc(s.name)}</span>
+          <strong style="color:${sfColor}">${saldoAtual !== null ? money(saldoAtual) : '—'}</strong>
+          <span class="subtle" style="font-size:11px">${last ? esc(last.date) : 'Sem fechamentos'}</span>
+        </div>`;
+      }).join('')}
+    </div>` : ''
+  );
+  const fechResumoClos = _sortResumo(fechResumoClos_filtered, _resumoSort.master);
   html('fechResumoBody', fechResumoClos.map((c) =>
     buildResumoRow(c, allReceipts.find((r) => r.closingId === c.id), true)
   ).join('') || emptyRow(13));
@@ -515,14 +576,39 @@ function renderAdminViews() {
     (!extratStart || parseBR(c.date) >= extratStart) &&
     (!extratEnd   || parseBR(c.date) <= extratEnd)
   );
-  html('adminMovementsDetailBody2', allMovementRows(adminMovRows).map((r) =>
+  let adminExtratRows = allMovementRows(adminMovRows);
+  adminExtratRows = _sortExtrat(adminExtratRows, _extratSort.admin);
+  html('adminMovementsDetailBody2', adminExtratRows.map((r) =>
     `<tr><td>${esc(r.Data)}</td><td>${esc(r.Loja)}</td><td>${esc(r.Tipo)}</td><td>${esc(r.Descrição)}</td>
      <td style="color:${Number(r.Valor)>=0?'var(--success)':'var(--danger)'}">${money(r.Valor)}</td><td>${esc(r.Responsável)}</td></tr>`
   ).join('') || emptyRow(6));
+  _updateExtratSortUI('admin');
 
   /* Resumo por Fechamento (amov-resumo) */
   setOptions('adminResumoStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
-  const resumoClos = _sortResumo(adminResumoFilteredClosings(), _resumoSort.admin);
+  const adminResumoClos_filtered = adminResumoFilteredClosings();
+  /* Dashboard: saldo atual de cada loja */
+  const _adResumoStoreIds = [...new Set(adminResumoClos_filtered.map((c) => c.storeId))];
+  html('adminResumoSaldoDashboard', _adResumoStoreIds.length ? `
+    <div class="exec-stats" style="flex-wrap:wrap;gap:10px;margin-bottom:4px">
+      ${_adResumoStoreIds.map((sid) => {
+        const s = state.stores.find((st) => st.id === sid);
+        if (!s) return '';
+        const cls = adminResumoClos_filtered.filter((c) => c.storeId === sid)
+          .sort((a, b) => (a.date+(a.shift||'')).localeCompare(b.date+(b.shift||'')));
+        const last = cls[cls.length - 1];
+        const saldoAtual = last ? Number(last.expected||0) - Number(last.transfer||0) : null;
+        const sfDiff = saldoAtual !== null ? saldoAtual - Number(s.standardFund||0) : 0;
+        const sfColor = saldoAtual === null ? '' : Math.abs(sfDiff) <= 0.01 ? 'var(--success)' : sfDiff > 0 ? 'var(--warning)' : 'var(--danger)';
+        return `<div class="exec-stat" style="min-width:160px">
+          <span style="font-size:12px">${esc(s.name)}</span>
+          <strong style="color:${sfColor}">${saldoAtual !== null ? money(saldoAtual) : '—'}</strong>
+          <span class="subtle" style="font-size:11px">${last ? esc(last.date) : 'Sem fechamentos'}</span>
+        </div>`;
+      }).join('')}
+    </div>` : ''
+  );
+  const resumoClos = _sortResumo(adminResumoClos_filtered, _resumoSort.admin);
   html('adminResumoBody', resumoClos.map((c) =>
     buildResumoRow(c, receipts.find((r) => r.closingId === c.id), false)
   ).join('') || emptyRow(12));
@@ -539,6 +625,25 @@ function renderAdminViews() {
     (!repStore || c.storeId === repStore) &&
     (!repStart || parseBR(c.date) >= repStart) &&
     (!repEnd   || parseBR(c.date) <= repEnd)
+  );
+  /* Dashboard de repasses */
+  const _repConfirmados = repasseRows.filter((c) => receipts.find((r) => r.closingId === c.id));
+  const _repPendentes   = repasseRows.filter((c) => !receipts.find((r) => r.closingId === c.id));
+  const _totalConf  = _repConfirmados.reduce((a, c) => a + Number(c.transfer||0), 0);
+  const _totalPend  = _repPendentes.reduce((a, c) => a + Number(c.transfer||0), 0);
+  html('adminRepassesDashboard', `
+    <div class="exec-stats">
+      <div class="exec-stat">
+        <span>Total Repassado</span>
+        <strong style="color:var(--success)">${money(_totalConf)}</strong>
+        <span class="subtle" style="font-size:11px">${_repConfirmados.length} confirmado(s)</span>
+      </div>
+      <div class="exec-stat">
+        <span>Aguardando Confirmação</span>
+        <strong style="color:var(--warning)">${money(_totalPend)}</strong>
+        <span class="subtle" style="font-size:11px">${_repPendentes.length} pendente(s)</span>
+      </div>
+    </div>`
   );
   html('adminRepassesBody', repasseRows.map((c) => {
     const receipt = receipts.find((r) => r.closingId === c.id);
@@ -791,20 +896,47 @@ function switchCentral(tabId, btn) {
 ================================================================ */
 function renderDocumentos() {
   const docs = state.storeDocuments || [];
-  const docItem = (d) => `
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #f1f5f9;font-size:13px">
-      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-        ${esc(d.name)}${d.description ? ` <span class="subtle">— ${esc(d.description)}</span>` : ''}
-      </span>
-      <span class="subtle" style="white-space:nowrap">${Math.round((d.size||0)/1024)} KB</span>
-      <span class="subtle" style="white-space:nowrap">${esc((d.createdAt||'').slice(0,10))}</span>
-      ${d.path ? `<button class="btn btn-sm" style="white-space:nowrap" onclick="viewStorageFile('store-documents','${esc(d.path)}','${esc(d.name)}')">Ver</button>` : ''}
-      <button class="btn btn-danger btn-sm" onclick="handleDeleteDoc('${d.id}','${esc(d.path||'')}')">Remover</button>
-    </div>`;
+
+  const docItem = (d) => {
+    const bucket   = d._isClosingAtt ? 'closing-attachments' : 'store-documents';
+    const viewBtn  = d.path
+      ? `<button class="btn btn-sm" style="white-space:nowrap" onclick="viewStorageFile('${bucket}','${esc(d.path)}','${esc(d.name)}')">Ver</button>`
+      : '';
+    const removeBtn = d._isClosingAtt
+      ? ''
+      : `<button class="btn btn-danger btn-sm" onclick="handleDeleteDoc('${d.id}','${esc(d.path||'')}')">Remover</button>`;
+    const badge = d._isClosingAtt
+      ? `<span style="font-size:10px;padding:1px 5px;background:#e0f2fe;color:#0369a1;border-radius:3px;margin-left:5px;white-space:nowrap">Fechamento</span>`
+      : '';
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #f1f5f9;font-size:13px">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${esc(d.name)}${badge}${d.description ? ` <span class="subtle">— ${esc(d.description)}</span>` : ''}
+        </span>
+        <span class="subtle" style="white-space:nowrap">${d.size ? Math.round(d.size/1024) + ' KB' : ''}</span>
+        <span class="subtle" style="white-space:nowrap">${esc((d.createdAt||'').slice(0,10))}</span>
+        ${viewBtn}${removeBtn}
+      </div>`;
+  };
+
+  /* Coleta anexos de fechamentos de uma loja, formatados como doc */
+  const closingAttsByStore = (storeId) => (state.closings || [])
+    .filter((c) => c.storeId === storeId)
+    .flatMap((c) => (c.attachments || []).map((a) => ({
+      id:          a.id || a.path || '',
+      name:        a.name || 'Anexo',
+      path:        a.path || '',
+      size:        0,
+      description: `Fechamento ${c.date}${c.shift ? ' — ' + c.shift : ''}`,
+      createdAt:   a.createdAt || c.createdAt || '',
+      _isClosingAtt: true,
+    })));
 
   if (role === 'operator') {
-    const myDocs = docs.filter((d) => d.storeId === currentUser?.storeId)
-      .sort((a, b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    const myDocs = [
+      ...docs.filter((d) => d.storeId === currentUser?.storeId),
+      ...closingAttsByStore(currentUser?.storeId),
+    ].sort((a, b) => (b.createdAt||'').localeCompare(a.createdAt||''));
     html('operatorDocList', myDocs.length
       ? myDocs.map(docItem).join('')
       : '<p class="subtle" style="padding:16px">Nenhum documento enviado ainda.</p>'
@@ -813,8 +945,11 @@ function renderDocumentos() {
   }
 
   const storeFolder = (s) => {
-    const storeDocs = docs.filter((d) => d.storeId === s.id)
-      .sort((a, b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    const storeDocs = [
+      ...docs.filter((d) => d.storeId === s.id),
+      ...closingAttsByStore(s.id),
+    ].sort((a, b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    const uploadedCount = docs.filter((d) => d.storeId === s.id).length;
     const header = role === 'master'
       ? `${esc(companyName(s.companyId))} / ${esc(s.name)}`
       : esc(s.name);
@@ -822,7 +957,7 @@ function renderDocumentos() {
       <div class="rule-company-card" style="margin-bottom:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
           <h4 style="margin:0">${header} <span class="subtle">(${storeDocs.length} arquivo${storeDocs.length!==1?'s':''})</span></h4>
-          ${storeDocs.length ? `<button class="btn btn-danger btn-sm" onclick="handleClearStoreDocuments('${s.id}','${esc(s.name)}')">Limpar pasta</button>` : ''}
+          ${uploadedCount ? `<button class="btn btn-danger btn-sm" onclick="handleClearStoreDocuments('${s.id}','${esc(s.name)}')">Limpar pasta</button>` : ''}
         </div>
         ${storeDocs.length
           ? storeDocs.map(docItem).join('')
@@ -860,5 +995,5 @@ Object.assign(window, {
   renderAll, renderMetrics, renderMasterDashboard, renderCadastros,
   renderUsersByCompany, renderOperacao, renderFechamentos, renderSistema,
   renderAdminViews, renderOperatorViews, renderModuleManager, switchCentral,
-  renderDocumentos, sortResumo,
+  renderDocumentos, sortResumo, sortExtrato,
 });
