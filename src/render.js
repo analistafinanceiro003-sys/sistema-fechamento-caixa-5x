@@ -406,6 +406,63 @@ function renderFechamentos() {
   ).join('') || emptyRow(13));
   _updateResumoSortUI('master');
 
+  /* Repasses (Master) */
+  const allReceiptsMaster = getTransferReceipts();
+  const repComp   = val('masterRepasseCompany');
+  const repStore2 = val('masterRepasseStore');
+  const repStart2 = val('masterRepasseStart');
+  const repEnd2   = val('masterRepasseEnd');
+  const repStat2  = val('masterRepasseStatus');
+  const masterRepasseRows = state.closings.filter((c) =>
+    Number(c.transfer || 0) > 0 &&
+    (!repComp   || c.companyId === repComp) &&
+    (!repStore2 || c.storeId === repStore2) &&
+    (!repStart2 || parseBR(c.date) >= repStart2) &&
+    (!repEnd2   || parseBR(c.date) <= repEnd2)
+  );
+  const _mrConf = masterRepasseRows.filter((c) => allReceiptsMaster.find((r) => r.closingId === c.id));
+  const _mrPend = masterRepasseRows.filter((c) => !allReceiptsMaster.find((r) => r.closingId === c.id));
+  html('masterRepassesDashboard', `
+    <div class="exec-stats">
+      <div class="exec-stat">
+        <span>Total Repassado</span>
+        <strong style="color:var(--success)">${money(_mrConf.reduce((a,c)=>a+Number(c.transfer||0),0))}</strong>
+        <span class="subtle" style="font-size:11px">${_mrConf.length} confirmado(s)</span>
+      </div>
+      <div class="exec-stat">
+        <span>Aguardando Confirmação</span>
+        <strong style="color:var(--warning)">${money(_mrPend.reduce((a,c)=>a+Number(c.transfer||0),0))}</strong>
+        <span class="subtle" style="font-size:11px">${_mrPend.length} pendente(s)</span>
+      </div>
+    </div>`
+  );
+  html('masterRepassesBody', masterRepasseRows.map((c) => {
+    const receipt  = allReceiptsMaster.find((r) => r.closingId === c.id);
+    const status   = receipt ? 'Recebido' : 'Pendente';
+    if (repStat2 && status !== repStat2) return '';
+    const esperado = Math.max(0, Number(c.expected||0) - Number(c.standardFund||0));
+    const informado = Number(c.transfer||0);
+    const diff = informado - esperado;
+    const diffColor = diff === 0 ? 'var(--success)' : 'var(--danger)';
+    const diffLabel = diff === 0 ? '—' : (diff > 0 ? '+' : '') + money(diff);
+    return `<tr>
+      <td>${esc(c.date)}</td>
+      <td>${esc(companyName(c.companyId))}</td>
+      <td>${esc(storeName(c.storeId))}</td>
+      <td>${esc(c.responsible || c.operator || '-')}</td>
+      <td>${money(esperado)}</td>
+      <td>${money(informado)}</td>
+      <td style="color:${diffColor};font-weight:600">${diffLabel}</td>
+      <td>${tag(status)}</td>
+      <td>${esc(receipt?.confirmedBy || '-')}</td>
+      <td>${receipt ? new Date(receipt.confirmedAt).toLocaleString('pt-BR') : '-'}</td>
+      <td>${receipt
+        ? `<button class="btn btn-danger btn-sm" onclick="cancelTransferReceipt('${esc(c.id)}')" title="Desfazer confirmação">Desconfirmar</button>`
+        : '<span class="subtle">—</span>'
+      }</td>
+    </tr>`;
+  }).filter(Boolean).join('') || emptyRow(11));
+
   /* Divergências */
   const divRows = divergenceFilteredClosings();
   html('divergenceSummary',

@@ -419,6 +419,7 @@
         <button class="inner-tab-btn active" onclick="showSubTab('fechamentos','fech-movimentacoes',this)">Movimentações</button>
         <button class="inner-tab-btn" onclick="showSubTab('fechamentos','fech-extrato',this)">Extrato</button>
         <button class="inner-tab-btn" onclick="showSubTab('fechamentos','fech-resumo',this)">Resumo por Fechamento</button>
+        <button class="inner-tab-btn" onclick="showSubTab('fechamentos','fech-repasses',this)">Repasses</button>
         <button class="inner-tab-btn" onclick="showSubTab('fechamentos','fech-divergencias',this)">Divergências</button>
       </div>
 
@@ -493,6 +494,26 @@
             </tr></thead>
             <tbody id="fechResumoBody"></tbody></table>
           </div>
+        </div>
+      </div>
+
+      <!-- Repasses (Master) -->
+      <div class="inner-tab-panel hidden" id="fech-repasses">
+        <div class="card">
+          <h3 class="section-title">Repasses — visão geral</h3>
+          <div id="masterRepassesDashboard" style="margin-bottom:14px"></div>
+          <div class="filter-bar-5x" style="margin-bottom:12px">
+            <div class="field"><label>Empresa</label><select id="masterRepasseCompany" onchange="fillMasterRepasseStore();renderFechamentos()"></select></div>
+            <div class="field"><label>Loja</label><select id="masterRepasseStore" onchange="renderFechamentos()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Data inicial</label><input id="masterRepasseStart" type="date" onchange="renderFechamentos()"/></div>
+            <div class="field"><label>Data final</label><input id="masterRepasseEnd" type="date" onchange="renderFechamentos()"/></div>
+            <div class="field"><label>Status</label><select id="masterRepasseStatus" onchange="renderFechamentos()"><option value="">Todos</option><option value="Recebido">Confirmados</option><option value="Pendente">Pendentes</option></select></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr>
+            <th>Data</th><th>Empresa</th><th>Loja</th><th>Operador</th>
+            <th>Rep. Esperado</th><th>Rep. Informado</th><th>Diferença</th>
+            <th>Status</th><th>Confirmado por</th><th>Confirmado em</th><th>Ação</th>
+          </tr></thead><tbody id="masterRepassesBody"></tbody></table></div>
         </div>
       </div>
 

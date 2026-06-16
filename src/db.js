@@ -1923,7 +1923,7 @@ function fillSelects() {
   [
     'storeCompany','opCompany','ruleCompany','implantCompanyFilter','operationCompany',
     'ruleFilterCompany','moduleCompany','reportCompany','masterExtractCompany',
-    'masterMovementCompanyFilter','masterDivergenceCompanyFilter','masterResumoCompany',
+    'masterMovementCompanyFilter','masterDivergenceCompanyFilter','masterResumoCompany','masterRepasseCompany',
     'userManageCompany','usersCompanyFilter',
   ].forEach((id) => setOptions(id, companies));
 
@@ -1934,6 +1934,7 @@ function fillSelects() {
   fillMasterMovementStore();
   fillMasterDivergenceStore();
   fillMasterResumoStore();
+  fillMasterRepasseStore();
   fillUserManageSelect();
   fillClientReportStore();
 }
@@ -1978,7 +1979,8 @@ function fillClientReportStore() { setOptions('clientReportStore', storeOptionsF
 function fillMasterExtractStore() { setOptions('masterExtractStore', storeOptionsForCompany(val('masterExtractCompany')), 'Todas'); }
 function fillMasterMovementStore() { setOptions('masterMovementStoreFilter', storeOptionsForCompany(val('masterMovementCompanyFilter')), 'Todas'); }
 function fillMasterDivergenceStore() { setOptions('masterDivergenceStoreFilter', storeOptionsForCompany(val('masterDivergenceCompanyFilter')), 'Todas'); }
-function fillMasterResumoStore() { setOptions('masterResumoStore', storeOptionsForCompany(val('masterResumoCompany')), 'Todas'); }
+function fillMasterResumoStore()  { setOptions('masterResumoStore',  storeOptionsForCompany(val('masterResumoCompany')),  'Todas'); }
+function fillMasterRepasseStore() { setOptions('masterRepasseStore', storeOptionsForCompany(val('masterRepasseCompany')), 'Todas'); }
 function fillUserManageSelect() {
   const cid = val('userManageCompany');
   setOptions('userManageSelect', state.users.filter((u) => !cid || u.companyId === cid).map((u) => [u.id, `${u.name} — ${u.login}`]));
@@ -2196,7 +2198,7 @@ Object.assign(window, {
   storeOptionsForCompany, setOptions, fillSelects,
   fillStoreSelect, fillClosingStoreSelect, fillClosingResponsible5X,
   fillReportStore, fillClientReportStore, fillMasterExtractStore,
-  fillMasterMovementStore, fillMasterDivergenceStore, fillMasterResumoStore,
+  fillMasterMovementStore, fillMasterDivergenceStore, fillMasterResumoStore, fillMasterRepasseStore,
   fillUserManageSelect, fillEditUserStore, toggleUserStore,
   mapStoreDocument, uploadStoreDocument, deleteStoreDocument, clearStoreDocumentsByStore,
   previewDocUpload, handleDocUpload, handleDeleteDoc, handleClearStoreDocuments,
