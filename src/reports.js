@@ -187,6 +187,7 @@ function allMovementRows(rows = []) {
     const base = {
       companyId: c.companyId, storeId: c.storeId,
       closingId: c.id,
+      notes: c.notes || '',
       Empresa: companyName(c.companyId), Data: c.date,
       Loja: storeName(c.storeId), 'Responsável': c.responsible || c.operator || '',
     };

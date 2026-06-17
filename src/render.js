@@ -232,6 +232,16 @@ function _updateResumoSortUI(view) {
   });
 }
 
+/* --- Observações do Extrato --- */
+function showObsModal(btn) {
+  document.getElementById('obsModalText').textContent = btn.dataset.notes;
+  const m = document.getElementById('obsModal');
+  m.style.display = 'flex';
+}
+function closeObsModal() {
+  document.getElementById('obsModal').style.display = 'none';
+}
+
 /* --- Ordenação do Extrato --- */
 const _extratSort = { master: { col: 'date', dir: -1 }, admin: { col: 'date', dir: -1 } };
 
@@ -366,14 +376,16 @@ function renderFechamentos() {
   let extractRows = allMovementRows(extractFilteredClosings());
   if (type) extractRows = extractRows.filter((r) => r.Tipo === type);
   extractRows = _sortExtrat(extractRows, _extratSort.master);
-  html('masterMovementsExtractBody', extractRows.map((r) =>
-    `<tr>
+  html('masterMovementsExtractBody', extractRows.map((r) => {
+    const obsBtn = r.notes ? `<button class="btn-obs-extrat" data-notes="${esc(r.notes)}" onclick="showObsModal(this)" title="Ver observação">💬</button>` : '';
+    return `<tr>
       <td>${esc(r.Empresa)}</td><td>${esc(r.Data)}</td><td>${esc(r.Loja)}</td>
       <td>${esc(r.Tipo)}</td><td>${esc(r.Descrição)}</td>
       <td style="color:${Number(r.Valor)>=0?'var(--success)':'var(--danger)'}">${money(r.Valor)}</td>
       <td>${esc(r.Responsável)}</td>
-    </tr>`
-  ).join('') || emptyRow(7));
+      <td style="text-align:center">${obsBtn}</td>
+    </tr>`;
+  }).join('') || emptyRow(8));
   _updateExtratSortUI('master');
 
   /* Resumo por Fechamento */
@@ -635,10 +647,12 @@ function renderAdminViews() {
   );
   let adminExtratRows = allMovementRows(adminMovRows);
   adminExtratRows = _sortExtrat(adminExtratRows, _extratSort.admin);
-  html('adminMovementsDetailBody2', adminExtratRows.map((r) =>
-    `<tr><td>${esc(r.Data)}</td><td>${esc(r.Loja)}</td><td>${esc(r.Tipo)}</td><td>${esc(r.Descrição)}</td>
-     <td style="color:${Number(r.Valor)>=0?'var(--success)':'var(--danger)'}">${money(r.Valor)}</td><td>${esc(r.Responsável)}</td></tr>`
-  ).join('') || emptyRow(6));
+  html('adminMovementsDetailBody2', adminExtratRows.map((r) => {
+    const obsBtn = r.notes ? `<button class="btn-obs-extrat" data-notes="${esc(r.notes)}" onclick="showObsModal(this)" title="Ver observação">💬</button>` : '';
+    return `<tr><td>${esc(r.Data)}</td><td>${esc(r.Loja)}</td><td>${esc(r.Tipo)}</td><td>${esc(r.Descrição)}</td>
+     <td style="color:${Number(r.Valor)>=0?'var(--success)':'var(--danger)'}">${money(r.Valor)}</td><td>${esc(r.Responsável)}</td>
+     <td style="text-align:center">${obsBtn}</td></tr>`;
+  }).join('') || emptyRow(7));
   _updateExtratSortUI('admin');
 
   /* Resumo por Fechamento (amov-resumo) */

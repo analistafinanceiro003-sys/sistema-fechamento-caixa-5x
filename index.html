@@ -460,6 +460,7 @@
               <th class="th-sort" onclick="sortExtrato('desc','master')">Descrição<span id="ex-m-desc"></span></th>
               <th class="th-sort" onclick="sortExtrato('value','master')">Valor<span id="ex-m-value"></span></th>
               <th class="th-sort" onclick="sortExtrato('resp','master')">Responsável<span id="ex-m-resp"></span></th>
+              <th>Obs.</th>
             </tr></thead>
             <tbody id="masterMovementsExtractBody"></tbody></table>
           </div>
@@ -819,6 +820,7 @@
             <th class="th-sort" onclick="sortExtrato('desc','admin')">Descrição<span id="ex-a-desc"></span></th>
             <th class="th-sort" onclick="sortExtrato('value','admin')">Valor<span id="ex-a-value"></span></th>
             <th class="th-sort" onclick="sortExtrato('resp','admin')">Responsável<span id="ex-a-resp"></span></th>
+            <th>Obs.</th>
           </tr></thead><tbody id="adminMovementsDetailBody2"></tbody></table></div>
         </div>
       </div>
@@ -2192,6 +2194,22 @@
 
 <!-- Tooltip flutuante global -->
 <div id="infoTooltip"></div>
+
+<!-- Modal: Observação do extrato -->
+<div id="obsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeObsModal()">
+  <div class="card" style="width:min(480px,94vw);max-height:80vh;overflow-y:auto;padding:28px">
+    <h3 class="section-title">Observações</h3>
+    <p id="obsModalText" style="margin-top:16px;white-space:pre-wrap;line-height:1.7;font-size:14px"></p>
+    <div class="btn-row" style="margin-top:20px">
+      <button class="btn" onclick="closeObsModal()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.btn-obs-extrat{background:none;border:none;cursor:pointer;font-size:15px;padding:2px 5px;border-radius:4px;line-height:1}
+.btn-obs-extrat:hover{background:var(--bg-secondary,#f0f4f8)}
+</style>
 
 </body>
 </html>
