@@ -467,6 +467,22 @@
           </div>
           <div class="btn-row"><button class="btn btn-brand" onclick="handleRecalculateStoreChain()">Recalcular cadeia de saldos</button></div>
         </div>
+
+        <div class="card" style="margin-top:16px">
+          <h3 class="section-title">Encerrar diferenças de repasse em massa</h3>
+          <p class="subtle" style="margin-bottom:14px">Use quando o cliente não confirma os repasses e a mesma diferença fica se repetindo em vários fechamentos seguidos de uma loja. Cada fechamento selecionado é marcado como "Diferença aceita" com a justificativa informada — não confirma o repasse (não finge que o valor foi recebido), só encerra a pendência.</p>
+          <div class="form-grid">
+            <div class="field"><label>Loja</label><select id="bulkWaiveStore"></select></div>
+            <div class="field"><label>Data inicial</label><input id="bulkWaiveStart" type="date"/></div>
+            <div class="field"><label>Data final</label><input id="bulkWaiveEnd" type="date"/></div>
+            <div class="field full"><label>Justificativa <span style="color:#dc2626">*</span></label><textarea id="bulkWaiveReason" placeholder="Ex: cliente não confirma repasses há semanas, diferença revisada e aceita."></textarea></div>
+          </div>
+          <div class="btn-row">
+            <button class="btn" onclick="previewBulkWaive()">Pré-visualizar</button>
+            <button class="btn btn-brand" onclick="applyBulkWaiveDifferences()">Encerrar diferenças</button>
+          </div>
+          <div id="bulkWaivePreview" style="margin-top:14px"></div>
+        </div>
       </div>
     </section>
 
@@ -571,7 +587,7 @@
             <div class="field"><label>Operador</label><select id="masterRepasseOperatorFilter" onchange="renderFechamentos()"><option value="">Todos</option></select></div>
             <div class="field"><label>Data inicial</label><input id="masterRepasseStart" type="date" onchange="renderFechamentos()"/></div>
             <div class="field"><label>Data final</label><input id="masterRepasseEnd" type="date" onchange="renderFechamentos()"/></div>
-            <div class="field"><label>Status</label><select id="masterRepasseStatus" onchange="renderFechamentos()"><option value="">Todos</option><option value="Recebido">Confirmados</option><option value="Pendente">Pendentes</option></select></div>
+            <div class="field"><label>Status</label><select id="masterRepasseStatus" onchange="renderFechamentos()"><option value="">Todos</option><option value="Recebido">Confirmados</option><option value="Pendente">Pendentes</option><option value="Diferença aceita">Diferença aceita</option></select></div>
           </div>
           <div class="table-wrap"><table><thead><tr>
             <th>Data</th><th>Empresa</th><th>Loja</th><th>Operador</th>
@@ -655,6 +671,7 @@
       <div class="inner-tabs">
         <button class="inner-tab-btn active" onclick="showSubTab('sistema','sis-configuracoes',this)">Configurações Gerais</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-analistas',this)">Analistas</button>
+        <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-coordenadores',this)">Coordenadores</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-fornecedores',this)">Fornecedores e Categorias</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-backup',this)">Backup e Manutenção</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-logs',this)">Logs de Auditoria</button>
@@ -753,6 +770,43 @@
             <button class="btn" onclick="resetAnalystPassword()">Redefinir senha pelo Auth</button>
             <button class="btn btn-danger" onclick="deleteAnalystUser()">Excluir Analista</button>
             <button class="btn" onclick="closeAnalystEditPanel()">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Coordenadores (outros acessos Master) -->
+      <div class="inner-tab-panel hidden" id="sis-coordenadores">
+        <div class="card" id="coordinatorCreatePanel">
+          <h3 class="section-title">Criar Coordenador</h3>
+          <p class="subtle" style="margin-bottom:14px">Mesmo acesso total do Master (todas as empresas, todas as abas, incluindo Sistema) — não é vinculado a uma empresa específica. Por segurança, só o dono da conta pode criar, editar, redefinir senha ou excluir outro acesso Master.</p>
+          <div class="form-grid">
+            <div class="field"><label>Nome</label><input id="coordinatorName"/></div>
+            <div class="field"><label>Login (e-mail)</label><input id="coordinatorLogin"/></div>
+            <div class="field"><label>Senha</label><input id="coordinatorPass" type="password" placeholder="Defina uma senha"/></div>
+          </div>
+          <div class="btn-row"><button class="btn btn-primary" onclick="createCoordinatorUser()">Criar Coordenador</button></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h3 class="section-title">Coordenadores cadastrados</h3>
+          <div class="table-wrap">
+            <table><thead><tr><th>Nome</th><th>Login</th><th>Status</th><th>Ação</th></tr></thead>
+            <tbody id="coordinatorsBody"></tbody></table>
+          </div>
+        </div>
+
+        <div class="card hidden" id="coordinatorEditPanel" style="margin-top:16px">
+          <h3 class="section-title">Editar Coordenador</h3>
+          <input type="hidden" id="editCoordinatorId"/>
+          <div class="form-grid">
+            <div class="field"><label>Nome</label><input id="editCoordinatorName"/></div>
+            <div class="field"><label>Status</label><select id="editCoordinatorStatus"><option>Ativo</option><option>Inativo</option></select></div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="saveCoordinatorEdit()">Salvar alteração</button>
+            <button class="btn" onclick="resetCoordinatorPassword()">Redefinir senha pelo Auth</button>
+            <button class="btn btn-danger" onclick="deleteCoordinatorUser()">Excluir Coordenador</button>
+            <button class="btn" onclick="closeCoordinatorEditPanel()">Cancelar</button>
           </div>
         </div>
       </div>
@@ -1923,7 +1977,7 @@
             <div class="field"><label>Loja</label><select id="adminRepasseStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
             <div class="field"><label>Data inicial</label><input id="adminRepasseStart" type="date" onchange="renderAdminViews()"/></div>
             <div class="field"><label>Data final</label><input id="adminRepasseEnd" type="date" onchange="renderAdminViews()"/></div>
-            <div class="field"><label>Status</label><select id="adminRepasseStatusFilter" onchange="renderAdminViews()"><option value="">Todos</option><option value="Pendente">Pendente</option><option value="Recebido">Recebido</option></select></div>
+            <div class="field"><label>Status</label><select id="adminRepasseStatusFilter" onchange="renderAdminViews()"><option value="">Todos</option><option value="Pendente">Pendente</option><option value="Recebido">Recebido</option><option value="Diferença aceita">Diferença aceita</option></select></div>
           </div>
           <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Operador</th><th>Saldo Inicial</th><th>Entradas</th><th>Saídas</th><th>Repasse Esperado</th><th>Repasse Informado</th><th>Diferença</th><th>Status</th><th>Confirmado em</th><th>Por</th><th>Ação</th></tr></thead><tbody id="adminRepassesBody"></tbody></table></div>
         </div>

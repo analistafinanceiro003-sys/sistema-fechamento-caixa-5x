@@ -84,6 +84,7 @@ async function enterApp() {
         companyId: prof.company_id,
         storeId: prof.store_id,
         status: prof.status,
+        isOwner: !!prof.is_owner,
       };
     }
   }
@@ -102,6 +103,7 @@ async function enterApp() {
           companyId: localUser.companyId,
           storeId: localUser.storeId,
           status: localUser.status || 'Ativo',
+          isOwner: !!localUser.isOwner,
         };
         break;
       }

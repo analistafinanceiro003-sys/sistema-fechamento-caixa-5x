@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
 
   const { data: requester } = await admin
     .from('profiles')
-    .select('id, user_id, role, status')
+    .select('id, user_id, role, status, is_owner')
     .eq('user_id', authUser.user.id)
     .maybeSingle();
 
@@ -84,6 +84,12 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (!targetProfile) return friendlyError(req, 'Usuário não encontrado.', 404);
+
+  /* Redefinir senha de outro acesso Master (Coordenador) é exclusivo de quem
+     já é dono (is_owner). */
+  if (targetProfile.role === 'master' && !requester.is_owner) {
+    return friendlyError(req, 'Apenas o dono da conta pode redefinir a senha de outro acesso Master.', 403);
+  }
 
   /* Analista só redefine senha de Admin/Operador de empresas às quais tem acesso. */
   if (requester.role === 'analyst') {

@@ -15,7 +15,7 @@ const NORMALIZED_TABLES = [
   'companies','stores','profiles','module_permissions','operation_rules','operation_configs',
   'closings','closing_entries','closing_expenses','closing_attachments',
   'cash_opening_adjustments','divergence_reviews','audit_logs','select_options',
-  'implant_steps',
+  'implant_steps','transfer_waivers',
 ];
 
 const IMPLANT_STEP_LIST = [
@@ -76,6 +76,7 @@ function defaultState() {
     companySelectOptions: {},
     audit: [],
     transferReceipts: [],
+    transferWaivers: [],
     storeDocuments: [],
     rectificationRequests: [],
     analystCompanies: [],
@@ -199,9 +200,124 @@ async function cancelTransferReceipt(closingId) {
   toast('Repasse desconfirmado. Status voltou para pendente.');
 }
 
+/* ----------------------------------------------------------------
+   DIFERENÇA DE REPASSE — ACEITAR/ENCERRAR
+   Quando o repasse informado fica abaixo do esperado (fundo padrão da
+   loja) e o cliente nunca confirma, a diferença ficava "pendente" para
+   sempre. waiveTransferDifference() registra que o Master revisou e
+   aceitou aquela diferença como está — não confirma o repasse (não finge
+   que o valor foi recebido), só encerra a pendência com justificativa.
+   Tabela: transfer_waivers (ver supabase/schema.sql).
+---------------------------------------------------------------- */
+function mapTransferWaiver(row) {
+  return {
+    id:        row.id,
+    closingId: row.closing_id,
+    companyId: row.company_id,
+    storeId:   row.store_id,
+    amount:    Number(row.amount || 0),
+    reason:    row.reason || '',
+    waivedBy:  row.waived_by || '',
+    waivedAt:  row.waived_at || row.created_at,
+  };
+}
+
+function getTransferWaivers() {
+  return state?.transferWaivers || [];
+}
+
+async function createTransferWaiverRecord(waiver) {
+  const row = await supabaseWrite('transfer_waivers', 'insert', cleanPayload({
+    id:         isUuid(waiver.id) ? waiver.id : undefined,
+    closing_id: waiver.closingId,
+    company_id: waiver.companyId,
+    store_id:   waiver.storeId,
+    amount:     waiver.amount,
+    reason:     waiver.reason,
+    waived_by:  waiver.waivedBy,
+  }));
+  return row ? mapTransferWaiver(row) : waiver;
+}
+
+/* Núcleo sem efeitos de UI (sem save/renderAll/toast) — usado tanto pela
+   ação individual quanto pelo encerramento em massa (Ajustes e Correções),
+   que dispara isso várias vezes e só quer salvar/renderizar uma vez no final. */
+async function _writeTransferWaiver(c, reason) {
+  const esperado  = Math.max(0, Number(c.expected || 0) - Number(c.standardFund || 0));
+  const diferenca = Number(c.transfer || 0) - esperado;
+
+  const waiver = {
+    id:        uid('tw'),
+    closingId: c.id,
+    companyId: c.companyId,
+    storeId:   c.storeId,
+    amount:    diferenca,
+    reason,
+    waivedBy:  currentUser?.name || 'Master',
+    waivedAt:  new Date().toISOString(),
+  };
+
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    const saved = await createTransferWaiverRecord(waiver);
+    if (saved?.id) waiver.id = saved.id;
+  } else if (!DEV_LOCAL_MODE) {
+    throw new Error('Supabase obrigatório em produção para encerrar diferença de repasse.');
+  }
+  state.transferWaivers = state.transferWaivers || [];
+  state.transferWaivers.push(waiver);
+  addAudit('Diferença de repasse encerrada', `${storeName(c.storeId)} — ${money(diferenca)} em ${c.date} — Motivo: ${reason}`);
+  return waiver;
+}
+
+async function waiveTransferDifference(closingId, reasonArg) {
+  if (role !== 'master') return alert('Apenas Gestão 5X pode encerrar diferenças de repasse.');
+  const c = (state.closings || []).find((x) => x.id === closingId);
+  if (!c) return;
+  if ((state.transferWaivers || []).find((w) => w.closingId === closingId)) return;
+
+  const esperado   = Math.max(0, Number(c.expected || 0) - Number(c.standardFund || 0));
+  const diferenca  = Number(c.transfer || 0) - esperado;
+  if (diferenca === 0) return alert('Este fechamento não tem diferença de repasse a encerrar.');
+
+  const reason = (reasonArg ?? prompt(`Encerrar a diferença de ${money(diferenca)} da loja "${storeName(c.storeId)}" (${c.date}).\n\nInforme a justificativa (obrigatória):`))?.trim();
+  if (!reason) return alert('É obrigatório informar a justificativa para encerrar a diferença.');
+
+  try {
+    await _writeTransferWaiver(c, reason);
+  } catch (e) {
+    return alert(`Erro ao encerrar diferença no Supabase: ${e.message}`);
+  }
+  save();
+  renderAll();
+  toast('Diferença encerrada. Não aparecerá mais como pendente.');
+}
+
+async function reopenTransferWaiver(closingId) {
+  if (role !== 'master') return alert('Apenas Gestão 5X pode reabrir uma diferença encerrada.');
+  const waiver = (state.transferWaivers || []).find((w) => w.closingId === closingId);
+  if (!waiver) return;
+  const c = (state.closings || []).find((x) => x.id === closingId);
+  if (!confirm(`Reabrir a diferença de ${money(waiver.amount)} da loja "${storeName(waiver.storeId)}"?\n\nEla voltará a aparecer como pendente.`)) return;
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      const { error } = await sb.from('transfer_waivers').delete().eq('id', waiver.id);
+      if (error) throw error;
+    } catch (e) {
+      return alert(`Erro ao reabrir diferença: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase obrigatório em produção para reabrir diferença.');
+  }
+  state.transferWaivers = (state.transferWaivers || []).filter((w) => w.id !== waiver.id);
+  addAudit('Diferença de repasse reaberta (Master)', `${storeName(waiver.storeId)} — ${money(waiver.amount)}${c ? ' em ' + c.date : ''}`);
+  save();
+  renderAll();
+  toast('Diferença reaberta. Voltou a aparecer como pendente.');
+}
+
 function normalizeState() {
   state = (state && typeof state === 'object') ? state : defaultState();
-  ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit','transferReceipts','storeDocuments','rectificationRequests','analystCompanies'].forEach((k) => {
+  ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit','transferReceipts','transferWaivers','storeDocuments','rectificationRequests','analystCompanies'].forEach((k) => {
     if (!Array.isArray(state[k])) state[k] = [];
   });
   /* Migração: importa recibos salvos na chave antiga (localStorage separado) */
@@ -273,6 +389,7 @@ function mapProfile(row) {
     pass: '',
     role: row.role,
     status: row.status || 'Ativo',
+    isOwner: !!row.is_owner,
   };
 }
 
@@ -402,7 +519,7 @@ async function loadFromNormalizedSupabase() {
   const [
     companies, stores, profiles, modulePermissions, rules, operationConfigs,
     closings, entries, expenses, attachments, openingAdjustments, reviews, audit, selectOptions,
-    transferReceiptsRows, implantStepsRows, storeDocumentsRows, analystCompanyRows,
+    transferReceiptsRows, implantStepsRows, storeDocumentsRows, analystCompanyRows, transferWaiversRows,
   ] = await Promise.all([
     selectTable('companies'),
     selectTable('stores'),
@@ -426,6 +543,8 @@ async function loadFromNormalizedSupabase() {
     selectTable('store_documents').catch(() => []),
     /* tabela analyst_companies — execute a migração migration_analyst_role.sql para ativar */
     selectTable('analyst_companies').catch(() => []),
+    /* tabela transfer_waivers — execute a migração migration_diferenca_repasse.sql para ativar */
+    selectTable('transfer_waivers').catch(() => []),
   ]);
 
   const entriesByClosing = groupBy(entries, 'closing_id');
@@ -458,6 +577,7 @@ async function loadFromNormalizedSupabase() {
       id: a.id, date: a.created_at, user: a.user_id || 'Sistema', role: '', action: a.action, detail: a.entity || '', metadata: a.metadata,
     })),
     transferReceipts: transferReceiptsRows.map(mapTransferReceipt),
+    transferWaivers: transferWaiversRows.map(mapTransferWaiver),
     storeDocuments: storeDocumentsRows.map(mapStoreDocument),
     analystCompanies: analystCompanyRows.map((r) => ({ id: r.id, profileId: r.profile_id, companyId: r.company_id })),
   };
@@ -1881,6 +2001,133 @@ function deleteAnalystUser() {
   closeAnalystEditPanel();
 }
 
+/* --- COORDENADORES (outros acessos Master) ---
+   Mesmo acesso total do Master, sem vínculo de empresa. Só quem já é dono
+   (currentUser.isOwner) pode criar, editar, redefinir senha ou excluir um
+   coordenador — a lista fica visível a qualquer Master (transparência de
+   quem tem acesso), mas as ações de gestão ficam ocultas/bloqueadas para
+   quem não é dono. Reforçado no servidor pelas Edge Functions e pela RLS
+   (ver supabase/schema.sql, seção "COORDENADORES"). */
+function renderCoordinators() {
+  if (!$('coordinatorsBody')) return;
+  const isOwner = !!currentUser?.isOwner;
+  $('coordinatorCreatePanel')?.classList.toggle('hidden', !isOwner);
+  const coordinators = state.users.filter((u) => u.role === 'master' && u.id !== currentUser?.id);
+  html('coordinatorsBody', coordinators.length
+    ? coordinators.map((c) => `<tr>
+        <td>${esc(c.name)}</td><td>${esc(c.login)}</td>
+        <td>${tag(c.status)}</td>
+        <td>${isOwner ? `<button class="btn btn-sm" onclick="editCoordinator('${esc(c.id)}')">Editar</button>` : '<span class="subtle">—</span>'}</td>
+      </tr>`).join('')
+    : emptyRow(4, 'Nenhum coordenador cadastrado.'));
+}
+
+async function createCoordinatorUser() {
+  if (!currentUser?.isOwner) return alert('Apenas o dono da conta pode criar outro acesso Master.');
+  const name = val('coordinatorName');
+  const login = val('coordinatorLogin');
+  const password = val('coordinatorPass');
+  if (!name || !login) return alert('Informe nome e login.');
+  if (state.users.some((u) => String(u.login).toLowerCase() === login.toLowerCase())) {
+    return alert('Já existe usuário com este login.');
+  }
+  if (!password || password.length < 6) return alert('Informe uma senha com pelo menos 6 caracteres.');
+
+  if (!DEV_LOCAL_MODE) {
+    try {
+      const profile = await createUserViaEdgeFunction({ name, email: login, password, role: 'master' });
+      if (profile) state.users.push(profile);
+      ['coordinatorName', 'coordinatorLogin'].forEach(clear);
+      setVal('coordinatorPass', '');
+      addAudit('Cadastro de coordenador (Master)', login);
+      save();
+      renderAll();
+      return toast('Coordenador cadastrado com sucesso.');
+    } catch (e) {
+      const message = String(e.message || '');
+      if (message.toLowerCase().includes('e-mail') || message.toLowerCase().includes('email') || message.toLowerCase().includes('already')) {
+        return alert('Já existe um usuário cadastrado com este e-mail.');
+      }
+      return alert('Não foi possível cadastrar o coordenador: ' + message);
+    }
+  }
+
+  const newProfile = { id: uid('u'), companyId: null, storeId: null, name, login, pass: password, role: 'master', status: 'Ativo', isOwner: false };
+  state.users.push(newProfile);
+  ['coordinatorName', 'coordinatorLogin'].forEach(clear);
+  setVal('coordinatorPass', '');
+  addAudit('Cadastro de coordenador (Master)', login);
+  save();
+  renderAll();
+  toast('Coordenador cadastrado com sucesso.');
+}
+
+function editCoordinator(id) {
+  if (!currentUser?.isOwner) return alert('Apenas o dono da conta pode gerenciar outro acesso Master.');
+  const c = state.users.find((u) => u.id === id);
+  if (!c) return;
+  setVal('editCoordinatorId', id);
+  setVal('editCoordinatorName', c.name);
+  setVal('editCoordinatorStatus', c.status || 'Ativo');
+  $('coordinatorEditPanel')?.classList.remove('hidden');
+}
+
+function closeCoordinatorEditPanel() {
+  $('coordinatorEditPanel')?.classList.add('hidden');
+}
+
+async function saveCoordinatorEdit() {
+  if (!currentUser?.isOwner) return alert('Apenas o dono da conta pode gerenciar outro acesso Master.');
+  const id = val('editCoordinatorId');
+  const c = state.users.find((u) => u.id === id);
+  if (!c) return alert('Selecione um coordenador.');
+  c.name = val('editCoordinatorName');
+  c.status = val('editCoordinatorStatus') || 'Ativo';
+
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await updateProfile(c.id, c);
+    } catch (e) {
+      return alert(`Erro ao atualizar coordenador no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para atualizar coordenadores.');
+  }
+
+  addAudit('Edição de coordenador', c.login);
+  save();
+  renderAll();
+  closeCoordinatorEditPanel();
+  toast('Coordenador atualizado.');
+}
+
+async function resetCoordinatorPassword() {
+  if (!currentUser?.isOwner) return alert('Apenas o dono da conta pode redefinir a senha de outro acesso Master.');
+  const id = val('editCoordinatorId');
+  const c = state.users.find((u) => u.id === id);
+  if (!c) return alert('Selecione um coordenador.');
+  if (!c.authId) return alert('Este coordenador não possui vínculo com o Supabase Auth.');
+  const newPass = prompt(`Nova senha para ${c.name}:\n(Mínimo 6 caracteres)`);
+  if (!newPass) return;
+  if (newPass.length < 6) return alert('A senha precisa ter pelo menos 6 caracteres.');
+  try {
+    await resetUserPasswordViaEdgeFunction(c.authId, newPass);
+    addAudit('Reset de senha', c.login);
+    save();
+    toast('Senha redefinida com sucesso.');
+  } catch (e) {
+    alert('Erro ao redefinir senha: ' + (e.message || 'tente novamente.'));
+  }
+}
+
+function deleteCoordinatorUser() {
+  if (!currentUser?.isOwner) return alert('Apenas o dono da conta pode excluir outro acesso Master.');
+  const id = val('editCoordinatorId');
+  if (!id) return alert('Selecione um coordenador.');
+  removeUserById(id);
+  closeCoordinatorEditPanel();
+}
+
 /* --- CRUD — Regras --- */
 async function createRule() {
   const cid = val('ruleCompany');
@@ -2338,7 +2585,7 @@ async function clearCompanyData() {
   if (delClose) itens.push('fechamentos (+ entradas, saídas, anexos)');
   if (delAdj)   itens.push('ajustes de saldo inicial');
   if (delDiv)   itens.push('revisões de divergência');
-  if (delRep)   itens.push('repasses recebidos');
+  if (delRep)   itens.push('repasses recebidos e diferenças encerradas');
   if (delAudit) itens.push('logs de auditoria');
 
   const periodoTxt = (dataDe || dataAte)
@@ -2370,6 +2617,8 @@ async function clearCompanyData() {
       if (delRep) {
         const { error } = await sb.from('transfer_receipts').delete().eq('company_id', companyId);
         if (error) throw error;
+        const { error: errorW } = await sb.from('transfer_waivers').delete().eq('company_id', companyId);
+        if (errorW) throw errorW;
       }
       if (delAudit) {
         const { error } = await sb.from('audit_logs').delete().eq('company_id', companyId);
@@ -2409,6 +2658,7 @@ async function clearCompanyData() {
     }
     if (delRep) {
       state.transferReceipts = (state.transferReceipts || []).filter((r) => r.companyId !== companyId);
+      state.transferWaivers  = (state.transferWaivers  || []).filter((w) => w.companyId !== companyId);
     }
     if (delAudit) {
       state.audit = state.audit.filter((a) => a.companyId !== companyId);
@@ -2509,7 +2759,7 @@ function fillSelects() {
    para não confundir lojas de clientes diferentes com o mesmo nome. */
 function fillOperationalAdjustmentStores() {
   const options = (state.stores || []).map((s) => [s.id, `${companyName(s.companyId)} — ${s.name}`]);
-  ['bulkReassignSourceStore', 'bulkReassignTargetStore', 'recalcChainStore'].forEach((id) =>
+  ['bulkReassignSourceStore', 'bulkReassignTargetStore', 'recalcChainStore', 'bulkWaiveStore'].forEach((id) =>
     setOptions(id, options, 'Selecione a loja')
   );
 }
@@ -2777,6 +3027,8 @@ Object.assign(window, {
   renderCompanyChecklist, getCheckedCompanyIds, analystCompanyNames, renderAnalysts,
   createAnalystUser, editAnalyst, closeAnalystEditPanel, saveAnalystEdit,
   resetAnalystPassword, deleteAnalystUser,
+  renderCoordinators, createCoordinatorUser, editCoordinator, closeCoordinatorEditPanel,
+  saveCoordinatorEdit, resetCoordinatorPassword, deleteCoordinatorUser,
   createRule, deleteRule, saveImplantStep, upsertImplantStep, saveOperationConfig,
   addSelectOption, removeSelectOption, renameSelectOption, promptRenameSelectOption, resetSelectOptions, optionsForCompany,
   addCompanyOption, removeCompanyOption, renameCompanyOption, promptRenameCompanyOption,
@@ -2793,6 +3045,7 @@ Object.assign(window, {
   viewStorageFile, openFileViewer, closeFileViewer, reloadStoreDocuments,
   saveRectificationRequest,
   confirmTransferReceipt, cancelTransferReceipt,
+  getTransferWaivers, waiveTransferDifference, reopenTransferWaiver, _writeTransferWaiver,
 });
 
 Object.defineProperty(window, 'state', {

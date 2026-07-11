@@ -434,6 +434,7 @@ function buildResumoRow(c, receipt, includeEmpresa) {
     difHtml = `<span style="color:${col};font-weight:600">${sig}${money(diferenca)}</span>`;
   }
   const transferTolerance = Number(cfg(c.companyId)?.transferTolerance || 0);
+  const waiver = (state.transferWaivers || []).find((w) => w.closingId === c.id);
   const recMotivos = {
     semRepasse: 'Repasse e fundo estão equilibrados — nenhum repasse era necessário neste fechamento.',
     tolerancia: `Valor a repassar (${money(esperado)}) está dentro da tolerância de repasse configurada (${money(transferTolerance)}). Não gera alerta.`,
@@ -442,7 +443,13 @@ function buildResumoRow(c, receipt, includeEmpresa) {
     pendente: 'Repasse informado pelo operador, aguardando confirmação da gestão.',
   };
   let recTag, recMotivo;
-  if (esperado === 0 && transfer === 0) {
+  if (waiver) {
+    recMotivo = `Diferença aceita por ${waiver.waivedBy || 'Master'} em ${new Date(waiver.waivedAt).toLocaleDateString('pt-BR')}: "${waiver.reason}"`;
+    recTag = `<span style="background:#e0e7ff;color:#3730a3;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">Diferença aceita</span>`
+      + (role === 'master'
+        ? ` <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;margin-left:4px" onclick="reopenTransferWaiver('${esc(c.id)}')" title="Reabrir esta diferença">Reabrir</button>`
+        : '');
+  } else if (esperado === 0 && transfer === 0) {
     recMotivo = recMotivos.semRepasse;
     recTag = `<span style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">Sem repasse — fundo OK</span>`;
   } else if (transfer === 0 && transferTolerance > 0 && esperado <= transferTolerance) {
@@ -460,6 +467,9 @@ function buildResumoRow(c, receipt, includeEmpresa) {
   } else {
     recMotivo = recMotivos.pendente;
     recTag = `<span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap">Pendente confirmação</span>`;
+  }
+  if (!waiver && diferenca !== 0 && role === 'master') {
+    recTag += ` <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;margin-left:4px" onclick="waiveTransferDifference('${esc(c.id)}')" title="Aceitar/encerrar esta diferença de repasse">Encerrar</button>`;
   }
   const infoBtn = `<button class="info-tip-btn" data-tooltip="${esc(recMotivo)}" onmouseenter="showInfoTooltip(this)" onmouseleave="hideInfoTooltip()">ⓘ</button>`;
   const regTime = c.createdAt ? new Date(c.createdAt).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
@@ -590,13 +600,24 @@ function renderFechamentos() {
   );
   html('masterRepassesBody', masterRepasseRows.map((c) => {
     const receipt  = allReceiptsMaster.find((r) => r.closingId === c.id);
-    const status   = receipt ? 'Recebido' : 'Pendente';
+    const waiver   = (state.transferWaivers || []).find((w) => w.closingId === c.id);
+    const status   = waiver ? 'Diferença aceita' : (receipt ? 'Recebido' : 'Pendente');
     if (repStat2 && status !== repStat2) return '';
     const esperado = Math.max(0, Number(c.expected||0) - Number(c.standardFund||0));
     const informado = Number(c.transfer||0);
     const diff = informado - esperado;
     const diffColor = diff === 0 ? 'var(--success)' : 'var(--danger)';
     const diffLabel = diff === 0 ? '—' : (diff > 0 ? '+' : '') + money(diff);
+    const waiverTip = waiver
+      ? ` <button class="info-tip-btn" data-tooltip="${esc(`Diferença aceita por ${waiver.waivedBy || 'Master'}: "${waiver.reason}"`)}" onmouseenter="showInfoTooltip(this)" onmouseleave="hideInfoTooltip()">ⓘ</button>`
+      : '';
+    const actionHtml = waiver
+      ? `<button class="btn btn-sm" onclick="reopenTransferWaiver('${esc(c.id)}')" title="Reabrir esta diferença">Reabrir</button>`
+      : receipt
+        ? `<button class="btn btn-danger btn-sm" onclick="cancelTransferReceipt('${esc(c.id)}')" title="Desfazer confirmação">Desconfirmar</button>`
+        : diff !== 0
+          ? `<button class="btn btn-sm" onclick="waiveTransferDifference('${esc(c.id)}')" title="Aceitar/encerrar esta diferença">Encerrar</button>`
+          : '<span class="subtle">—</span>';
     return `<tr>
       <td>${esc(c.date)}</td>
       <td>${esc(companyName(c.companyId))}</td>
@@ -605,13 +626,10 @@ function renderFechamentos() {
       <td>${money(esperado)}</td>
       <td>${money(informado)}</td>
       <td style="color:${diffColor};font-weight:600">${diffLabel}</td>
-      <td>${tag(status)}</td>
-      <td>${esc(receipt?.confirmedBy || '-')}</td>
-      <td>${receipt ? new Date(receipt.confirmedAt).toLocaleString('pt-BR') : '-'}</td>
-      <td>${receipt
-        ? `<button class="btn btn-danger btn-sm" onclick="cancelTransferReceipt('${esc(c.id)}')" title="Desfazer confirmação">Desconfirmar</button>`
-        : '<span class="subtle">—</span>'
-      }</td>
+      <td>${tag(status)}${waiverTip}</td>
+      <td>${esc(receipt?.confirmedBy || waiver?.waivedBy || '-')}</td>
+      <td>${receipt ? new Date(receipt.confirmedAt).toLocaleString('pt-BR') : (waiver ? new Date(waiver.waivedAt).toLocaleString('pt-BR') : '-')}</td>
+      <td>${actionHtml}</td>
     </tr>`;
   }).filter(Boolean).join('') || emptyRow(11));
 
@@ -669,6 +687,7 @@ function toggleOptionCompanyField() {
 function renderSistema() {
   toggleOptionCompanyField();
   if (window.renderAnalysts) renderAnalysts();
+  if (window.renderCoordinators) renderCoordinators();
   /* Config / opções de seleção */
   const labels = {
     segments:'Segmentos', plans:'Planos', companyStatus:'Status da empresa',
@@ -932,13 +951,17 @@ function renderAdminViews() {
   );
   html('adminRepassesBody', repasseRows.map((c) => {
     const receipt = receipts.find((r) => r.closingId === c.id);
-    const status  = receipt ? 'Recebido' : 'Pendente';
+    const waiver  = (state.transferWaivers || []).find((w) => w.closingId === c.id);
+    const status  = waiver ? 'Diferença aceita' : (receipt ? 'Recebido' : 'Pendente');
     if (repStatus && status !== repStatus) return '';
     const esperado  = Math.max(0, Number(c.expected ?? 0) - Number(c.standardFund ?? 0));
     const informado = Number(c.transfer || 0);
     const diff      = informado - esperado;
     const diffColor = diff === 0 ? 'var(--success)' : 'var(--danger)';
     const diffLabel = diff === 0 ? '0,00 R$' : (diff > 0 ? '+' : '') + money(diff);
+    const waiverTip = waiver
+      ? ` <button class="info-tip-btn" data-tooltip="${esc(`Diferença aceita pela gestão: "${waiver.reason}"`)}" onmouseenter="showInfoTooltip(this)" onmouseleave="hideInfoTooltip()">ⓘ</button>`
+      : '';
     return `<tr>
       <td>${esc(c.date)}</td><td>${esc(storeName(c.storeId))}</td><td>${esc(c.responsible || c.operator || '-')}</td>
       <td>${money(c.initial)}</td>
@@ -947,12 +970,14 @@ function renderAdminViews() {
       <td>${money(esperado)}</td>
       <td>${money(informado)}</td>
       <td style="color:${diffColor};font-weight:600">${diffLabel}</td>
-      <td>${tag(status)}</td>
-      <td>${receipt ? new Date(receipt.confirmedAt).toLocaleString('pt-BR') : '-'}</td>
-      <td>${esc(receipt?.confirmedBy || '-')}</td>
-      <td>${status === 'Pendente'
-        ? `<button class="btn btn-sm btn-primary" onclick="confirmTransferReceipt('${c.id}')">Recebido</button>`
-        : '<span class="status success">✓</span>'
+      <td>${tag(status)}${waiverTip}</td>
+      <td>${receipt ? new Date(receipt.confirmedAt).toLocaleString('pt-BR') : (waiver ? new Date(waiver.waivedAt).toLocaleString('pt-BR') : '-')}</td>
+      <td>${esc(receipt?.confirmedBy || waiver?.waivedBy || '-')}</td>
+      <td>${waiver
+        ? '<span class="subtle">—</span>'
+        : status === 'Pendente'
+          ? `<button class="btn btn-sm btn-primary" onclick="confirmTransferReceipt('${c.id}')">Recebido</button>`
+          : '<span class="status success">✓</span>'
       }</td>
     </tr>`;
   }).filter(Boolean).join('') || emptyRow(13));

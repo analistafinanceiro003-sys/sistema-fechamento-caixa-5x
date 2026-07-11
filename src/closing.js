@@ -1188,6 +1188,83 @@ async function applyBulkReassignStore() {
 }
 
 /* ================================================================
+   ENCERRAR DIFERENÇAS DE REPASSE EM MASSA (Operação → Ajustes e Correções)
+   Quando o repasse informado fica abaixo do esperado em vários fechamentos
+   seguidos da mesma loja (ex: cliente nunca confirma o repasse), permite
+   ao Master aceitar/encerrar todos de uma vez com uma única justificativa
+   — reaproveita _writeTransferWaiver() (mesmo núcleo usado pela ação
+   individual em Resumo/Repasses), sem repetir save()/renderAll() a cada item.
+================================================================ */
+function findBulkWaiveMatches({ storeId, startISO, endISO }) {
+  if (!storeId) return [];
+  return activeClosingsForStore(storeId).filter((c) => {
+    const d = parseBR(c.date);
+    if (startISO && d < startISO) return false;
+    if (endISO && d > endISO) return false;
+    const esperado = Math.max(0, Number(c.expected || 0) - Number(c.standardFund || 0));
+    const diferenca = Number(c.transfer || 0) - esperado;
+    if (diferenca === 0) return false;
+    if ((state.transferWaivers || []).find((w) => w.closingId === c.id)) return false;
+    return true;
+  });
+}
+
+function _readBulkWaiveFilters() {
+  return {
+    storeId:  val('bulkWaiveStore'),
+    startISO: parseBR(val('bulkWaiveStart')),
+    endISO:   parseBR(val('bulkWaiveEnd')),
+  };
+}
+
+function previewBulkWaive() {
+  const { storeId, startISO, endISO } = _readBulkWaiveFilters();
+  if (!storeId) { html('bulkWaivePreview', '<p class="subtle">Selecione a loja.</p>'); return; }
+  const matches = findBulkWaiveMatches({ storeId, startISO, endISO });
+  html('bulkWaivePreview', matches.length
+    ? `<p class="subtle" style="margin-bottom:8px">${matches.length} fechamento(s) com diferença pendente:</p>
+       <div class="table-wrap" style="max-height:240px;overflow-y:auto">
+         <table><thead><tr><th>Data</th><th>Turno</th><th>Responsável</th><th>Diferença</th></tr></thead>
+         <tbody>${matches.map((c) => {
+           const esperado = Math.max(0, Number(c.expected || 0) - Number(c.standardFund || 0));
+           const diferenca = Number(c.transfer || 0) - esperado;
+           return `<tr><td>${esc(c.date)}</td><td>${esc(c.shift || 'Integral')}</td><td>${esc(c.responsible)}</td><td style="color:var(--danger);font-weight:600">${money(diferenca)}</td></tr>`;
+         }).join('')}</tbody></table>
+       </div>`
+    : '<p class="subtle">Nenhum fechamento com diferença pendente encontrado para esses filtros.</p>'
+  );
+}
+
+async function applyBulkWaiveDifferences() {
+  if (role !== 'master') return alert('Apenas Gestão 5X pode encerrar diferenças de repasse em massa.');
+  const { storeId, startISO, endISO } = _readBulkWaiveFilters();
+  const reason = (val('bulkWaiveReason') || '').trim();
+  if (!storeId) return alert('Selecione a loja.');
+  if (!reason) return alert('Informe a justificativa.');
+
+  const matches = findBulkWaiveMatches({ storeId, startISO, endISO });
+  if (!matches.length) return alert('Nenhum fechamento com diferença pendente encontrado para esses filtros.');
+  if (!confirm(`Confirma encerrar a diferença de repasse de ${matches.length} fechamento(s) de "${storeName(storeId)}"?\n\nCada um ficará marcado como "Diferença aceita", com a mesma justificativa.`)) return;
+
+  let ok = 0, fail = 0;
+  for (const c of matches) {
+    try {
+      await _writeTransferWaiver(c, reason);
+      ok++;
+    } catch (e) {
+      fail++;
+      console.warn('Falha ao encerrar diferença do fechamento', c.id, e);
+    }
+  }
+
+  save();
+  setVal('bulkWaiveReason', '');
+  html('bulkWaivePreview', '');
+  renderAll();
+  toast(`${ok} diferença(s) encerrada(s)${fail ? `, ${fail} com erro (veja o console)` : ''}.`);
+}
+
+/* ================================================================
    SOLICITAÇÃO DE RETIFICAÇÃO — fluxo do Operador com aprovação Admin
 ================================================================ */
 let _opRectifyTargetId = null;
@@ -1426,6 +1503,7 @@ Object.assign(window, {
   computeOpeningReference, canBackdateClosing, updateClosingDateFieldVisibility,
   recalculateStoreChain, handleRecalculateStoreChain,
   previewBulkReassign, applyBulkReassignStore,
+  previewBulkWaive, applyBulkWaiveDifferences,
 });
 
 

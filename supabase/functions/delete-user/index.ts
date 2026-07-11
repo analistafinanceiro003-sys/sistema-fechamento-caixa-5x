@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
 
   const { data: requester, error: requesterError } = await admin
     .from('profiles')
-    .select('id, user_id, role, status')
+    .select('id, user_id, role, status, is_owner')
     .eq('user_id', authUser.user.id)
     .maybeSingle();
 
@@ -85,6 +85,12 @@ Deno.serve(async (req) => {
 
   if (targetError) return friendlyError(req, 'Não foi possível localizar o usuário.', 500);
   if (!targetProfile) return friendlyError(req, 'Usuário não encontrado.', 404);
+
+  /* Excluir outro acesso Master (Coordenador) é exclusivo de quem já é dono
+     (is_owner) — um coordenador não pode remover o dono nem outro coordenador. */
+  if (targetProfile.role === 'master' && !requester.is_owner) {
+    return friendlyError(req, 'Apenas o dono da conta pode excluir outro acesso Master.', 403);
+  }
 
   /* Analista só exclui Admin/Operador de empresas às quais tem acesso —
      nunca outro Analista ou o Master. */

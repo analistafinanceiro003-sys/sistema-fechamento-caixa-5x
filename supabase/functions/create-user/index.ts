@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
 
   const { data: requester, error: requesterError } = await admin
     .from('profiles')
-    .select('id, user_id, role, status')
+    .select('id, user_id, role, status, is_owner')
     .eq('user_id', authUser.user.id)
     .maybeSingle();
 
@@ -90,7 +90,11 @@ Deno.serve(async (req) => {
   const companyIds = Array.isArray(body.company_ids) ? body.company_ids.map(String) : [];
   const status = String(body.status || 'Ativo').trim() || 'Ativo';
 
-  const allowedRoles = requester.role === 'master' ? ['admin', 'operator', 'analyst'] : ['admin', 'operator'];
+  /* Criar outro acesso Master (Coordenador) é exclusivo de quem já é dono
+     (is_owner) — evita que um coordenador crie/multiplique outros Masters. */
+  const allowedRoles = requester.role === 'master'
+    ? (requester.is_owner ? ['admin', 'operator', 'analyst', 'master'] : ['admin', 'operator', 'analyst'])
+    : ['admin', 'operator'];
 
   if (!name) return friendlyError(req, 'Informe o nome do usuário.');
   if (!email || !isValidEmail(email)) return friendlyError(req, 'Informe um e-mail válido.');
@@ -123,6 +127,8 @@ Deno.serve(async (req) => {
     if (!companies || companies.length !== companyIds.length) {
       return friendlyError(req, 'Uma ou mais empresas selecionadas não foram encontradas.');
     }
+  } else if (role === 'master') {
+    /* Coordenador: acesso total, sem empresa/loja vinculada — nada a validar aqui. */
   } else {
     const { data: company } = await admin
       .from('companies')
@@ -161,9 +167,10 @@ Deno.serve(async (req) => {
     name,
     email,
     role,
-    company_id: role === 'analyst' ? null : companyId,
+    company_id: (role === 'analyst' || role === 'master') ? null : companyId,
     store_id: role === 'operator' ? storeId : null,
     status,
+    is_owner: false,
   };
 
   const { data: profile, error: profileError } = await admin
