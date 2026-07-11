@@ -242,6 +242,43 @@ async function createTransferWaiverRecord(waiver) {
 /* Núcleo sem efeitos de UI (sem save/renderAll/toast) — usado tanto pela
    ação individual quanto pelo encerramento em massa (Ajustes e Correções),
    que dispara isso várias vezes e só quer salvar/renderizar uma vez no final. */
+/* fundDivergence (usado em divergenceReviews / KPIs) e a "Diferença" de
+   repasse são o MESMO número, com sinal invertido — então aceitar uma
+   diferença de repasse precisa também encerrar a divergência de fundo
+   padrão equivalente, senão o mesmo valor continua "vivo" no total de
+   divergência, nos Alertas críticos e na aba Divergências. A tag no
+   adminComment marca que foi este fluxo (e não uma revisão manual do
+   cliente) que resolveu — só assim reopenTransferWaiver() sabe que é
+   seguro reverter ao reabrir. */
+const AUTO_WAIVER_REVIEW_TAG = '[Encerrado via diferença de repasse]';
+
+async function _reconcileDivergenceReviewForWaiver(c, reason) {
+  const review = (state.divergenceReviews || []).find((r) => r.closingId === c.id && r.divergenceType === 'Divergência contra fundo padrão');
+  if (!review || (review.reviewStatus || 'Pendente') !== 'Pendente') return;
+  const updated = {
+    ...review,
+    reviewStatus: 'Resolvida',
+    adminComment: `${AUTO_WAIVER_REVIEW_TAG} ${reason}`,
+    reviewedBy: currentUser?.name || 'Master',
+    reviewedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  if (sb && !USE_LOCAL_FALLBACK && currentUser?.authId) {
+    try { await updateDivergenceReview(review.id, updated); } catch (e) { console.warn('Falha ao reconciliar divergência de fundo padrão', e); }
+  }
+  Object.assign(review, updated);
+}
+
+async function _unreconcileDivergenceReviewForWaiver(closingId) {
+  const review = (state.divergenceReviews || []).find((r) => r.closingId === closingId && r.divergenceType === 'Divergência contra fundo padrão');
+  if (!review || !(review.adminComment || '').startsWith(AUTO_WAIVER_REVIEW_TAG)) return;
+  const updated = { ...review, reviewStatus: 'Pendente', adminComment: '', reviewedBy: '', reviewedAt: '', updatedAt: new Date().toISOString() };
+  if (sb && !USE_LOCAL_FALLBACK && currentUser?.authId) {
+    try { await updateDivergenceReview(review.id, updated); } catch (e) { console.warn('Falha ao reabrir divergência de fundo padrão', e); }
+  }
+  Object.assign(review, updated);
+}
+
 async function _writeTransferWaiver(c, reason) {
   const esperado  = Math.max(0, Number(c.expected || 0) - Number(c.standardFund || 0));
   const diferenca = Number(c.transfer || 0) - esperado;
@@ -265,6 +302,7 @@ async function _writeTransferWaiver(c, reason) {
   }
   state.transferWaivers = state.transferWaivers || [];
   state.transferWaivers.push(waiver);
+  await _reconcileDivergenceReviewForWaiver(c, reason);
   addAudit('Diferença de repasse encerrada', `${storeName(c.storeId)} — ${money(diferenca)} em ${c.date} — Motivo: ${reason}`);
   return waiver;
 }
@@ -309,6 +347,7 @@ async function reopenTransferWaiver(closingId) {
     return alert('Supabase obrigatório em produção para reabrir diferença.');
   }
   state.transferWaivers = (state.transferWaivers || []).filter((w) => w.id !== waiver.id);
+  await _unreconcileDivergenceReviewForWaiver(closingId);
   addAudit('Diferença de repasse reaberta (Master)', `${storeName(waiver.storeId)} — ${money(waiver.amount)}${c ? ' em ' + c.date : ''}`);
   save();
   renderAll();

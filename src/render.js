@@ -23,20 +23,37 @@ function renderAll() {
   try { calc(); } catch(e) { console.warn('calc:', e); }
 }
 
+/* Fechamentos com pelo menos uma divergência (fundo padrão ou abertura) ainda
+   pendente de revisão — usado para não contar/alertar o que já foi
+   revisado/justificado/resolvido na aba Divergências, ou aceito via
+   "Encerrar diferença" em Repasses/Resumo (que reconcilia com
+   divergenceReviews — ver _writeTransferWaiver/reopenTransferWaiver em
+   src/db.js). Uma divergência tratada não deve mais contar como pendência
+   em nenhum KPI, alerta ou listagem — só o extrato/relatórios (histórico
+   factual) continuam mostrando o valor real ocorrido. */
+function pendingDivergenceClosingIds() {
+  return new Set(
+    (state.divergenceReviews || [])
+      .filter((r) => (r.reviewStatus || 'Pendente') === 'Pendente')
+      .map((r) => r.closingId)
+  );
+}
+
 /* --- KPIs (Master e Admin) --- */
 function renderMetrics() {
+  const pendingIds = pendingDivergenceClosingIds();
   /* Master — getScopedClosings() já exclui excluídos e originais superados por retificação */
   const masterRows = getScopedClosings({ scope: 'master' });
   text('mCompanies', state.companies.filter((c) => c.status !== 'Inativa').length);
   text('mStores', state.stores.length);
   text('mClosings', masterRows.length);
-  text('mDiff', money(masterRows.reduce((a, c) => a + Math.abs(Number(c.diff || 0)), 0)));
+  text('mDiff', money(masterRows.reduce((a, c) => a + (pendingIds.has(c.id) ? Math.abs(Number(c.diff || 0)) : 0), 0)));
   /* Admin */
   const adminRows = getScopedClosings({ scope: 'admin' });
   text('aStores', state.stores.filter((s) => s.companyId === currentUser?.companyId).length);
   text('aClosings', adminRows.length);
   text('aUsers', state.users.filter((u) => u.companyId === currentUser?.companyId).length);
-  text('aDiff', money(adminRows.reduce((a, c) => a + Math.abs(Number(c.diff || 0)), 0)));
+  text('aDiff', money(adminRows.reduce((a, c) => a + (pendingIds.has(c.id) ? Math.abs(Number(c.diff || 0)) : 0), 0)));
 }
 
 /* --- MASTER DASHBOARD --- */
@@ -89,11 +106,12 @@ function renderMasterDashboard() {
      quem entra nas contagens/somas é sempre o valor retificado, não o original. */
   const dashCompanyId = val('dashCompanyFilter') || null;
   const activeRows = getScopedClosings({ scope: 'master', companyId: dashCompanyId });
+  const pendingReviewClosingIds = pendingDivergenceClosingIds();
 
   /* KPIs — refletem a empresa filtrada quando selecionada (Empresas ativas continua global) */
   text('mStores', dashCompanyId ? state.stores.filter((s) => s.companyId === dashCompanyId).length : state.stores.length);
   text('mClosings', activeRows.length);
-  text('mDiff', money(activeRows.reduce((a, c) => a + Math.abs(Number(c.diff || 0)), 0)));
+  text('mDiff', money(activeRows.reduce((a, c) => a + (pendingReviewClosingIds.has(c.id) ? Math.abs(Number(c.diff || 0)) : 0), 0)));
 
   /* Tendência — fechamentos e divergências por dia (últimos 14 dias) */
   const divRows = activeRows.filter((c) => c.status === 'Divergência');
@@ -115,11 +133,6 @@ function renderMasterDashboard() {
      desde a criação — reviewDivergence() só atualiza o registro de divergenceReviews, nunca o
      fechamento em si). Um fechamento some daqui assim que TODAS as suas divergências associadas
      forem marcadas Revisada/Justificada/Resolvida na aba Divergências. */
-  const pendingReviewClosingIds = new Set(
-    (state.divergenceReviews || [])
-      .filter((r) => (r.reviewStatus || 'Pendente') === 'Pendente')
-      .map((r) => r.closingId)
-  );
   const critical = activeRows
     .filter((c) => c.status === 'Divergência' && pendingReviewClosingIds.has(c.id))
     .map((c) => ({ c, days: _daysSince(c.date) }))
@@ -157,15 +170,22 @@ function renderMasterDashboard() {
     : '<p class="subtle">Nenhuma empresa em implantação.</p>'
   );
 
-  /* Lojas sem fechamento recente — loja ativa (de empresa ativa) sem nenhum
-     fechamento novo há STALE_STORE_DAYS dias ou mais. Detecta operação
-     esquecida/parada sem precisar de uma configuração de dias úteis por loja. */
+  /* Lojas sem fechamento recente — loja ativa sem nenhum fechamento novo há
+     STALE_STORE_DAYS dias ou mais. Detecta operação esquecida/parada sem
+     precisar de uma configuração de dias úteis por loja.
+     - Empresa "Inativa" é ignorada (empresa Implantação continua contando —
+       uma loja pode já ter fechamentos reais mesmo com a empresa ainda não
+       marcada como Ativa no cadastro).
+     - Caixa tipo "Central" é ignorado — é um ponto que só recebe repasses de
+       outras lojas, não fecha caixa diariamente, então nunca ter fechamento
+       próprio é esperado, não uma pendência. */
   const STALE_STORE_DAYS = 2;
   const relevantStores = state.stores.filter((s) => {
     if (s.status !== 'Ativa') return false;
+    if (s.cashType === 'Central') return false;
     if (dashCompanyId && s.companyId !== dashCompanyId) return false;
     const company = state.companies.find((co) => co.id === s.companyId);
-    return !!company && company.status === 'Ativa';
+    return !!company && company.status !== 'Inativa';
   });
   const staleStores = relevantStores
     .map((s) => {
@@ -187,6 +207,47 @@ function renderMasterDashboard() {
         </div>`;
       }).join('')
     : '<p class="subtle">Todas as lojas ativas com fechamentos em dia.</p>'
+  );
+
+  /* Totais por Loja — entradas/saídas/repasse somados por loja no período
+     selecionado (independente do filtro de empresa acima), para o master
+     validar rapidamente se os números por loja fazem sentido. */
+  const totalsStart = val('dashTotalsStart');
+  const totalsEnd   = val('dashTotalsEnd');
+  const totalsRows = activeRows.filter((c) => {
+    const d = parseBR(c.date);
+    if (totalsStart && d < totalsStart) return false;
+    if (totalsEnd && d > totalsEnd) return false;
+    return true;
+  });
+  const totalsByStore = new Map();
+  totalsRows.forEach((c) => {
+    if (!totalsByStore.has(c.storeId)) {
+      totalsByStore.set(c.storeId, { companyId: c.companyId, storeId: c.storeId, count: 0, entries: 0, expenses: 0, transfer: 0 });
+    }
+    const t = totalsByStore.get(c.storeId);
+    t.count++;
+    t.entries  += Number(c.entries  || 0);
+    t.expenses += Number(c.expenses || 0);
+    t.transfer += Number(c.transfer || 0);
+  });
+  const totalsList = [...totalsByStore.values()].sort((a, b) => storeName(a.storeId).localeCompare(storeName(b.storeId)));
+  html('dashTotalsBody', totalsList.length
+    ? totalsList.map((t) => `<tr>
+        <td>${esc(companyName(t.companyId))}</td><td>${esc(storeName(t.storeId))}</td>
+        <td>${t.count}</td><td>${money(t.entries)}</td><td>${money(t.expenses)}</td><td>${money(t.transfer)}</td>
+      </tr>`).join('')
+    : emptyRow(6)
+  );
+  const totalsGrand = totalsList.reduce((a, t) => ({
+    count: a.count + t.count, entries: a.entries + t.entries, expenses: a.expenses + t.expenses, transfer: a.transfer + t.transfer,
+  }), { count: 0, entries: 0, expenses: 0, transfer: 0 });
+  html('dashTotalsFooter', totalsList.length
+    ? `<tr style="font-weight:700">
+        <td colspan="2">Total</td>
+        <td>${totalsGrand.count}</td><td>${money(totalsGrand.entries)}</td><td>${money(totalsGrand.expenses)}</td><td>${money(totalsGrand.transfer)}</td>
+      </tr>`
+    : ''
   );
 
   /* Atividade recente — últimos fechamentos registrados, de todas as empresas */
@@ -674,46 +735,60 @@ function renderFechamentos() {
     </tr>`;
   }).filter(Boolean).join('') || emptyRow(11));
 
-  /* Divergências */
+  /* Divergências — só lista o que ainda está pendente de revisão. Uma vez
+     revisada/justificada/resolvida na aba Divergências do cliente, ou aceita
+     via "Encerrar diferença" em Repasses/Resumo (reconciliado automaticamente
+     com divergenceReviews — ver _writeTransferWaiver em src/db.js), some
+     daqui. O status de cada item vem do registro real em divergenceReviews,
+     não de c.reviewStatus (campo do fechamento que nunca é atualizado pela
+     revisão). */
   const divRows = divergenceFilteredClosings();
-  html('divergenceSummary',
-    `<div class="kpi-alert"><strong>${divRows.length} divergência(s)</strong>
-    <p class="subtle">Valor absoluto total: ${money(divRows.reduce((a,c)=>a+Math.abs(Number(c.diff||0)),0))}</p></div>`
-  );
-  html('divergencesBody', divRows.flatMap((c) => {
+  const divItems = divRows.flatMap((c) => {
     const tolerance = Number(c.toleranceSnapshot ?? cfg(c.companyId).tolerance ?? 5);
     const fundDiv   = Number(c.fundDivergence ?? c.diff ?? 0);
     const openDiv   = Number(c.openingDivergence || 0);
     const items = [];
     if (Math.abs(fundDiv) > tolerance) {
+      const review = (state.divergenceReviews || []).find((r) => r.closingId === c.id && r.divergenceType === 'Divergência contra fundo padrão');
       items.push({
+        c,
         tipo: '<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:11px">Fundo padrão</span>',
         esperado:   Number(c.standardFund || 0),
         encontrado: Number(c.cashBalance ?? c.finalAfterTransfer ?? 0),
         diferenca:  fundDiv,
+        reviewStatus: review ? (review.reviewStatus || 'Pendente') : 'Pendente',
       });
     }
     if (Math.abs(openDiv) > tolerance) {
+      const review = (state.divergenceReviews || []).find((r) => r.closingId === c.id && r.divergenceType === 'Divergência de abertura');
       items.push({
+        c,
         tipo: '<span style="background:#fef9c3;color:#854d0e;padding:1px 6px;border-radius:3px;font-size:11px">Abertura</span>',
         esperado:   Number(c.previousFinalAfterTransfer || 0),
         encontrado: Number(c.initial || 0),
         diferenca:  openDiv,
+        reviewStatus: review ? (review.reviewStatus || 'Pendente') : 'Pendente',
       });
     }
-    return items.map((item) => {
-      const col = item.diferenca < 0 ? 'var(--danger)' : 'var(--warning)';
-      const sig = item.diferenca > 0 ? '+' : '';
-      return `<tr>
-        <td>${esc(companyName(c.companyId))}</td><td>${esc(storeName(c.storeId))}</td>
-        <td>${esc(c.date)}</td><td>${esc(c.responsible || '-')}</td>
-        <td>${item.tipo}</td>
-        <td>${money(item.esperado)}</td>
-        <td>${money(item.encontrado)}</td>
-        <td style="color:${col};font-weight:600">${sig}${money(item.diferenca)}</td>
-        <td>${tag(c.reviewStatus || 'Pendente de revisão')}</td>
-      </tr>`;
-    });
+    return items;
+  }).filter((item) => item.reviewStatus === 'Pendente');
+
+  html('divergenceSummary',
+    `<div class="kpi-alert"><strong>${divItems.length} divergência(s) pendente(s)</strong>
+    <p class="subtle">Valor absoluto total: ${money(divItems.reduce((a,item)=>a+Math.abs(item.diferenca),0))}</p></div>`
+  );
+  html('divergencesBody', divItems.map((item) => {
+    const col = item.diferenca < 0 ? 'var(--danger)' : 'var(--warning)';
+    const sig = item.diferenca > 0 ? '+' : '';
+    return `<tr>
+      <td>${esc(companyName(item.c.companyId))}</td><td>${esc(storeName(item.c.storeId))}</td>
+      <td>${esc(item.c.date)}</td><td>${esc(item.c.responsible || '-')}</td>
+      <td>${item.tipo}</td>
+      <td>${money(item.esperado)}</td>
+      <td>${money(item.encontrado)}</td>
+      <td style="color:${col};font-weight:600">${sig}${money(item.diferenca)}</td>
+      <td>${tag(item.reviewStatus)}</td>
+    </tr>`;
   }).join('') || emptyRow(9));
 }
 
@@ -820,11 +895,12 @@ function renderFornecedoresCategorias() {
 function renderAdminViews() {
   const stores = state.stores.filter((s) => s.companyId === currentUser?.companyId);
   const rows   = getScopedClosings({ scope: 'admin' });
+  const pendingReviewClosingIds = pendingDivergenceClosingIds();
 
   /* KPIs do dashboard */
   text('aStores',   stores.length);
   text('aClosings', rows.length);
-  const totalDiff = rows.reduce((a, c) => a + Math.abs(Number(c.diff || 0)), 0);
+  const totalDiff = rows.reduce((a, c) => a + (pendingReviewClosingIds.has(c.id) ? Math.abs(Number(c.diff || 0)) : 0), 0);
   text('aDiff', money(totalDiff));
 
   /* Saldo Central = soma dos repasses marcados como Recebido */
@@ -845,7 +921,7 @@ function renderAdminViews() {
         <div class="store-kpi"><span>Entradas</span><strong>${money(cls.reduce((a,c)=>a+Number(c.entries||0),0))}</strong></div>
         <div class="store-kpi"><span>Saídas</span><strong>${money(cls.reduce((a,c)=>a+Number(c.expenses||0),0))}</strong></div>
         <div class="store-kpi"><span>Repasse</span><strong>${money(cls.reduce((a,c)=>a+Number(c.transfer||0),0))}</strong></div>
-        <div class="store-kpi"><span>Divergência</span><strong>${money(cls.reduce((a,c)=>a+Number(c.diff||0),0))}</strong></div>
+        <div class="store-kpi"><span>Divergência</span><strong>${money(cls.reduce((a,c)=>a+(pendingReviewClosingIds.has(c.id)?Number(c.diff||0):0),0))}</strong></div>
       </div>
       <div style="margin-top:8px">${tag(lastStatus)}</div>
     </div>`;

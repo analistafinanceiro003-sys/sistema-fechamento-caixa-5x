@@ -161,6 +161,22 @@
       </div>
 
       <div class="card" style="margin-top:16px">
+        <h3 class="section-title">Totais por Loja</h3>
+        <p class="subtle" style="margin-bottom:10px">Entradas, saídas e repasse informado por loja no período — use para validar os números rapidamente. Respeita o filtro de empresa acima.</p>
+        <div class="filter-bar-5x" style="margin-bottom:10px;max-width:420px">
+          <div class="field"><label>Data inicial</label><input id="dashTotalsStart" type="date" onchange="renderMasterDashboard()"/></div>
+          <div class="field"><label>Data final</label><input id="dashTotalsEnd" type="date" onchange="renderMasterDashboard()"/></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Empresa</th><th>Loja</th><th>Fechamentos</th><th>Entradas</th><th>Saídas</th><th>Repasse informado</th></tr></thead>
+            <tbody id="dashTotalsBody"></tbody>
+            <tfoot id="dashTotalsFooter"></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
         <h3 class="section-title">Atividade recente</h3>
         <div id="dashActivity"></div>
       </div>
