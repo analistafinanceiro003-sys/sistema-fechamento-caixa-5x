@@ -1781,6 +1781,7 @@ async function addSelectOption() {
 }
 
 async function removeSelectOption(key, value) {
+  if (!confirm(`Excluir "${value}"?`)) return;
   if (COMPANY_SCOPED_OPTION_CATEGORIES.includes(key)) {
     const companyId = val('optionCompany');
     if (!companyId) return;
@@ -1824,6 +1825,44 @@ async function removeSelectOption(key, value) {
   }
   save();
   renderAll();
+}
+
+async function renameSelectOption(key, oldValue, newValue) {
+  newValue = (newValue || '').trim();
+  if (!newValue || newValue === oldValue) return;
+  if (COMPANY_SCOPED_OPTION_CATEGORIES.includes(key)) {
+    const companyId = val('optionCompany');
+    if (!companyId) return;
+    return renameCompanyOption(key, companyId, oldValue, newValue);
+  }
+  const list = state.selectOptions[key] || [];
+  const idx = list.indexOf(oldValue);
+  if (idx === -1) return;
+  if (list.includes(newValue)) return alert('Já existe uma opção com esse nome.');
+  const backup = [...list];
+  const updated = [...list];
+  updated[idx] = newValue;
+  state.selectOptions[key] = updated;
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await saveSelectOptionsToSupabase();
+    } catch (e) {
+      state.selectOptions[key] = backup;
+      renderAll();
+      return alert(`Não foi possível salvar a alteração. Tente novamente.\n(${e.message})`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    state.selectOptions[key] = backup;
+    return alert('Supabase Auth/Sessão obrigatório em produção para salvar opções.');
+  }
+  save();
+  renderAll();
+}
+
+function promptRenameSelectOption(key, oldValue) {
+  const newValue = prompt(`Novo nome para "${oldValue}":`, oldValue);
+  if (newValue === null) return;
+  renameSelectOption(key, oldValue, newValue);
 }
 
 /* --- Fornecedores e Categorias por empresa (aba dedicada em Sistema → Configurações) --- */
@@ -2446,7 +2485,7 @@ Object.assign(window, {
   resetSelectedUserPassword, resetUserPasswordViaEdgeFunction, removeUserById,
   deleteSelectedUser, deleteUser,
   createRule, deleteRule, saveImplantStep, upsertImplantStep, saveOperationConfig,
-  addSelectOption, removeSelectOption, resetSelectOptions, optionsForCompany,
+  addSelectOption, removeSelectOption, renameSelectOption, promptRenameSelectOption, resetSelectOptions, optionsForCompany,
   addCompanyOption, removeCompanyOption, renameCompanyOption, promptRenameCompanyOption,
   addFornecedor, addCategoria, addCliente, addCategoriaEntrada,
   openLimparDadosModal, closeLimparDadosModal, clearCompanyData,

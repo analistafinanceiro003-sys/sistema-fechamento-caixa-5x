@@ -552,9 +552,17 @@ function renderSistema() {
     const values = isCompanyScoped ? optionsForCompany(optionCompanyId, key) : (state.selectOptions[key] || []);
     return `<div class="option-group">
       <div class="option-group-head"><strong>${labels[key]}</strong><span class="pill">${values.length} opção(ões)</span></div>
-      <div class="option-items">${values.map((v) =>
-        `<span class="option-pill">${esc(v)}<button onclick="removeSelectOption('${key}','${esc(v)}')">×</button></span>`
-      ).join('') || '<span class="subtle">Nenhuma.</span>'}</div>
+      <div class="table-wrap compact-table"><table><thead><tr><th>Nome</th><th>Ação</th></tr></thead><tbody>${
+        values.length
+          ? values.map((v) => `<tr>
+              <td>${esc(v)}</td>
+              <td class="row-actions">
+                <button class="btn btn-sm" data-gopt-action="edit" data-gopt-key="${esc(key)}" data-gopt-value="${esc(v)}">Editar</button>
+                <button class="btn btn-sm btn-danger" data-gopt-action="remove" data-gopt-key="${esc(key)}" data-gopt-value="${esc(v)}">Excluir</button>
+              </td>
+            </tr>`).join('')
+          : emptyRow(2, 'Nenhuma opção cadastrada.')
+      }</tbody></table></div>
     </div>`;
   }).join(''));
 

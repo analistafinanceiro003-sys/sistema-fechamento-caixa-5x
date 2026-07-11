@@ -125,6 +125,15 @@ function bindGlobalEvents() {
     if (optAction === 'remove') removeCompanyOption(optCategory, optCompany, optValue);
     else if (optAction === 'edit') promptRenameCompanyOption(optCategory, optCompany, optValue);
   });
+
+  /* Editar/Excluir na tela genérica "Opções das caixas de seleção" (Sistema → Configurações). */
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-gopt-action]');
+    if (!btn) return;
+    const { goptAction, goptKey, goptValue } = btn.dataset;
+    if (goptAction === 'remove') removeSelectOption(goptKey, goptValue);
+    else if (goptAction === 'edit') promptRenameSelectOption(goptKey, goptValue);
+  });
 }
 
 /* Sidebar compacta (hover) por padrão no desktop */
