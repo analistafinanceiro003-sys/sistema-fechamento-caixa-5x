@@ -650,36 +650,36 @@
           </div>
           <div class="management-grid">
             <div class="management-card">
-              <h4>Fornecedores</h4>
-              <div class="option-manager" style="margin-bottom:10px">
+              <div class="option-group-head"><h4>Fornecedores</h4><span class="pill" id="fcFornecedoresCount">0</span></div>
+              <div class="option-manager">
                 <div class="field"><label>Novo fornecedor</label><input id="fcNewFornecedor" placeholder="Nome do fornecedor"/></div>
                 <button class="btn btn-brand" onclick="addFornecedor()">Adicionar</button>
               </div>
-              <div class="option-list" id="fcFornecedoresList"></div>
+              <div class="table-wrap compact-table"><table><thead><tr><th>Fornecedor</th><th>Ação</th></tr></thead><tbody id="fcFornecedoresBody"></tbody></table></div>
             </div>
             <div class="management-card">
-              <h4>Categorias de saída</h4>
-              <div class="option-manager" style="margin-bottom:10px">
+              <div class="option-group-head"><h4>Categorias de saída</h4><span class="pill" id="fcCategoriasCount">0</span></div>
+              <div class="option-manager">
                 <div class="field"><label>Nova categoria</label><input id="fcNewCategoria" placeholder="Nome da categoria"/></div>
                 <button class="btn btn-brand" onclick="addCategoria()">Adicionar</button>
               </div>
-              <div class="option-list" id="fcCategoriasList"></div>
+              <div class="table-wrap compact-table"><table><thead><tr><th>Categoria</th><th>Ação</th></tr></thead><tbody id="fcCategoriasBody"></tbody></table></div>
             </div>
             <div class="management-card">
-              <h4>Clientes</h4>
-              <div class="option-manager" style="margin-bottom:10px">
+              <div class="option-group-head"><h4>Clientes</h4><span class="pill" id="fcClientesCount">0</span></div>
+              <div class="option-manager">
                 <div class="field"><label>Novo cliente</label><input id="fcNewCliente" placeholder="Nome do cliente"/></div>
                 <button class="btn btn-brand" onclick="addCliente()">Adicionar</button>
               </div>
-              <div class="option-list" id="fcClientesList"></div>
+              <div class="table-wrap compact-table"><table><thead><tr><th>Cliente</th><th>Ação</th></tr></thead><tbody id="fcClientesBody"></tbody></table></div>
             </div>
             <div class="management-card">
-              <h4>Categorias de entrada</h4>
-              <div class="option-manager" style="margin-bottom:10px">
+              <div class="option-group-head"><h4>Categorias de entrada</h4><span class="pill" id="fcCategoriasEntradaCount">0</span></div>
+              <div class="option-manager">
                 <div class="field"><label>Nova categoria</label><input id="fcNewCategoriaEntrada" placeholder="Nome da categoria"/></div>
                 <button class="btn btn-brand" onclick="addCategoriaEntrada()">Adicionar</button>
               </div>
-              <div class="option-list" id="fcCategoriasEntradaList"></div>
+              <div class="table-wrap compact-table"><table><thead><tr><th>Categoria</th><th>Ação</th></tr></thead><tbody id="fcCategoriasEntradaBody"></tbody></table></div>
             </div>
           </div>
         </div>

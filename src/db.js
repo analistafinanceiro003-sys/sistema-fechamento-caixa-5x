@@ -50,6 +50,12 @@ function defaultSelectOptions() {
    As demais categorias do seletor continuam globais para todo o sistema. */
 const COMPANY_SCOPED_OPTION_CATEGORIES = ['expenseCategories', 'fornecedores', 'entryCategories', 'clientes'];
 
+/* Marcador salvo no Supabase quando uma empresa apaga todos os itens de uma categoria
+   (inclusive os padrões). Sem ele, "zero linhas no banco" fica indistinguível de
+   "empresa nunca customizou essa categoria" e os padrões globais voltam a aparecer
+   após excluir o último item ou recarregar a página. */
+const EMPTY_OPTION_MARKER = '__EMPTY__';
+
 function defaultState() {
   return {
     companies: [{ id: 'demo', name: 'Cliente Demonstração', legal: 'Cliente Demonstração LTDA', cnpj: '00.000.000/0001-00', segment: 'Restaurante / Hamburgueria', plan: 'Premium 5X', status: 'Ativa', notes: 'Base demonstrativa' }],
@@ -356,7 +362,9 @@ function applySelectOptionRows(rows = []) {
     if (row.company_id) {
       companyOptions[row.company_id] = companyOptions[row.company_id] || {};
       companyOptions[row.company_id][row.category] = companyOptions[row.company_id][row.category] || [];
-      if (!companyOptions[row.company_id][row.category].includes(row.value)) {
+      /* O marcador só existe para registrar "empresa esvaziou esta categoria" —
+         não deve virar um item real na lista. */
+      if (row.value !== EMPTY_OPTION_MARKER && !companyOptions[row.company_id][row.category].includes(row.value)) {
         companyOptions[row.company_id][row.category].push(row.value);
       }
       return;
@@ -861,7 +869,10 @@ async function saveSelectOptionsToSupabase() {
 function optionsForCompany(companyId, category) {
   if (COMPANY_SCOPED_OPTION_CATEGORIES.includes(category)) {
     const companyValues = state.companySelectOptions?.[companyId]?.[category];
-    if (companyValues?.length) return companyValues;
+    /* Uma vez que a empresa customizou a categoria (mesmo esvaziando tudo),
+       companyValues é um array real (possivelmente []) e prevalece sobre os
+       padrões globais. Só cai nos padrões quando a empresa nunca mexeu nela. */
+    if (companyValues !== undefined) return companyValues;
   }
   return state.selectOptions?.[category] || [];
 }
@@ -872,11 +883,14 @@ async function saveCompanyOptionsToSupabase(companyId, category) {
   const { error: deleteError } = await sb.from('select_options')
     .delete().eq('company_id', companyId).eq('category', category);
   if (deleteError) throw deleteError;
-  if (values.length) {
-    const rows = values.map((value) => ({ company_id: companyId, category, value, is_global: false }));
-    const { error: insertError } = await sb.from('select_options').insert(rows);
-    if (insertError) throw insertError;
-  }
+  /* Mesmo com a lista vazia, grava um marcador — sem isso o Supabase fica com
+     zero linhas para esta empresa+categoria, indistinguível de "nunca customizada",
+     e os padrões globais voltariam a aparecer no próximo carregamento. */
+  const rows = values.length
+    ? values.map((value) => ({ company_id: companyId, category, value, is_global: false }))
+    : [{ company_id: companyId, category, value: EMPTY_OPTION_MARKER, is_global: false }];
+  const { error: insertError } = await sb.from('select_options').insert(rows);
+  if (insertError) throw insertError;
   lastOwnSave = Date.now();
 }
 
@@ -1722,7 +1736,9 @@ async function addSelectOption() {
     const companyId = val('optionCompany');
     if (!companyId) return alert('Selecione a empresa para esta categoria.');
     state.companySelectOptions[companyId] = state.companySelectOptions[companyId] || {};
-    state.companySelectOptions[companyId][key] = state.companySelectOptions[companyId][key] || [];
+    if (state.companySelectOptions[companyId][key] === undefined) {
+      state.companySelectOptions[companyId][key] = [...optionsForCompany(companyId, key)];
+    }
     if (state.companySelectOptions[companyId][key].includes(value)) return;
     state.companySelectOptions[companyId][key].push(value);
     if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
@@ -1768,8 +1784,11 @@ async function removeSelectOption(key, value) {
   if (COMPANY_SCOPED_OPTION_CATEGORIES.includes(key)) {
     const companyId = val('optionCompany');
     if (!companyId) return;
-    const backup = [...(state.companySelectOptions[companyId]?.[key] || [])];
     state.companySelectOptions[companyId] = state.companySelectOptions[companyId] || {};
+    const current = state.companySelectOptions[companyId][key] !== undefined
+      ? state.companySelectOptions[companyId][key]
+      : optionsForCompany(companyId, key);
+    const backup = [...current];
     state.companySelectOptions[companyId][key] = backup.filter((v) => v !== value);
     if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
       try {
@@ -1813,7 +1832,11 @@ async function addCompanyOption(category, companyId, value) {
   if (!companyId) return alert('Selecione a empresa.');
   if (!value) return alert('Informe um valor.');
   state.companySelectOptions[companyId] = state.companySelectOptions[companyId] || {};
-  state.companySelectOptions[companyId][category] = state.companySelectOptions[companyId][category] || [];
+  /* Parte da lista atualmente visível (própria ou padrão global) — nunca de [] —
+     senão adicionar um item apaga da tela os padrões que a empresa não excluiu. */
+  if (state.companySelectOptions[companyId][category] === undefined) {
+    state.companySelectOptions[companyId][category] = [...optionsForCompany(companyId, category)];
+  }
   if (state.companySelectOptions[companyId][category].includes(value)) return alert('Este item já está cadastrado para esta empresa.');
   state.companySelectOptions[companyId][category].push(value);
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
@@ -1873,8 +1896,15 @@ async function addCategoriaEntrada() {
 }
 
 async function removeCompanyOption(category, companyId, value) {
-  const backup = [...(state.companySelectOptions[companyId]?.[category] || [])];
+  if (!confirm(`Excluir "${value}"?`)) return;
   state.companySelectOptions[companyId] = state.companySelectOptions[companyId] || {};
+  /* Parte da lista atualmente visível (própria ou padrão global) — assim, excluir
+     um item padrão que a empresa nunca havia customizado gera uma lista própria
+     "padrões menos este item" em vez de reaparecer no próximo render/reload. */
+  const current = state.companySelectOptions[companyId][category] !== undefined
+    ? state.companySelectOptions[companyId][category]
+    : optionsForCompany(companyId, category);
+  const backup = [...current];
   state.companySelectOptions[companyId][category] = backup.filter((v) => v !== value);
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
     try {
@@ -1895,13 +1925,16 @@ async function removeCompanyOption(category, companyId, value) {
 async function renameCompanyOption(category, companyId, oldValue, newValue) {
   newValue = (newValue || '').trim();
   if (!newValue || newValue === oldValue) return;
-  const list = state.companySelectOptions?.[companyId]?.[category] || [];
+  const list = state.companySelectOptions?.[companyId]?.[category] !== undefined
+    ? state.companySelectOptions[companyId][category]
+    : optionsForCompany(companyId, category);
   const idx = list.indexOf(oldValue);
   if (idx === -1) return;
   if (list.includes(newValue)) return alert('Já existe um item com esse nome para esta empresa.');
   const backup = [...list];
   const updated = [...list];
   updated[idx] = newValue;
+  state.companySelectOptions[companyId] = state.companySelectOptions[companyId] || {};
   state.companySelectOptions[companyId][category] = updated;
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
     try {

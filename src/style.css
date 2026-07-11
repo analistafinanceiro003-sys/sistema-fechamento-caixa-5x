@@ -301,6 +301,8 @@ tr:hover td{background:#fafbfc}
 .management-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px}
 .management-card h4{font-size:14px;margin-bottom:10px;font-weight:650}
 .compact-table table{min-width:560px}
+.option-group-head h4{margin-bottom:0}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap}
 .config-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
 .mini-actions{display:flex;gap:8px;flex-wrap:wrap}
 

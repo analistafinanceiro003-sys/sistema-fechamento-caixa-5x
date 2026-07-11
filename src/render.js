@@ -580,26 +580,33 @@ function renderSistema() {
   renderFornecedoresCategorias();
 }
 
-/* --- Fornecedores e Categorias por empresa (aba dedicada em Sistema → Configurações) --- */
+/* --- Fornecedores e Categorias por empresa (aba dedicada em Sistema → Configurações) ---
+   Ações (editar/excluir) usam data-attributes + delegação de evento (ver bindGlobalEvents
+   em app.js), nunca onclick com o valor interpolado — evita quebrar o atributo quando o
+   nome cadastrado tem aspas/apóstrofo (ex: "Distribuidora D'Ávila"). */
 function renderFornecedoresCategorias() {
   if (!$('fcCompanyFilter')) return;
   setOptions('fcCompanyFilter', visibleCompanies().map((c) => [c.id, c.name]), 'Selecione a empresa');
   const companyId = val('fcCompanyFilter');
 
-  const renderList = (elId, category, emptyLabel) => {
-    if (!companyId) { html(elId, `<p class="subtle">Selecione uma empresa acima.</p>`); return; }
+  const renderList = (elId, countId, category, emptyLabel) => {
+    if (!companyId) { html(elId, emptyRow(2, 'Selecione uma empresa acima.')); text(countId, '0'); return; }
     const values = optionsForCompany(companyId, category);
+    text(countId, String(values.length));
     html(elId, values.length
-      ? values.map((v) => `<span class="option-pill">${esc(v)}
-          <button class="edit-btn" title="Editar" onclick="promptRenameCompanyOption('${category}','${esc(companyId)}','${esc(v)}')">✎</button>
-          <button title="Excluir" onclick="removeCompanyOption('${category}','${esc(companyId)}','${esc(v)}')">×</button>
-        </span>`).join('')
-      : `<p class="subtle">${emptyLabel}</p>`);
+      ? values.map((v) => `<tr>
+          <td>${esc(v)}</td>
+          <td class="row-actions">
+            <button class="btn btn-sm" data-opt-action="edit" data-opt-category="${esc(category)}" data-opt-company="${esc(companyId)}" data-opt-value="${esc(v)}">Editar</button>
+            <button class="btn btn-sm btn-danger" data-opt-action="remove" data-opt-category="${esc(category)}" data-opt-company="${esc(companyId)}" data-opt-value="${esc(v)}">Excluir</button>
+          </td>
+        </tr>`).join('')
+      : emptyRow(2, emptyLabel));
   };
-  renderList('fcFornecedoresList', 'fornecedores', 'Nenhum fornecedor cadastrado para esta empresa.');
-  renderList('fcCategoriasList', 'expenseCategories', 'Nenhuma categoria cadastrada para esta empresa.');
-  renderList('fcClientesList', 'clientes', 'Nenhum cliente cadastrado para esta empresa.');
-  renderList('fcCategoriasEntradaList', 'entryCategories', 'Nenhuma categoria cadastrada para esta empresa.');
+  renderList('fcFornecedoresBody', 'fcFornecedoresCount', 'fornecedores', 'Nenhum fornecedor cadastrado para esta empresa.');
+  renderList('fcCategoriasBody', 'fcCategoriasCount', 'expenseCategories', 'Nenhuma categoria cadastrada para esta empresa.');
+  renderList('fcClientesBody', 'fcClientesCount', 'clientes', 'Nenhum cliente cadastrado para esta empresa.');
+  renderList('fcCategoriasEntradaBody', 'fcCategoriasEntradaCount', 'entryCategories', 'Nenhuma categoria cadastrada para esta empresa.');
 }
 
 /* --- ADMIN --- */

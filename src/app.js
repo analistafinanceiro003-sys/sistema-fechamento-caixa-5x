@@ -114,6 +114,17 @@ function bindGlobalEvents() {
       enterApp();
     }
   });
+
+  /* Editar/Excluir de Fornecedores, Categorias e Clientes (aba Sistema → Configurações).
+     Usa data-attributes (HTML-escapados) em vez de onclick com o valor interpolado,
+     para não quebrar quando o nome cadastrado tem aspas/apóstrofo. */
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-opt-action]');
+    if (!btn) return;
+    const { optAction, optCategory, optCompany, optValue } = btn.dataset;
+    if (optAction === 'remove') removeCompanyOption(optCategory, optCompany, optValue);
+    else if (optAction === 'edit') promptRenameCompanyOption(optCategory, optCompany, optValue);
+  });
 }
 
 /* Sidebar compacta (hover) por padrão no desktop */
