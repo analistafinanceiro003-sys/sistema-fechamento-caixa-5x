@@ -153,6 +153,11 @@
           <h3 class="section-title">Empresas em implantação</h3>
           <div id="dashImplant"><p class="subtle">Carregando…</p></div>
         </div>
+        <div class="card">
+          <h3 class="section-title">Lojas sem fechamento recente</h3>
+          <p class="subtle" style="margin-bottom:10px">Lojas ativas sem nenhum fechamento novo há 2 dias ou mais — possível operação esquecida ou parada.</p>
+          <div id="dashStaleStores"><p class="subtle">Carregando…</p></div>
+        </div>
       </div>
 
       <div class="card" style="margin-top:16px">
@@ -992,13 +997,15 @@
                 <tr><td><strong>Histórico</strong></td><td>Consulta de fechamentos anteriores com filtros por data e loja</td><td>Admin / Operador</td></tr>
                 <tr><td><strong>Regras Operacionais</strong></td><td>Regras visíveis ao operador: saídas permitidas, checklist de conferência</td><td>Admin (cadastra) / Operador (lê)</td></tr>
                 <tr><td><strong>Movimentações</strong></td><td>Extrato consolidado de entradas, saídas e repasses com filtros de data, loja e operador</td><td>Admin / Master / Analista</td></tr>
-                <tr><td><strong>Repasses</strong></td><td>Confirmação dos valores de repasse enviados pelo operador. Mostra status: Confirmado, Pendente, Não repassado ou Dentro da tolerância</td><td>Admin</td></tr>
+                <tr><td><strong>Repasses</strong></td><td>Confirmação dos valores de repasse enviados pelo operador. Mostra status: Confirmado, Pendente, Não repassado, Dentro da tolerância ou Diferença aceita. Quando o cliente nunca confirma um repasse, o Master pode "encerrar" a diferença com justificativa</td><td>Admin (confirma) / Master (encerra diferença)</td></tr>
                 <tr><td><strong>Divergências</strong></td><td>Listagem de divergências de fundo padrão e de abertura, com valor esperado, encontrado e diferença</td><td>Admin / Master / Analista</td></tr>
                 <tr><td><strong>Relatórios</strong></td><td>Exportação PDF e Excel: fechamento por loja, consolidado, repasses, saídas, Conta Azul</td><td>Admin / Master / Analista</td></tr>
                 <tr><td><strong>Módulos</strong></td><td>Controle do que cada perfil pode ver em cada empresa</td><td>Master / Analista</td></tr>
                 <tr><td><strong>Auditoria</strong></td><td>Log completo de todas as ações realizadas no sistema — exclusivo da aba Sistema</td><td>Master</td></tr>
-                <tr><td><strong>Retificação</strong></td><td>Substituição de fechamento incorreto preservando o original com badge visual</td><td>Master / Admin / Analista</td></tr>
+                <tr><td><strong>Retificação</strong></td><td>Substituição de fechamento incorreto preservando o original com badge visual. Também corrige loja e responsável (ex: troca de operadoras entre lojas)</td><td>Master / Admin / Analista</td></tr>
+                <tr><td><strong>Ajustes e Correções</strong></td><td>Reatribuição de loja em massa (vários dias de uma vez), recálculo da cadeia de saldos após reatribuição/lançamento retroativo, e encerramento em massa de diferenças de repasse pendentes</td><td>Master</td></tr>
                 <tr><td><strong>Analistas</strong></td><td>Cadastro de perfis multiempresa: mesmo acesso de edição do Master, exceto a aba Sistema, restrito às empresas selecionadas</td><td>Master (Sistema → Analistas)</td></tr>
+                <tr><td><strong>Coordenadores</strong></td><td>Cadastro de outros acessos com o mesmo poder total do Master (todas as empresas, todas as abas). Criar, editar, redefinir senha ou excluir outro Master é restrito a quem é "dono" da conta</td><td>Master — dono (Sistema → Coordenadores)</td></tr>
               </tbody>
             </table>
           </div>
@@ -1025,12 +1032,17 @@
                 <li>Visualizar todos os fechamentos e divergências</li>
                 <li>Exportar relatórios consolidados de todas as empresas</li>
                 <li>Acessar logs de auditoria completos</li>
-                <li>Retificar fechamentos</li>
+                <li>Retificar fechamentos, incluindo loja e responsável (troca de operadoras), individualmente ou em massa</li>
+                <li>Liberar lançamentos retroativos por empresa e recalcular a cadeia de saldos de uma loja</li>
+                <li>Encerrar (aceitar) uma diferença de repasse que o cliente nunca confirma, individualmente ou em massa</li>
                 <li>Único perfil com acesso à aba Sistema (configurações gerais, fornecedores/categorias, backup, logs, documentos)</li>
               </ul>
             </div>
+            <div style="margin-top:10px;background:#e0e7ff;border-radius:8px;padding:8px 10px;font-size:12px;color:#3730a3">
+              <strong>Dono vs. Coordenador:</strong> todo Master tem o mesmo acesso operacional. A diferença é que só o "dono" da conta pode criar, editar, redefinir senha ou excluir outro acesso Master (Sistema → Coordenadores) — um coordenador não pode gerenciar outros Masters.
+            </div>
             <div style="margin-top:10px;background:#fef3c7;border-radius:8px;padding:8px 10px;font-size:12px;color:#92400e">
-              <strong>Como criar:</strong> Diretamente no painel do Supabase, tabela <code>profiles</code>, com <code>role = master</code>.
+              <strong>Como criar:</strong> o primeiro Master (dono) é criado diretamente no painel do Supabase, tabela <code>profiles</code>, com <code>role = master</code> e <code>is_owner = true</code>. Coordenadores adicionais são criados pelo dono em Sistema → Coordenadores.
             </div>
           </div>
 
@@ -1134,8 +1146,8 @@
               <tbody>
                 <tr>
                   <td><strong>Data</strong></td>
-                  <td>Data do fechamento. Geralmente hoje.</td>
-                  <td>Sempre confira a data antes de salvar — não é possível alterar depois sem retificar.</td>
+                  <td>Data do fechamento. Geralmente hoje — mas se a Gestão 5X liberar "lançamentos retroativos" para a empresa, o campo fica editável para preencher dias anteriores (ex: dias sem fechamento no início da implantação).</td>
+                  <td>Sempre confira a data antes de salvar — não é possível alterar depois sem retificar. Ao salvar com data retroativa, o sistema recalcula automaticamente a cadeia de saldos dos fechamentos seguintes da loja.</td>
                 </tr>
                 <tr>
                   <td><strong>Turno</strong></td>
@@ -1202,7 +1214,7 @@
             <li>Registros do primeiro fechamento de cada loja mostram indicador <em>Abertura manual</em> no saldo inicial, sinalizando que foi definido pelo master ao ativar o sistema.</li>
           </ol>
           <div style="margin-top:12px;background:#fef3c7;border-radius:10px;padding:12px;font-size:13px;color:#92400e">
-            <strong>Importante:</strong> Um fechamento salvo não pode ser excluído. Se houver erro, o gestor pode fazer uma <strong>Retificação</strong>, que substitui o fechamento incorreto e preserva o original para auditoria.
+            <strong>Importante:</strong> Um fechamento salvo não pode ser excluído. Se houver erro, o gestor pode fazer uma <strong>Retificação</strong>, que substitui o fechamento incorreto e preserva o original para auditoria. A retificação também corrige loja e responsável (ex: troca de operadoras) — e a Gestão 5X tem uma ferramenta para corrigir isso em massa, para vários dias de uma vez (Operação → Ajustes e Correções).
           </div>
         </div>
       </div>
@@ -1283,6 +1295,9 @@
               <p style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:6px">Gestor confirma:</p>
               <p style="font-size:13px;color:#374151;line-height:1.6">Acessa a aba "Repasses" e confirma que recebeu o dinheiro fisicamente.</p>
             </div>
+          </div>
+          <div style="margin-top:12px;background:#e0e7ff;border-radius:10px;padding:12px;font-size:13px;color:#3730a3">
+            <strong>Diferença que nunca é confirmada?</strong> Se o cliente não confirma um repasse e a mesma diferença fica se repetindo em vários fechamentos seguidos, a Gestão 5X pode "encerrar" essa diferença (com justificativa obrigatória) para que ela pare de aparecer como pendência — sem apagar o valor nem fingir que o dinheiro foi recebido. O status passa a mostrar "Diferença aceita".
           </div>
         </div>
 
@@ -1622,6 +1637,10 @@
             <div style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:#f8fafc;border-radius:8px">
               <span style="background:#e0f2fe;color:#0369a1;padding:2px 10px;border-radius:4px;font-size:12px;white-space:nowrap;margin-top:2px">Sem repasse — fundo OK</span>
               <p style="font-size:13px;color:#374151;line-height:1.5">O caixa ficou exatamente com o fundo padrão. Nenhum repasse era necessário.</p>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:#f8fafc;border-radius:8px">
+              <span style="background:#e0e7ff;color:#3730a3;padding:2px 10px;border-radius:4px;font-size:12px;white-space:nowrap;margin-top:2px">Diferença aceita</span>
+              <p style="font-size:13px;color:#374151;line-height:1.5">A Gestão 5X revisou essa diferença e decidiu encerrar a pendência, com justificativa registrada. Não significa que o repasse foi recebido — é um registro de que a diferença foi tratada e não vai continuar aparecendo como pendente.</p>
             </div>
           </div>
         </div>

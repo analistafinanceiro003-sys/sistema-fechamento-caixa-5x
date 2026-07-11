@@ -110,9 +110,18 @@ function renderMasterDashboard() {
     </div>`
   );
 
-  /* Alertas críticos — divergências pendentes de revisão, mais urgentes (mais dias) primeiro */
+  /* Alertas críticos — divergências pendentes de revisão, mais urgentes (mais dias) primeiro.
+     Usa state.divergenceReviews (não c.reviewStatus, que fica travado em "Pendente de revisão"
+     desde a criação — reviewDivergence() só atualiza o registro de divergenceReviews, nunca o
+     fechamento em si). Um fechamento some daqui assim que TODAS as suas divergências associadas
+     forem marcadas Revisada/Justificada/Resolvida na aba Divergências. */
+  const pendingReviewClosingIds = new Set(
+    (state.divergenceReviews || [])
+      .filter((r) => (r.reviewStatus || 'Pendente') === 'Pendente')
+      .map((r) => r.closingId)
+  );
   const critical = activeRows
-    .filter((c) => c.status === 'Divergência' && (c.reviewStatus || 'Pendente de revisão') !== 'Revisada')
+    .filter((c) => c.status === 'Divergência' && pendingReviewClosingIds.has(c.id))
     .map((c) => ({ c, days: _daysSince(c.date) }))
     .sort((a, b) => b.days - a.days)
     .slice(0, 8);
@@ -146,6 +155,38 @@ function renderMasterDashboard() {
         </div>`;
       }).join('')
     : '<p class="subtle">Nenhuma empresa em implantação.</p>'
+  );
+
+  /* Lojas sem fechamento recente — loja ativa (de empresa ativa) sem nenhum
+     fechamento novo há STALE_STORE_DAYS dias ou mais. Detecta operação
+     esquecida/parada sem precisar de uma configuração de dias úteis por loja. */
+  const STALE_STORE_DAYS = 2;
+  const relevantStores = state.stores.filter((s) => {
+    if (s.status !== 'Ativa') return false;
+    if (dashCompanyId && s.companyId !== dashCompanyId) return false;
+    const company = state.companies.find((co) => co.id === s.companyId);
+    return !!company && company.status === 'Ativa';
+  });
+  const staleStores = relevantStores
+    .map((s) => {
+      const last = activeRows
+        .filter((c) => c.storeId === s.id)
+        .reduce((latest, c) => (!latest || parseBR(c.date) > parseBR(latest.date)) ? c : latest, null);
+      return { store: s, last, days: last ? _daysSince(last.date) : null };
+    })
+    .filter(({ days }) => days === null || days >= STALE_STORE_DAYS)
+    .sort((a, b) => (b.days ?? Infinity) - (a.days ?? Infinity));
+  html('dashStaleStores', staleStores.length
+    ? staleStores.slice(0, 8).map(({ store, last, days }) => {
+        const urgency = days === null || days > 5 ? 'danger' : 'warning';
+        const label = last ? `${days} dia(s) sem fechamento` : 'Nunca teve fechamento registrado';
+        return `<div class="alert-item ${urgency}" style="cursor:pointer" onclick="showPage('fechamentos',document.querySelector('.nav button[data-page=fechamentos]'))">
+          <strong>${esc(companyName(store.companyId))} / ${esc(store.name)}</strong>
+          <span>${last ? esc(last.date) : '—'}</span>
+          <span class="status ${urgency}">${esc(label)}</span>
+        </div>`;
+      }).join('')
+    : '<p class="subtle">Todas as lojas ativas com fechamentos em dia.</p>'
   );
 
   /* Atividade recente — últimos fechamentos registrados, de todas as empresas */
