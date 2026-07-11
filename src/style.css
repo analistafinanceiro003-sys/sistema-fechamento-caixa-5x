@@ -211,7 +211,7 @@ tr:hover td{background:#fafbfc}
 .launch-box-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .launch-box-header span{font-size:13px;font-weight:700;color:#344054}
 .launch-row{display:grid;grid-template-columns:1.5fr 1fr auto;gap:10px;align-items:end;margin-top:8px}
-.launch-row.expense-row{grid-template-columns:1.5fr 1fr 1fr auto}
+.launch-row.expense-row{grid-template-columns:1.3fr 1fr 1fr 1fr auto}
 .closing-insight{font-size:13px;color:var(--muted);white-space:pre-wrap;line-height:1.6;font-family:var(--font)}
 /* Campos calculados: display-only, nunca editáveis pelo operador */
 .conf-block .summary-line strong,

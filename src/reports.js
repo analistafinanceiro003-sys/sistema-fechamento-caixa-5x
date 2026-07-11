@@ -9,6 +9,7 @@
 function getScopedClosings({
   companyId = null,
   storeId = null,
+  operatorId = null,
   startDate = null,
   endDate = null,
   onlyDivergences = false,
@@ -35,6 +36,11 @@ function getScopedClosings({
   /* Filtros adicionais */
   if (companyId) rows = rows.filter((c) => c.companyId === companyId);
   if (storeId)   rows = rows.filter((c) => c.storeId === storeId);
+  if (operatorId) {
+    const op = (state.users || []).find((u) => (u.authId || u.id) === operatorId);
+    const opName = op?.name || '';
+    rows = rows.filter((c) => c.operatorUserId === operatorId || (opName && (c.responsible === opName || c.operator === opName)));
+  }
 
   if (startDate) {
     const start = parseBR(startDate);
@@ -93,10 +99,11 @@ function adminMovFilteredClosings() {
   const { startISO, endISO, error } = readDateRange('adminMovStart', 'adminMovEnd');
   if (error) { flash(error); return []; }
   return getScopedClosings({
-    scope:     'admin',
-    storeId:   val('adminMovementStoreFilter'),
-    startDate: startISO,
-    endDate:   endISO,
+    scope:      'admin',
+    storeId:    val('adminMovementStoreFilter'),
+    operatorId: val('adminMovementOperatorFilter'),
+    startDate:  startISO,
+    endDate:    endISO,
   });
 }
 
@@ -115,10 +122,11 @@ function adminResumoFilteredClosings() {
   const { startISO, endISO, error } = readDateRange('adminResumoStart', 'adminResumoEnd');
   if (error) { flash(error); return []; }
   return getScopedClosings({
-    scope:     'admin',
-    storeId:   val('adminResumoStoreFilter'),
-    startDate: startISO,
-    endDate:   endISO,
+    scope:      'admin',
+    storeId:    val('adminResumoStoreFilter'),
+    operatorId: val('adminResumoOperatorFilter'),
+    startDate:  startISO,
+    endDate:    endISO,
   });
 }
 
@@ -138,11 +146,12 @@ function reportFilteredClosings(admin = false) {
     : readDateRange('reportStart', 'reportEnd');
   if (error) { flash(error); return []; }
   return getScopedClosings({
-    companyId: admin ? currentUser?.companyId : val('reportCompany'),
-    storeId:   admin ? val('clientReportStore') : val('reportStore'),
-    startDate: startISO,
-    endDate:   endISO,
-    scope:     admin ? 'admin' : null,
+    companyId:  admin ? currentUser?.companyId : val('reportCompany'),
+    storeId:    admin ? val('clientReportStore') : val('reportStore'),
+    operatorId: admin ? val('clientReportOperator') : val('reportOperator'),
+    startDate:  startISO,
+    endDate:    endISO,
+    scope:      admin ? 'admin' : null,
   });
 }
 
@@ -196,7 +205,7 @@ function allMovementRows(rows = []) {
       .map((i) => ({ ...base, Tipo: 'Entrada', 'Descrição': i.description, Categoria: '', Valor: Number(i.value) }));
     const exits = (c.expenseItems || [])
       .filter((i) => Number(i.value))
-      .map((i) => ({ ...base, Tipo: 'Saída', 'Descrição': i.description, Categoria: i.category || '', Valor: -Math.abs(Number(i.value)) }));
+      .map((i) => ({ ...base, Tipo: 'Saída', 'Descrição': i.description, Categoria: i.category || '', Fornecedor: i.supplier || '', Valor: -Math.abs(Number(i.value)) }));
     const transfer = Number(c.transfer)
       ? [{ ...base, Tipo: 'Repasse / Transferência', 'Descrição': 'Repasse ao caixa central', Categoria: '', Destino: 'Caixa Central', Valor: -Math.abs(Number(c.transfer)) }]
       : [];
@@ -232,27 +241,31 @@ const CLOSING_HEADERS = [
 ];
 const MOVEMENT_HEADERS = ['Empresa','Data','Loja','Tipo','Descrição','Categoria','Destino','Valor','Responsável','ID Fechamento'];
 
-function exportCSV() {
-  const headers = [
-    'Data de Competência','Data de Vencimento','Data de Pagamento',
-    'Descrição','Categoria','Valor','Cliente/Fornecedor','CNPJ/CPF',
-    'Centro de Custo','Observações',
-  ];
-  const rows = allMovementRows(reportFilteredClosings()).map((r) => ({
+/* Ordem/nomes de colunas conforme o modelo padrão do Conta Azul (aba "Dados") */
+const CONTA_AZUL_HEADERS = [
+  'Data de Competência','Data de Vencimento','Data de Pagamento',
+  'Valor','Categoria','Descrição','Cliente/Fornecedor','CNPJ/CPF Cliente/Fornecedor',
+  'Centro de Custo','Observações',
+];
+function contaAzulRow(r, obsPrefix) {
+  return {
     'Data de Competência': r.Data,
     'Data de Vencimento': r.Data,
     'Data de Pagamento': r.Data,
-    Descrição: r['Descrição'],
+    Valor: r.Valor,
     Categoria: r.Tipo === 'Entrada' ? 'Receita de Venda - Dinheiro'
       : r.Tipo === 'Saída' ? (r.Categoria || 'Saída de Caixa')
       : 'Transferência entre contas',
-    Valor: r.Valor,
-    'Cliente/Fornecedor': '',
-    'CNPJ/CPF': '',
+    'Descrição': r['Descrição'],
+    'Cliente/Fornecedor': r.Fornecedor || '',
+    'CNPJ/CPF Cliente/Fornecedor': '',
     'Centro de Custo': r.Loja,
-    Observações: `Fechamento de caixa 5X - ${r.Empresa} - ID ${r['ID Fechamento'] || ''}`,
-  }));
-  exportGenericCSV('fechamento_por_loja_conta_azul_5x.csv', headers, rows);
+    'Observações': `${obsPrefix} - ${r.Empresa} - ID ${r['ID Fechamento'] || ''}`,
+  };
+}
+function exportCSV() {
+  const rows = allMovementRows(reportFilteredClosings()).map((r) => contaAzulRow(r, 'Fechamento de caixa 5X'));
+  exportGenericCSV('fechamento_por_loja_conta_azul_5x.csv', CONTA_AZUL_HEADERS, rows);
 }
 function exportDivergencesCSV() {
   const rows = closingRows(reportFilteredClosings().filter((c) => Math.abs(Number(c.diff || 0)) > 0));
@@ -288,26 +301,8 @@ function exportClientDivergencesCSV() {
   exportGenericCSV('divergencias_cliente_5x.csv', CLOSING_HEADERS, rows);
 }
 function exportContaAzulCSV() {
-  const headers = [
-    'Data de Competência','Data de Vencimento','Data de Pagamento',
-    'Descrição','Categoria','Valor','Cliente/Fornecedor','CNPJ/CPF',
-    'Centro de Custo','Observações',
-  ];
-  const rows = allMovementRows(reportFilteredClosings()).map((r) => ({
-    'Data de Competência': r.Data,
-    'Data de Vencimento': r.Data,
-    'Data de Pagamento': r.Data,
-    'Descrição': r['Descrição'],
-    Categoria: r.Tipo === 'Entrada' ? 'Receita de Venda - Dinheiro'
-      : r.Tipo === 'Saída' ? (r.Categoria || 'Saída de Caixa')
-      : 'Transferência entre contas',
-    Valor: r.Valor,
-    'Cliente/Fornecedor': '',
-    'CNPJ/CPF': '',
-    'Centro de Custo': r.Loja,
-    'Observações': `Importado Central de Caixa 5X - ${r.Empresa} - ${r['ID Fechamento'] || ''}`,
-  }));
-  exportGenericCSV('modelo_conta_azul_5x.csv', headers, rows);
+  const rows = allMovementRows(reportFilteredClosings()).map((r) => contaAzulRow(r, 'Importado Central de Caixa 5X'));
+  exportGenericCSV('modelo_conta_azul_5x.csv', CONTA_AZUL_HEADERS, rows);
 }
 
 function exportConsolidadoCSV() {

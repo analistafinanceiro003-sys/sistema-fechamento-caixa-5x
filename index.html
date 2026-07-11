@@ -158,7 +158,8 @@
         <button class="inner-tab-btn active" onclick="showSubTab('cadastros','cad-setup',this)">Cadastro Guiado</button>
         <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-empresas',this)">Empresas</button>
         <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-lojas',this)">Lojas e Caixas</button>
-        <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-usuarios',this)">Usuários e Acessos</button>
+        <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-usuarios-cadastro',this)">Cadastrar Usuário</button>
+        <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-usuarios-lista',this)">Usuários e Acessos</button>
         <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-implantacao',this)">Implantação</button>
       </div>
 
@@ -263,8 +264,8 @@
         </div>
       </div>
 
-      <!-- Usuários -->
-      <div class="inner-tab-panel hidden" id="cad-usuarios">
+      <!-- Cadastrar Usuário -->
+      <div class="inner-tab-panel hidden" id="cad-usuarios-cadastro">
         <div class="panel-grid">
           <div class="card">
             <h3 class="section-title">Criar usuário</h3>
@@ -277,34 +278,38 @@
               <div class="field"><label>Senha</label><input id="opPass" type="password" placeholder="Defina uma senha"/></div>
             </div>
             <div class="btn-row"><button class="btn btn-primary" onclick="createUserFromMaster()">Criar usuário</button></div>
-            <div class="box" style="margin-top:16px">
-              <h4>Editar / Resetar / Excluir usuário</h4>
-              <div class="form-grid">
-                <div class="field"><label>Empresa</label><select id="userManageCompany" onchange="fillUserManageSelect();renderUsersByCompany()"></select></div>
-                <div class="field"><label>Usuário</label><select id="userManageSelect" onchange="loadUserToEdit()"></select></div>
-              </div>
-              <div class="user-edit-grid">
-                <div class="field"><label>Nome</label><input id="editUserName"/></div>
-                <div class="field"><label>Login</label><input id="editUserLogin"/></div>
-                <div class="field"><label>Perfil</label><select id="editUserRole" onchange="fillEditUserStore()"><option value="admin">Administrador Cliente</option><option value="operator">Operador</option></select></div>
-                <div class="field"><label>Loja</label><select id="editUserStore"></select></div>
-                <div class="field"><label>Status</label><select id="editUserStatus"><option>Ativo</option><option>Inativo</option></select></div>
-                <div class="field"><label>Nova senha</label><input id="editUserPass" type="password" placeholder="Preencha só se quiser alterar"/></div>
-              </div>
-              <div class="btn-row">
-                <button class="btn btn-primary" onclick="saveUserEdit()">Salvar alteração</button>
-                <button class="btn" onclick="resetSelectedUserPassword()">Redefinir senha pelo Auth</button>
-                <button class="btn btn-danger" onclick="deleteSelectedUser()">Excluir usuário</button>
-              </div>
-            </div>
           </div>
           <div class="card">
-            <h3 class="section-title">Usuários cadastrados</h3>
-            <div class="field" style="margin-bottom:14px"><label>Filtrar empresa</label><select id="usersCompanyFilter" onchange="renderUsersByCompany()"></select></div>
-            <div class="table-wrap">
-              <table><thead><tr><th>Empresa</th><th>Loja</th><th>Nome</th><th>Login</th><th>Perfil</th><th>Status</th><th>Ação</th></tr></thead>
-              <tbody id="usersBody"></tbody></table>
+            <h3 class="section-title">Editar / Resetar / Excluir usuário</h3>
+            <div class="form-grid">
+              <div class="field"><label>Empresa</label><select id="userManageCompany" onchange="fillUserManageSelect();renderUsersByCompany()"></select></div>
+              <div class="field"><label>Usuário</label><select id="userManageSelect" onchange="loadUserToEdit()"></select></div>
             </div>
+            <div class="user-edit-grid">
+              <div class="field"><label>Nome</label><input id="editUserName"/></div>
+              <div class="field"><label>Login</label><input id="editUserLogin"/></div>
+              <div class="field"><label>Perfil</label><select id="editUserRole" onchange="fillEditUserStore()"><option value="admin">Administrador Cliente</option><option value="operator">Operador</option></select></div>
+              <div class="field"><label>Loja</label><select id="editUserStore"></select></div>
+              <div class="field"><label>Status</label><select id="editUserStatus"><option>Ativo</option><option>Inativo</option></select></div>
+              <div class="field"><label>Nova senha</label><input id="editUserPass" type="password" placeholder="Preencha só se quiser alterar"/></div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="saveUserEdit()">Salvar alteração</button>
+              <button class="btn" onclick="resetSelectedUserPassword()">Redefinir senha pelo Auth</button>
+              <button class="btn btn-danger" onclick="deleteSelectedUser()">Excluir usuário</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Usuários e Acessos (visualização) -->
+      <div class="inner-tab-panel hidden" id="cad-usuarios-lista">
+        <div class="card">
+          <h3 class="section-title">Usuários cadastrados</h3>
+          <div class="field" style="margin-bottom:14px"><label>Filtrar empresa</label><select id="usersCompanyFilter" onchange="renderUsersByCompany()"></select></div>
+          <div class="table-wrap">
+            <table><thead><tr><th>Empresa</th><th>Loja</th><th>Nome</th><th>Login</th><th>Perfil</th><th>Status</th><th>Ação</th></tr></thead>
+            <tbody id="usersBody"></tbody></table>
           </div>
         </div>
       </div>
@@ -544,8 +549,9 @@
       <div class="card">
         <h3 class="section-title">Filtros de relatório</h3>
         <div class="form-grid three">
-          <div class="field"><label>Empresa</label><select id="reportCompany" onchange="fillReportStore();renderAll()"></select></div>
+          <div class="field"><label>Empresa</label><select id="reportCompany" onchange="fillReportStore();fillReportOperator();renderAll()"></select></div>
           <div class="field"><label>Loja / caixa</label><select id="reportStore" onchange="renderAll()"><option value="">Todas</option></select></div>
+          <div class="field"><label>Operador</label><select id="reportOperator" onchange="renderAll()"><option value="">Todos</option></select></div>
           <div class="field"><label>Data inicial</label><input id="reportStart" type="date" onchange="renderAll()"/></div>
           <div class="field"><label>Data final</label><input id="reportEnd" type="date" onchange="renderAll()"/></div>
         </div>
@@ -601,7 +607,7 @@
           <div class="option-manager">
             <div class="field">
               <label>Campo de seleção</label>
-              <select id="optionCategory">
+              <select id="optionCategory" onchange="toggleOptionCompanyField();renderSistema()">
                 <option value="segments">Segmentos de empresa</option>
                 <option value="plans">Planos / modelos</option>
                 <option value="companyStatus">Status da empresa</option>
@@ -611,8 +617,13 @@
                 <option value="shifts">Turnos de fechamento</option>
                 <option value="implantSteps">Etapas de implantação</option>
                 <option value="implantStatus">Status de implantação</option>
-                <option value="expenseCategories">Categorias de saída</option>
+                <option value="expenseCategories">Categorias de saída (por empresa)</option>
+                <option value="fornecedores">Fornecedores (por empresa)</option>
               </select>
+            </div>
+            <div class="field hidden" id="optionCompanyField">
+              <label>Empresa</label>
+              <select id="optionCompany" onchange="renderSistema()"></select>
             </div>
             <div class="field"><label>Nova opção</label><input id="optionNewValue" placeholder="Digite a nova opção"/></div>
             <button class="btn btn-brand" onclick="addSelectOption()">Adicionar</button>
@@ -721,6 +732,7 @@
           <h3 class="section-title">Histórico de fechamentos da empresa</h3>
           <div class="filter-bar-5x">
             <div class="field"><label>Loja</label><select id="adminMovementStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Operador</label><select id="adminMovementOperatorFilter" onchange="renderAdminViews()"><option value="">Todos</option></select></div>
             <div class="field"><label>Data inicial</label><input id="adminMovStart" type="date" onchange="renderAdminViews()"/></div>
             <div class="field"><label>Data final</label><input id="adminMovEnd" type="date" onchange="renderAdminViews()"/></div>
           </div>
@@ -785,6 +797,7 @@
           <div id="adminResumoSaldoDashboard" style="margin-bottom:14px"></div>
           <div class="filter-bar-5x" style="margin-bottom:12px">
             <div class="field"><label>Loja</label><select id="adminResumoStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Operador</label><select id="adminResumoOperatorFilter" onchange="renderAdminViews()"><option value="">Todos</option></select></div>
             <div class="field"><label>Data inicial</label><input id="adminResumoStart" type="date" onchange="renderAdminViews()"/></div>
             <div class="field"><label>Data final</label><input id="adminResumoEnd" type="date" onchange="renderAdminViews()"/></div>
           </div>
@@ -810,6 +823,7 @@
           <h3 class="section-title">Movimentações da empresa</h3>
           <div class="filter-bar-5x" style="margin-bottom:12px">
             <div class="field"><label>Loja</label><select id="adminExtratStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Operador</label><select id="adminExtratOperatorFilter" onchange="renderAdminViews()"><option value="">Todos</option></select></div>
             <div class="field"><label>Data inicial</label><input id="adminExtratStart" type="date" onchange="renderAdminViews()"/></div>
             <div class="field"><label>Data final</label><input id="adminExtratEnd" type="date" onchange="renderAdminViews()"/></div>
           </div>
@@ -885,6 +899,7 @@
         <h3 class="section-title">Relatórios do cliente</h3>
         <div class="form-grid three" style="margin-bottom:18px">
           <div class="field"><label>Loja / caixa</label><select id="clientReportStore" onchange="renderAll()"><option value="">Todas</option></select></div>
+          <div class="field"><label>Operador</label><select id="clientReportOperator" onchange="renderAll()"><option value="">Todos</option></select></div>
           <div class="field"><label>Data inicial</label><input id="clientReportStart" type="date" onchange="renderAll()"/></div>
           <div class="field"><label>Data final</label><input id="clientReportEnd" type="date" onchange="renderAll()"/></div>
         </div>
@@ -1083,7 +1098,7 @@
           <div class="field"><label>Data final</label><input id="opHistEnd" type="date" onchange="renderOperatorViews()"/></div>
         </div>
         <div class="table-wrap">
-          <table><thead><tr><th>Data</th><th>Loja</th><th>Entradas</th><th>Saídas</th><th>Repasse</th><th>Divergência</th><th>Tipo</th><th>Status</th><th>Retificação</th><th>Anexos</th></tr></thead>
+          <table><thead><tr><th>Data</th><th>Loja</th><th>Entradas</th><th>Saídas</th><th>Repasse</th><th class="operator-hidden">Divergência</th><th>Tipo</th><th class="operator-hidden">Status</th><th>Retificação</th><th>Anexos</th></tr></thead>
           <tbody id="operatorHistoryBody"></tbody></table>
         </div>
       </div>

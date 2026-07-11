@@ -296,9 +296,12 @@ create table if not exists public.closing_expenses (
   closing_id  uuid not null references public.closings(id) on delete cascade,
   description text not null,
   category    text,
+  supplier    text,
   amount      numeric not null check (amount >= 0),
   created_at  timestamptz not null default now()
 );
+-- Migração: adiciona supplier se a tabela já existia sem ela
+alter table public.closing_expenses add column if not exists supplier text;
 
 create index if not exists idx_expenses_closing on public.closing_expenses(closing_id);
 

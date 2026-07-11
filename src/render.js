@@ -518,24 +518,42 @@ function renderFechamentos() {
   }).join('') || emptyRow(9));
 }
 
+function toggleOptionCompanyField() {
+  const field = $('optionCompanyField');
+  if (!field) return;
+  const isCompanyScoped = COMPANY_SCOPED_OPTION_CATEGORIES.includes(val('optionCategory'));
+  field.classList.toggle('hidden', !isCompanyScoped);
+}
+
 /* --- SISTEMA (sub-abas: config, backup, logs) --- */
 function renderSistema() {
+  toggleOptionCompanyField();
   /* Config / opções de seleção */
   const labels = {
     segments:'Segmentos', plans:'Planos', companyStatus:'Status da empresa',
     cashTypes:'Tipos de caixa', operationModes:'Modos de fechamento',
     ruleTypes:'Tipos de regra', shifts:'Turnos',
     implantSteps:'Etapas de implantação', implantStatus:'Status de implantação',
-    expenseCategories:'Categorias de saída',
+    expenseCategories:'Categorias de saída', fornecedores:'Fornecedores',
   };
-  html('optionGroups', Object.keys(labels).map((key) =>
-    `<div class="option-group">
-      <div class="option-group-head"><strong>${labels[key]}</strong><span class="pill">${(state.selectOptions[key]||[]).length} opção(ões)</span></div>
-      <div class="option-items">${(state.selectOptions[key]||[]).map((v) =>
+  setOptions('optionCompany', visibleCompanies().map((c) => [c.id, c.name]), 'Selecione a empresa');
+  const optionCompanyId = val('optionCompany');
+  html('optionGroups', Object.keys(labels).map((key) => {
+    const isCompanyScoped = COMPANY_SCOPED_OPTION_CATEGORIES.includes(key);
+    if (isCompanyScoped && !optionCompanyId) {
+      return `<div class="option-group">
+        <div class="option-group-head"><strong>${labels[key]}</strong></div>
+        <p class="subtle">Selecione uma empresa acima para ver/editar ${labels[key].toLowerCase()}.</p>
+      </div>`;
+    }
+    const values = isCompanyScoped ? optionsForCompany(optionCompanyId, key) : (state.selectOptions[key] || []);
+    return `<div class="option-group">
+      <div class="option-group-head"><strong>${labels[key]}</strong><span class="pill">${values.length} opção(ões)</span></div>
+      <div class="option-items">${values.map((v) =>
         `<span class="option-pill">${esc(v)}<button onclick="removeSelectOption('${key}','${esc(v)}')">×</button></span>`
       ).join('') || '<span class="subtle">Nenhuma.</span>'}</div>
-    </div>`
-  ).join(''));
+    </div>`;
+  }).join(''));
 
   /* Tabelas de manutenção */
   html('settingsCompaniesBody', state.companies.map((c) =>
@@ -613,6 +631,7 @@ function renderAdminViews() {
 
   /* Histórico de fechamentos (afech-historico) — resumo por fechamento */
   setOptions('adminMovementStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
+  setOptions('adminMovementOperatorFilter', operatorOptionsForCompany(currentUser?.companyId), 'Todos');
   const histClosings = adminMovFilteredClosings();
   html('adminMovementsDetailBody', [...histClosings].reverse().map((c) => {
     const salFinal = Number(c.cashBalance ?? c.finalAfterTransfer ?? 0);
@@ -635,13 +654,17 @@ function renderAdminViews() {
     </tr>`;
   }).join('') || emptyRow(11));
 
-  /* Extrato (amov-extrato) — com filtros por loja e período */
+  /* Extrato (amov-extrato) — com filtros por loja, operador e período */
   setOptions('adminExtratStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
-  const extratStore = val('adminExtratStoreFilter');
-  const extratStart = val('adminExtratStart');
-  const extratEnd   = val('adminExtratEnd');
+  setOptions('adminExtratOperatorFilter', operatorOptionsForCompany(currentUser?.companyId), 'Todos');
+  const extratStore    = val('adminExtratStoreFilter');
+  const extratOperator = val('adminExtratOperatorFilter');
+  const extratStart    = val('adminExtratStart');
+  const extratEnd      = val('adminExtratEnd');
+  const extratOpName   = (state.users || []).find((u) => (u.authId || u.id) === extratOperator)?.name || '';
   const adminMovRows = rows.filter((c) =>
     (!extratStore || c.storeId === extratStore) &&
+    (!extratOperator || c.operatorUserId === extratOperator || (extratOpName && (c.responsible === extratOpName || c.operator === extratOpName))) &&
     (!extratStart || parseBR(c.date) >= extratStart) &&
     (!extratEnd   || parseBR(c.date) <= extratEnd)
   );
@@ -657,6 +680,7 @@ function renderAdminViews() {
 
   /* Resumo por Fechamento (amov-resumo) */
   setOptions('adminResumoStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
+  setOptions('adminResumoOperatorFilter', operatorOptionsForCompany(currentUser?.companyId), 'Todos');
   const adminResumoClos_filtered = adminResumoFilteredClosings();
   /* Dashboard: saldo atual de cada loja */
   const _adResumoStoreIds = [...new Set(adminResumoClos_filtered.map((c) => c.storeId))];
@@ -866,9 +890,9 @@ function renderOperatorViews() {
     return `<tr>
       <td>${esc(c.date)}</td><td>${esc(storeName(c.storeId))}</td>
       <td>${money(c.entries)}</td><td>${money(c.expenses)}</td><td>${money(c.transfer)}</td>
-      <td style="color:${Number(c.diff)<0?'var(--danger)':'var(--warning)'}">${money(c.diff)}</td>
+      <td class="operator-hidden" style="color:${Number(c.diff)<0?'var(--danger)':'var(--warning)'}">${money(c.diff)}</td>
       <td>${tag(c.type||'Original')}${c.type === 'Retificado' && c.originalClosingId ? `<button class="btn" style="padding:3px 8px;font-size:11px;margin-left:6px" onclick="openOriginalClosingModal('${esc(c.originalClosingId)}')">Ver original</button>` : ''}</td>
-      <td>${tag(c.status)}</td>
+      <td class="operator-hidden">${tag(c.status)}</td>
       <td>${rectCell}</td>
       <td>${attHtml}</td>
     </tr>`;
@@ -1066,5 +1090,5 @@ Object.assign(window, {
   renderAll, renderMetrics, renderMasterDashboard, renderCadastros,
   renderUsersByCompany, renderOperacao, renderFechamentos, renderSistema,
   renderAdminViews, renderOperatorViews, renderModuleManager, switchCentral,
-  renderDocumentos, sortResumo, sortExtrato,
+  renderDocumentos, sortResumo, sortExtrato, toggleOptionCompanyField,
 });

@@ -195,6 +195,7 @@ function bindClosingEvents() {
     if (e.target.matches('#closingStore')) {
       fillClosingResponsible5X();
       suggestInitialBalance();
+      refreshExpenseOptionLists();
       calc();
       return;
     }
@@ -289,11 +290,14 @@ function addEntry() {
 }
 
 function addExpense() {
-  const opts = (state.selectOptions?.expenseCategories || []).map((v) => `<option>${esc(v)}</option>`).join('');
+  const companyId = selectedStore()?.companyId;
+  const catOpts = optionsForCompany(companyId, 'expenseCategories').map((v) => `<option>${esc(v)}</option>`).join('');
+  const supOpts = optionsForCompany(companyId, 'fornecedores').map((v) => `<option>${esc(v)}</option>`).join('');
   $('expenses')?.insertAdjacentHTML('beforeend', `
     <div class="launch-row expense-row">
       <div class="field"><label>Descrição da saída</label><input class="expense-desc" placeholder="Ex: ajuda de custo motoboy"/></div>
-      <div class="field"><label>Categoria</label><select class="expense-category">${opts}</select></div>
+      <div class="field"><label>Categoria</label><select class="expense-category">${catOpts}</select></div>
+      <div class="field"><label>Fornecedor</label><select class="expense-supplier"><option value="">Selecione</option>${supOpts}</select></div>
       <div class="field"><label>Valor (R$)</label>
         <input class="expense" ${MONEY_ATTRS} oninput="calc()"/>
       </div>
@@ -306,11 +310,37 @@ function addExpense() {
 function removeLaunchRow(btn) { btn.closest('.launch-row')?.remove(); calc(); }
 
 function ensureExpenseCategories(root = document) {
+  const companyId = selectedStore()?.companyId;
   all('#expenses .launch-row', root).forEach((row) => {
     if (row.querySelector('.expense-category')) return;
-    const vf   = row.querySelector('.expense')?.closest('.field');
-    const opts = (state.selectOptions?.expenseCategories || []).map((v) => `<option>${esc(v)}</option>`).join('');
-    vf?.insertAdjacentHTML('beforebegin', `<div class="field"><label>Categoria</label><select class="expense-category">${opts}</select></div>`);
+    const vf      = row.querySelector('.expense')?.closest('.field');
+    const catOpts = optionsForCompany(companyId, 'expenseCategories').map((v) => `<option>${esc(v)}</option>`).join('');
+    const supOpts = optionsForCompany(companyId, 'fornecedores').map((v) => `<option>${esc(v)}</option>`).join('');
+    vf?.insertAdjacentHTML('beforebegin',
+      `<div class="field"><label>Categoria</label><select class="expense-category">${catOpts}</select></div>` +
+      `<div class="field"><label>Fornecedor</label><select class="expense-supplier"><option value="">Selecione</option>${supOpts}</select></div>`);
+  });
+}
+
+/* Repopula as opções de Categoria/Fornecedor de todas as linhas de saída existentes
+   conforme a empresa da loja selecionada (chamado ao trocar a loja do fechamento). */
+function refreshExpenseOptionLists() {
+  const companyId = selectedStore()?.companyId;
+  const catOpts = optionsForCompany(companyId, 'expenseCategories');
+  const supOpts = optionsForCompany(companyId, 'fornecedores');
+  all('#expenses .launch-row').forEach((row) => {
+    const catSel = row.querySelector('.expense-category');
+    if (catSel) {
+      const cur = catSel.value;
+      catSel.innerHTML = catOpts.map((v) => `<option>${esc(v)}</option>`).join('');
+      if (catOpts.includes(cur)) catSel.value = cur;
+    }
+    const supSel = row.querySelector('.expense-supplier');
+    if (supSel) {
+      const cur = supSel.value;
+      supSel.innerHTML = `<option value="">Selecione</option>${supOpts.map((v) => `<option>${esc(v)}</option>`).join('')}`;
+      if (supOpts.includes(cur)) supSel.value = cur;
+    }
   });
 }
 
@@ -537,6 +567,7 @@ async function saveClosing() {
     .map((row) => ({
       description: row.querySelector('.expense-desc')?.value?.trim() || 'Saída',
       category:    row.querySelector('.expense-category')?.value || '',
+      supplier:    row.querySelector('.expense-supplier')?.value || '',
       value: parseCurrencyBR(row.querySelector('.expense')?.value || '0'),
     })).filter((x) => x.value > 0);
 
@@ -718,15 +749,20 @@ function openRectifyModal(id) {
       <tr><th>Data</th><td>${esc(closing.date)}</td></tr>
       <tr><th>Turno</th><td>${esc(closing.shift || 'Integral')}</td></tr>
       <tr><th>Responsável</th><td>${esc(closing.responsible)}</td></tr>
-      <tr><th>Saldo inicial</th><td>${money(closing.initial)}</td></tr>
-      <tr><th>Entradas</th><td>${money(closing.entries)}</td></tr>
-      <tr><th>Saídas</th><td>${money(closing.expenses)}</td></tr>
-      <tr><th>Repasse</th><td>${money(closing.transfer)}</td></tr>
-      <tr><th>Saldo final</th><td>${money(closing.finalAfterTransfer)}</td></tr>
-      <tr><th>Divergência</th><td>${money(closing.fundDivergence ?? closing.diff)}</td></tr>
-      <tr><th>Status</th><td>${tag(closing.status)}</td></tr>
+      <tr><th>Status atual</th><td>${tag(closing.status)} — Divergência: ${money(closing.fundDivergence ?? closing.diff)}</td></tr>
       ${closing.notes ? `<tr><th>Obs. original</th><td>${esc(closing.notes)}</td></tr>` : ''}
-    </tbody></table>`;
+    </tbody></table>
+    <div class="form-grid" style="margin-top:12px">
+      <div class="field"><label>Saldo inicial (R$)</label><input id="rectifyInitial" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*"/></div>
+      <div class="field"><label>Entradas (R$)</label><input id="rectifyEntries" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*"/></div>
+      <div class="field"><label>Saídas (R$)</label><input id="rectifyExpenses" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*"/></div>
+      <div class="field"><label>Repasse (R$)</label><input id="rectifyTransfer" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*"/></div>
+    </div>`;
+    setVal('rectifyInitial',  formatCurrencyBR(Number(closing.initial  || 0)));
+    setVal('rectifyEntries',  formatCurrencyBR(Number(closing.entries  || 0)));
+    setVal('rectifyExpenses', formatCurrencyBR(Number(closing.expenses || 0)));
+    setVal('rectifyTransfer', formatCurrencyBR(Number(closing.transfer || 0)));
+    bindCurrencyInputs(body);
   }
   const reasonEl = $('rectifyReason');
   const notesEl  = $('rectifyNotes');
@@ -751,17 +787,48 @@ async function saveRectification() {
   if (!motivo) return alert('O motivo da retificação é obrigatório.');
   const novasObs = ($('rectifyNotes')?.value || '').trim();
 
+  const newInitial  = safeMoneyNumber(val('rectifyInitial'));
+  const newEntries  = safeMoneyNumber(val('rectifyEntries'));
+  const newExpenses = safeMoneyNumber(val('rectifyExpenses'));
+  const newTransfer = safeMoneyNumber(val('rectifyTransfer'));
+
+  const store              = state.stores.find((s) => s.id === original.storeId);
+  const standardFund       = Number(store?.standardFund || 0);
+  const cashBeforeTransfer = newInitial + newEntries - newExpenses;
+  const finalAfterTransfer = cashBeforeTransfer - newTransfer;
+  const fundDivergence     = finalAfterTransfer - standardFund;
+  const newStatus          = closingStatus(fundDivergence, original.companyId);
+
+  const entryItems = newEntries !== Number(original.entries || 0)
+    ? [{ description: 'Valor retificado', value: newEntries }]
+    : (original.entryItems || []);
+  const expenseItems = newExpenses !== Number(original.expenses || 0)
+    ? [{ description: 'Valor retificado', category: '', supplier: '', value: newExpenses }]
+    : (original.expenseItems || []);
+
   const retificado = {
     ...original,
     id:               uid('cl'),
     type:             'Retificado',
     originalClosingId: original.id,
+    initial:          newInitial,
+    entries:          newEntries,
+    expenses:         newExpenses,
+    transfer:         newTransfer,
+    expected:         cashBeforeTransfer,
+    finalAfterTransfer,
+    cashBalance:      finalAfterTransfer,
+    standardFund,
+    fundDivergence,
+    diff:             fundDivergence,
+    balance:          fundDivergence,
+    status:           newStatus,
     notes:            `[Retificação por ${currentUser?.name || 'master'} em ${new Date().toLocaleDateString('pt-BR')}] Motivo: ${motivo}${novasObs ? ` | Obs: ${novasObs}` : ''}`,
     reviewStatus:     'Retificado',
     createdAt:        new Date().toISOString(),
     attachments:      [],
-    entryItems:       original.entryItems || [],
-    expenseItems:     original.expenseItems || [],
+    entryItems,
+    expenseItems,
   };
 
   state.closings.push(retificado);

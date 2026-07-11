@@ -40,8 +40,13 @@ function defaultSelectOptions() {
     implantSteps: ['1. Cadastro da empresa','2. Cadastro de lojas/caixas','3. Cadastro de operadores','4. Regras de caixa','5. Treinamento','6. Início monitorado'],
     implantStatus: ['Pendente','Em andamento','Concluído'],
     expenseCategories: ['Ajuda de custo','Taxa de entrega','Compra de mercadoria','Outras saídas'],
+    fornecedores: [],
   };
 }
+
+/* Categorias cujas opções são específicas por empresa (cada cliente tem sua própria lista).
+   As demais categorias do seletor continuam globais para todo o sistema. */
+const COMPANY_SCOPED_OPTION_CATEGORIES = ['expenseCategories', 'fornecedores'];
 
 function defaultState() {
   return {
@@ -60,6 +65,7 @@ function defaultState() {
     operationConfigs: {},
     modules: {},
     selectOptions: defaultSelectOptions(),
+    companySelectOptions: {},
     audit: [],
     transferReceipts: [],
     storeDocuments: [],
@@ -198,6 +204,7 @@ function normalizeState() {
   state.modules = (state.modules && typeof state.modules === 'object') ? state.modules : {};
   state.implantSteps = (state.implantSteps && typeof state.implantSteps === 'object' && !Array.isArray(state.implantSteps)) ? state.implantSteps : {};
   state.selectOptions = { ...defaultSelectOptions(), ...(state.selectOptions || {}) };
+  state.companySelectOptions = (state.companySelectOptions && typeof state.companySelectOptions === 'object') ? state.companySelectOptions : {};
   state.stores.forEach((s) => { s.standardFund = Number(s.standardFund || 0); });
   state.companies.forEach((c) => {
     if (!state.operationConfigs[c.id]) {
@@ -287,7 +294,7 @@ function mapClosing(row, entries = [], expenses = [], attachments = []) {
     entries: Number(row.total_entries || 0),
     entryItems: entries.map((e) => ({ id: e.id, description: e.description, value: Number(e.amount || 0) })),
     expenses: Number(row.total_expenses || 0),
-    expenseItems: expenses.map((e) => ({ id: e.id, description: e.description, category: e.category || '', value: Number(e.amount || 0) })),
+    expenseItems: expenses.map((e) => ({ id: e.id, description: e.description, category: e.category || '', supplier: e.supplier || '', value: Number(e.amount || 0) })),
     transfer: Number(row.transfer_amount || 0),
     expected: Number(row.expected_cash || 0),
     finalAfterTransfer: Number(row.final_after_transfer || 0),
@@ -341,8 +348,17 @@ function applySelectOptionRows(rows = []) {
   const defaults = defaultSelectOptions();
   const categoriesInDB = new Set();
   const options = {};
+  const companyOptions = {};
   rows.forEach((row) => {
     if (!row.category || !row.value) return;
+    if (row.company_id) {
+      companyOptions[row.company_id] = companyOptions[row.company_id] || {};
+      companyOptions[row.company_id][row.category] = companyOptions[row.company_id][row.category] || [];
+      if (!companyOptions[row.company_id][row.category].includes(row.value)) {
+        companyOptions[row.company_id][row.category].push(row.value);
+      }
+      return;
+    }
     categoriesInDB.add(row.category);
     options[row.category] = options[row.category] || [];
     if (!options[row.category].includes(row.value)) options[row.category].push(row.value);
@@ -354,6 +370,7 @@ function applySelectOptionRows(rows = []) {
     if (!categoriesInDB.has(cat)) options[cat] = defaults[cat];
   });
   state.selectOptions = options;
+  state.companySelectOptions = companyOptions;
 }
 
 function buildImplantStepsState(rows = []) {
@@ -837,6 +854,30 @@ async function saveSelectOptionsToSupabase() {
   return state.selectOptions;
 }
 
+/* Opções por empresa (categorias em COMPANY_SCOPED_OPTION_CATEGORIES): retorna a lista
+   específica da empresa se existir, senão cai para a lista global (compatibilidade). */
+function optionsForCompany(companyId, category) {
+  if (COMPANY_SCOPED_OPTION_CATEGORIES.includes(category)) {
+    const companyValues = state.companySelectOptions?.[companyId]?.[category];
+    if (companyValues?.length) return companyValues;
+  }
+  return state.selectOptions?.[category] || [];
+}
+
+async function saveCompanyOptionsToSupabase(companyId, category) {
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return;
+  const values = state.companySelectOptions?.[companyId]?.[category] || [];
+  const { error: deleteError } = await sb.from('select_options')
+    .delete().eq('company_id', companyId).eq('category', category);
+  if (deleteError) throw deleteError;
+  if (values.length) {
+    const rows = values.map((value) => ({ company_id: companyId, category, value, is_global: false }));
+    const { error: insertError } = await sb.from('select_options').insert(rows);
+    if (insertError) throw insertError;
+  }
+  lastOwnSave = Date.now();
+}
+
 async function getClosingsByScope({ companyId = null, storeId = null, startDate = null, endDate = null } = {}) {
   if (!sb || !hasSupabaseSession()) return getScopedClosings({ companyId, storeId, startDate, endDate });
   let query = sb.from('closings').select('*');
@@ -875,7 +916,7 @@ async function createClosingEntries(closingId, entries = []) {
 
 async function createClosingExpenses(closingId, expenses = []) {
   if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession() || !expenses.length) return expenses;
-  const { error } = await sb.from('closing_expenses').insert(expenses.map((e) => ({ closing_id: closingId, description: e.description || 'Saída', category: e.category || '', amount: Number(e.value || 0) })));
+  const { error } = await sb.from('closing_expenses').insert(expenses.map((e) => ({ closing_id: closingId, description: e.description || 'Saída', category: e.category || '', supplier: e.supplier || '', amount: Number(e.value || 0) })));
   if (error) throw error;
   return expenses;
 }
@@ -1674,6 +1715,32 @@ async function addSelectOption() {
   const key = val('optionCategory');
   const value = val('optionNewValue').trim();
   if (!key || !value) return alert('Selecione o campo e informe a opção.');
+
+  if (COMPANY_SCOPED_OPTION_CATEGORIES.includes(key)) {
+    const companyId = val('optionCompany');
+    if (!companyId) return alert('Selecione a empresa para esta categoria.');
+    state.companySelectOptions[companyId] = state.companySelectOptions[companyId] || {};
+    state.companySelectOptions[companyId][key] = state.companySelectOptions[companyId][key] || [];
+    if (state.companySelectOptions[companyId][key].includes(value)) return;
+    state.companySelectOptions[companyId][key].push(value);
+    if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+      try {
+        await saveCompanyOptionsToSupabase(companyId, key);
+      } catch (e) {
+        state.companySelectOptions[companyId][key] = state.companySelectOptions[companyId][key].filter((v) => v !== value);
+        renderAll();
+        return alert(`Não foi possível salvar a alteração. Tente novamente.\n(${e.message})`);
+      }
+    } else if (!DEV_LOCAL_MODE) {
+      state.companySelectOptions[companyId][key] = state.companySelectOptions[companyId][key].filter((v) => v !== value);
+      return alert('Supabase Auth/Sessão obrigatório em produção para salvar opções.');
+    }
+    clear('optionNewValue');
+    save();
+    renderAll();
+    return;
+  }
+
   state.selectOptions[key] = state.selectOptions[key] || [];
   if (state.selectOptions[key].includes(value)) return;
   state.selectOptions[key].push(value);
@@ -1696,6 +1763,29 @@ async function addSelectOption() {
 }
 
 async function removeSelectOption(key, value) {
+  if (COMPANY_SCOPED_OPTION_CATEGORIES.includes(key)) {
+    const companyId = val('optionCompany');
+    if (!companyId) return;
+    const backup = [...(state.companySelectOptions[companyId]?.[key] || [])];
+    state.companySelectOptions[companyId] = state.companySelectOptions[companyId] || {};
+    state.companySelectOptions[companyId][key] = backup.filter((v) => v !== value);
+    if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+      try {
+        await saveCompanyOptionsToSupabase(companyId, key);
+      } catch (e) {
+        state.companySelectOptions[companyId][key] = backup;
+        renderAll();
+        return alert(`Não foi possível salvar a alteração. Tente novamente.\n(${e.message})`);
+      }
+    } else if (!DEV_LOCAL_MODE) {
+      state.companySelectOptions[companyId][key] = backup;
+      return alert('Supabase Auth/Sessão obrigatório em produção para salvar opções.');
+    }
+    save();
+    renderAll();
+    return;
+  }
+
   const backup = [...(state.selectOptions[key] || [])];
   state.selectOptions[key] = backup.filter((v) => v !== value);
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
@@ -1909,6 +1999,12 @@ function storeOptionsForCompany(companyId) {
     .map((s) => [s.id, s.name]);
 }
 
+function operatorOptionsForCompany(companyId) {
+  return (state.users || [])
+    .filter((u) => u.role === 'operator' && u.companyId === companyId && u.status !== 'Inativo')
+    .map((u) => [u.authId || u.id, u.name]);
+}
+
 function setOptions(id, rows, placeholder = 'Selecione') {
   const el = $(id); if (!el) return;
   const current = el.value;
@@ -1930,6 +2026,7 @@ function fillSelects() {
   fillStoreSelect();
   fillClosingStoreSelect();
   fillReportStore();
+  fillReportOperator();
   fillMasterExtractStore();
   fillMasterMovementStore();
   fillMasterDivergenceStore();
@@ -1937,6 +2034,7 @@ function fillSelects() {
   fillMasterRepasseStore();
   fillUserManageSelect();
   fillClientReportStore();
+  fillClientReportOperator();
 }
 
 function fillStoreSelect() {
@@ -1975,7 +2073,9 @@ function fillClosingResponsible5X() {
   }
 }
 function fillReportStore() { setOptions('reportStore', storeOptionsForCompany(val('reportCompany')), 'Todas'); }
+function fillReportOperator() { setOptions('reportOperator', operatorOptionsForCompany(val('reportCompany')), 'Todos'); }
 function fillClientReportStore() { setOptions('clientReportStore', storeOptionsForCompany(currentUser?.companyId), 'Todas'); }
+function fillClientReportOperator() { setOptions('clientReportOperator', operatorOptionsForCompany(currentUser?.companyId), 'Todos'); }
 function fillMasterExtractStore() { setOptions('masterExtractStore', storeOptionsForCompany(val('masterExtractCompany')), 'Todas'); }
 function fillMasterMovementStore() { setOptions('masterMovementStoreFilter', storeOptionsForCompany(val('masterMovementCompanyFilter')), 'Todas'); }
 function fillMasterDivergenceStore() { setOptions('masterDivergenceStoreFilter', storeOptionsForCompany(val('masterDivergenceCompanyFilter')), 'Todas'); }
@@ -2192,12 +2292,12 @@ Object.assign(window, {
   resetSelectedUserPassword, resetUserPasswordViaEdgeFunction, removeUserById,
   deleteSelectedUser, deleteUser,
   createRule, deleteRule, saveImplantStep, upsertImplantStep, saveOperationConfig,
-  addSelectOption, removeSelectOption, resetSelectOptions,
+  addSelectOption, removeSelectOption, resetSelectOptions, optionsForCompany,
   openLimparDadosModal, closeLimparDadosModal, clearCompanyData,
   exportBackup, importBackup, resetSystem,
-  storeOptionsForCompany, setOptions, fillSelects,
+  storeOptionsForCompany, operatorOptionsForCompany, setOptions, fillSelects,
   fillStoreSelect, fillClosingStoreSelect, fillClosingResponsible5X,
-  fillReportStore, fillClientReportStore, fillMasterExtractStore,
+  fillReportStore, fillReportOperator, fillClientReportStore, fillClientReportOperator, fillMasterExtractStore,
   fillMasterMovementStore, fillMasterDivergenceStore, fillMasterResumoStore, fillMasterRepasseStore,
   fillUserManageSelect, fillEditUserStore, toggleUserStore,
   mapStoreDocument, uploadStoreDocument, deleteStoreDocument, clearStoreDocumentsByStore,
