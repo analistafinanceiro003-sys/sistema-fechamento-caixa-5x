@@ -254,7 +254,7 @@ create table if not exists public.closings (
   review_status               text not null default 'Pendente',
   notes                       text,
   type                        text not null default 'Original'
-                                check (type in ('Original', 'Retificado')),
+                                check (type in ('Original', 'Retificado', 'Excluído')),
   original_closing_id         uuid references public.closings(id) on delete set null,
   created_at                  timestamptz not null default now(),
   updated_at                  timestamptz not null default now()

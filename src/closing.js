@@ -736,11 +736,26 @@ async function confirmDeleteClosing(id) {
 ================================================================ */
 let _rectifyTargetId = null;
 
+/* Segue a cadeia de retificações até a versão ativa mais recente.
+   Evita criar um "irmão" duplicado quando o botão Retificar é
+   acionado sobre uma versão que já foi substituída (ex.: aba/estado
+   desatualizado). */
+function findActiveClosingVersion(id) {
+  let current = (state.closings || []).find((c) => c.id === id);
+  if (!current) return null;
+  let next = (state.closings || []).find((c) => c.type === 'Retificado' && c.originalClosingId === current.id);
+  while (next) {
+    current = next;
+    next = (state.closings || []).find((c) => c.type === 'Retificado' && c.originalClosingId === current.id);
+  }
+  return current;
+}
+
 function openRectifyModal(id) {
   if (role !== 'master') return alert('Apenas Gestão 5X pode retificar fechamentos.');
-  const closing = (state.closings || []).find((c) => c.id === id);
+  const closing = findActiveClosingVersion(id);
   if (!closing) return alert('Fechamento não encontrado.');
-  _rectifyTargetId = id;
+  _rectifyTargetId = closing.id;
   const modal = $('rectifyClosingModal');
   const body  = $('rectifyModalBody');
   if (body) {

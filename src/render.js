@@ -25,11 +25,12 @@ function renderAll() {
 
 /* --- KPIs (Master e Admin) --- */
 function renderMetrics() {
-  /* Master */
+  /* Master — getScopedClosings() já exclui excluídos e originais superados por retificação */
+  const masterRows = getScopedClosings({ scope: 'master' });
   text('mCompanies', state.companies.filter((c) => c.status !== 'Inativa').length);
   text('mStores', state.stores.length);
-  text('mClosings', state.closings.length);
-  text('mDiff', money(state.closings.reduce((a, c) => a + Math.abs(Number(c.diff || 0)), 0)));
+  text('mClosings', masterRows.length);
+  text('mDiff', money(masterRows.reduce((a, c) => a + Math.abs(Number(c.diff || 0)), 0)));
   /* Admin */
   const adminRows = getScopedClosings({ scope: 'admin' });
   text('aStores', state.stores.filter((s) => s.companyId === currentUser?.companyId).length);
@@ -40,8 +41,11 @@ function renderMetrics() {
 
 /* --- MASTER DASHBOARD --- */
 function renderMasterDashboard() {
+  /* getScopedClosings() já exclui excluídos e originais superados por retificação —
+     quem entra nas contagens/somas é sempre o valor retificado, não o original. */
+  const activeRows = getScopedClosings({ scope: 'master' });
   /* Alertas de divergência */
-  const critical = state.closings.filter((c) => c.status === 'Divergência').slice(-5);
+  const critical = activeRows.filter((c) => c.status === 'Divergência').slice(-5);
   html('dashAlerts', critical.length
     ? critical.map((c) => `<div class="alert-item warning"><strong>${esc(companyName(c.companyId))} / ${esc(storeName(c.storeId))}</strong><span>${money(c.diff)}</span><span class="subtle">${esc(c.date)}</span></div>`).join('')
     : '<p class="subtle">Nenhuma divergência recente.</p>'
@@ -53,12 +57,12 @@ function renderMasterDashboard() {
     : '<p class="subtle">Nenhuma empresa em implantação.</p>'
   );
   /* Resumo executivo */
-  const totalDiv = state.closings.reduce((a, c) => a + Math.abs(Number(c.diff || 0)), 0);
+  const totalDiv = activeRows.reduce((a, c) => a + Math.abs(Number(c.diff || 0)), 0);
   html('dashSummary', `
     <div class="exec-stats">
       <div class="exec-stat"><span>Empresas ativas</span><strong>${state.companies.filter((c) => c.status !== 'Inativa').length}</strong></div>
       <div class="exec-stat"><span>Lojas/Caixas</span><strong>${state.stores.length}</strong></div>
-      <div class="exec-stat"><span>Fechamentos</span><strong>${state.closings.length}</strong></div>
+      <div class="exec-stat"><span>Fechamentos</span><strong>${activeRows.length}</strong></div>
       <div class="exec-stat"><span>Divergência total</span><strong>${money(totalDiv)}</strong></div>
     </div>`
   );
@@ -425,7 +429,7 @@ function renderFechamentos() {
   const repStart2 = val('masterRepasseStart');
   const repEnd2   = val('masterRepasseEnd');
   const repStat2  = val('masterRepasseStatus');
-  const masterRepasseRows = state.closings.filter((c) =>
+  const masterRepasseRows = getScopedClosings({ scope: 'master' }).filter((c) =>
     Number(c.transfer || 0) > 0 &&
     (!repComp   || c.companyId === repComp) &&
     (!repStore2 || c.storeId === repStore2) &&

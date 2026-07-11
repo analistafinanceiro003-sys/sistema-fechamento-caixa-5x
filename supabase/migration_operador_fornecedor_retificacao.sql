@@ -15,6 +15,17 @@ alter table public.closing_expenses
 
 
 -- ============================================================
+-- 2. RESTRIÇÃO DESATUALIZADA: closings.type não permitia 'Excluído'
+--    O app marca um fechamento excluído com type = 'Excluído', mas a
+--    constraint original só aceitava 'Original'/'Retificado' — por isso
+--    o botão "Excluir" na aba Movimentações falhava mesmo para o Master.
+-- ============================================================
+alter table public.closings drop constraint if exists closings_type_check;
+alter table public.closings add constraint closings_type_check
+  check (type in ('Original', 'Retificado', 'Excluído'));
+
+
+-- ============================================================
 -- Observações:
 -- * Filtro por operador (Relatórios/Movimentações/Fechamento) usa
 --   closings.operator_user_id, que já existe no schema — nenhuma

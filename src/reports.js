@@ -19,6 +19,17 @@ function getScopedClosings({
   let rows = [...(state?.closings || [])];
   if (!includeDeleted) rows = rows.filter((c) => c.type !== 'Excluído');
 
+  /* Fechamento retificado substitui o original nas listagens/relatórios/somatórios —
+     o original some da visão "atual" (evita duplicar entradas/saídas/saldo), mas
+     continua acessível via botão "Ver original" (openOriginalClosingModal), que lê
+     state.closings diretamente sem passar por este filtro. */
+  const supersededIds = new Set(
+    (state?.closings || [])
+      .filter((c) => c.type === 'Retificado' && c.originalClosingId)
+      .map((c) => c.originalClosingId)
+  );
+  if (supersededIds.size) rows = rows.filter((c) => !supersededIds.has(c.id));
+
   /* Escopo por role */
   const effectiveScope = scope || role;
   if (effectiveScope === 'admin' || role === 'admin') {
