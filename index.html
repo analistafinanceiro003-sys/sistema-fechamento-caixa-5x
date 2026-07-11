@@ -128,6 +128,9 @@
          MASTER: DASHBOARD
     ============================================================ -->
     <section class="page hidden" id="dashboard">
+      <div class="filter-bar-5x" style="margin-bottom:14px;max-width:340px">
+        <div class="field"><label>Empresa</label><select id="dashCompanyFilter" onchange="renderMasterDashboard()"></select></div>
+      </div>
       <div class="grid cards">
         <div class="card clickable-card" onclick="showPage('cadastros',document.querySelector('.nav button[data-page=cadastros]'));showSubTab('cadastros','cad-empresas',document.querySelector('[data-subtab=cad-empresas]'))"><div class="metric-label">Empresas ativas</div><div class="metric-value" id="mCompanies">0</div><div class="metric-hint">Clientes em operação</div></div>
         <div class="card clickable-card" onclick="showPage('cadastros',document.querySelector('.nav button[data-page=cadastros]'));showSubTab('cadastros','cad-lojas',document.querySelector('[data-subtab=cad-lojas]'))"><div class="metric-label">Lojas / caixas</div><div class="metric-value" id="mStores">0</div><div class="metric-hint">Pontos de fechamento</div></div>
@@ -168,7 +171,7 @@
         <button class="inner-tab-btn" data-subtab="cad-lojas" onclick="showSubTab('cadastros','cad-lojas',this)">Lojas e Caixas</button>
         <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-usuarios-cadastro',this)">Cadastrar Usuário</button>
         <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-usuarios-lista',this)">Usuários e Acessos</button>
-        <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-implantacao',this)">Implantação</button>
+        <button class="inner-tab-btn" data-subtab="cad-implantacao" onclick="showSubTab('cadastros','cad-implantacao',this)">Implantação</button>
       </div>
 
       <!-- Setup guiado -->
@@ -325,6 +328,12 @@
       <!-- Implantação -->
       <div class="inner-tab-panel hidden" id="cad-implantacao">
         <div class="card">
+          <h3 class="section-title">Progresso de implantação por cliente</h3>
+          <p class="subtle" style="margin-bottom:14px">Clique em uma empresa para abrir o checklist detalhado abaixo.</p>
+          <div id="implantSummary"></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
           <h3 class="section-title">Checklist de implantação por cliente</h3>
           <p class="subtle" style="margin-bottom:14px">Selecione um cliente para ver e atualizar cada etapa individualmente. As alterações são salvas no Supabase.</p>
           <div class="field" style="max-width:340px">
@@ -333,6 +342,7 @@
               <option value="">Selecione a empresa</option>
             </select>
           </div>
+          <div id="implantProgressBar" style="margin-top:12px"></div>
           <div class="table-wrap" style="margin-top:16px">
             <table>
               <thead><tr><th style="min-width:200px">Etapa</th><th>Status</th><th>Observação</th><th>Atualizado</th><th>Ação</th></tr></thead>
@@ -667,27 +677,26 @@
 
       <!-- Analistas (perfil multiempresa) -->
       <div class="inner-tab-panel hidden" id="sis-analistas">
-        <div class="panel-grid">
-          <div class="card">
-            <h3 class="section-title">Criar Analista</h3>
-            <p class="subtle" style="margin-bottom:14px">Mesmo acesso de edição do Master, exceto esta aba (Sistema). Selecione as empresas que este Analista poderá acessar.</p>
-            <div class="form-grid">
-              <div class="field"><label>Nome</label><input id="analystName"/></div>
-              <div class="field"><label>Login (e-mail)</label><input id="analystLogin"/></div>
-              <div class="field"><label>Senha</label><input id="analystPass" type="password" placeholder="Defina uma senha"/></div>
-            </div>
-            <div class="field full" style="margin-top:10px">
-              <label>Empresas liberadas</label>
-              <div class="option-list company-checklist" id="analystCompanyChecklist" style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;padding:10px"></div>
-            </div>
-            <div class="btn-row"><button class="btn btn-primary" onclick="createAnalystUser()">Criar Analista</button></div>
+        <div class="card">
+          <h3 class="section-title">Criar Analista</h3>
+          <p class="subtle" style="margin-bottom:14px">Mesmo acesso de edição do Master, exceto esta aba (Sistema). Selecione as empresas que este Analista poderá acessar.</p>
+          <div class="form-grid">
+            <div class="field"><label>Nome</label><input id="analystName"/></div>
+            <div class="field"><label>Login (e-mail)</label><input id="analystLogin"/></div>
+            <div class="field"><label>Senha</label><input id="analystPass" type="password" placeholder="Defina uma senha"/></div>
           </div>
-          <div class="card">
-            <h3 class="section-title">Analistas cadastrados</h3>
-            <div class="table-wrap">
-              <table><thead><tr><th>Nome</th><th>Login</th><th>Empresas</th><th>Status</th><th>Ação</th></tr></thead>
-              <tbody id="analystsBody"></tbody></table>
-            </div>
+          <div class="field full" style="margin-top:10px">
+            <label>Empresas liberadas</label>
+            <div class="option-list company-checklist" id="analystCompanyChecklist" style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;padding:10px"></div>
+          </div>
+          <div class="btn-row"><button class="btn btn-primary" onclick="createAnalystUser()">Criar Analista</button></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h3 class="section-title">Analistas cadastrados</h3>
+          <div class="table-wrap">
+            <table><thead><tr><th>Nome</th><th>Login</th><th>Empresas</th><th>Status</th><th>Ação</th></tr></thead>
+            <tbody id="analystsBody"></tbody></table>
           </div>
         </div>
 

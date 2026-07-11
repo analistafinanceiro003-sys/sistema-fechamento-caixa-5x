@@ -17,7 +17,7 @@ const COMPANY_SELECT_IDS = [
   'operationCompany', 'moduleCompany', 'masterMovementCompanyFilter',
   'masterExtractCompany', 'masterResumoCompany', 'masterRepasseCompany',
   'masterDivergenceCompanyFilter', 'reportCompany', 'optionCompany',
-  'fcCompanyFilter', 'docFilterCompany', 'openingAdjustmentCompany',
+  'fcCompanyFilter', 'docFilterCompany', 'openingAdjustmentCompany', 'dashCompanyFilter',
 ];
 
 function enhanceSearchableSelect(select) {
@@ -89,4 +89,15 @@ function enhanceAllCompanySelects() {
   COMPANY_SELECT_IDS.forEach((id) => enhanceSearchableSelect($(id)));
 }
 
-Object.assign(window, { enhanceAllCompanySelects });
+/* Chamado por setVal() sempre que um <select> de empresa tem o valor
+   trocado por código (ex.: navegação a partir de um card do dashboard) —
+   mantém o texto do input de busca em dia com o valor real do select. */
+function syncSearchableSelectDisplay(id) {
+  const select = $(id);
+  if (!select || !select.dataset.searchEnhanced) return;
+  const wrap = select.closest('.searchable-select-wrap');
+  const input = wrap?.querySelector('.searchable-select-input');
+  if (input) input.value = select.options[select.selectedIndex]?.textContent || '';
+}
+
+Object.assign(window, { enhanceAllCompanySelects, syncSearchableSelectDisplay });

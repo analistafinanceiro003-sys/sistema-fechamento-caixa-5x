@@ -1286,6 +1286,27 @@ async function toggleCompany(id) {
   renderAll();
 }
 
+/* Chamado da aba Implantação quando as 6 etapas do checklist estão concluídas */
+async function activateCompanyFromImplant(id) {
+  const c = state.companies.find((x) => x.id === id);
+  if (!c) return;
+  if (!confirm(`Marcar "${c.name}" como Ativa? Isso libera o cliente para operação normal.`)) return;
+  c.status = 'Ativa';
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await updateCompany(c.id, c);
+    } catch (e) {
+      return alert(`Erro ao atualizar empresa no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para atualizar empresas.');
+  }
+  addAudit('Empresa ativada (implantação concluída)', c.name);
+  save();
+  renderAll();
+  toast(`${c.name} agora está Ativa!`);
+}
+
 async function deleteCompany(id) {
   if (!confirm('Excluir empresa e todos os dados vinculados?')) return;
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
@@ -2396,8 +2417,8 @@ function fillSelects() {
     'storeCompany','opCompany','ruleCompany','implantCompanyFilter','operationCompany',
     'ruleFilterCompany','moduleCompany','reportCompany','masterExtractCompany',
     'masterMovementCompanyFilter','masterDivergenceCompanyFilter','masterResumoCompany','masterRepasseCompany',
-    'userManageCompany','usersCompanyFilter',
-  ].forEach((id) => setOptions(id, companies));
+    'userManageCompany','usersCompanyFilter','dashCompanyFilter',
+  ].forEach((id) => setOptions(id, companies, id === 'dashCompanyFilter' ? 'Todas as empresas' : undefined));
 
   fillStoreSelect();
   fillClosingStoreSelect();
@@ -2673,7 +2694,7 @@ Object.assign(window, {
   createDivergenceReview, getPendingDivergenceReviews, updateDivergenceReview,
   logAudit,
   companyName, storeName, visibleCompanies, visibleStores, cfg,
-  saveClientSetup, clearClientSetup, toggleCompany, deleteCompany,
+  saveClientSetup, clearClientSetup, toggleCompany, activateCompanyFromImplant, deleteCompany,
   createStore, updateStoreFund, deleteStore,
   createUserFromMaster, loadUserToEdit, saveUserEdit,
   resetSelectedUserPassword, resetUserPasswordViaEdgeFunction, removeUserById,

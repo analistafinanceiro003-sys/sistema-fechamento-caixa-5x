@@ -8,7 +8,15 @@
 const $ = (id) => document.getElementById(id);
 const all = (sel, root = document) => [...root.querySelectorAll(sel)];
 const val = (id) => $(id)?.value ?? '';
-const setVal = (id, value) => { const el = $(id); if (el) el.value = value ?? ''; };
+const setVal = (id, value) => {
+  const el = $(id);
+  if (!el) return;
+  el.value = value ?? '';
+  /* Selects de empresa com busca (searchableSelect.js) têm um input visual
+     separado do <select> real — sem isso, ele ficaria mostrando o valor
+     antigo quando o valor é setado por código (não por clique do usuário). */
+  if (window.syncSearchableSelectDisplay) syncSearchableSelectDisplay(id);
+};
 const html = (id, value) => { const el = $(id); if (el) el.innerHTML = value ?? ''; };
 const text = (id, value) => { const el = $(id); if (el) el.textContent = value ?? ''; };
 const clear = (id) => setVal(id, '');

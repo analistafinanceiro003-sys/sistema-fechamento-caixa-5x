@@ -69,10 +69,31 @@ function _trendBarsHTML(rows, { days = 14, dangerColor = false } = {}) {
   }).join('');
 }
 
+/* Quantas etapas de implantação (de IMPLANT_STEP_LIST) estão "Concluído" para a empresa */
+function implantProgress(companyId) {
+  const steps = state.implantSteps?.[companyId] || {};
+  const done = IMPLANT_STEP_LIST.filter((s) => steps[s.key]?.status === 'Concluído').length;
+  return { done, total: IMPLANT_STEP_LIST.length };
+}
+
+/* Sidebar → Cadastros → Implantação, já com a empresa selecionada */
+function goToImplantacao(companyId) {
+  showPage('cadastros', document.querySelector('.nav button[data-page=cadastros]'));
+  showSubTab('cadastros', 'cad-implantacao', document.querySelector('[data-subtab=cad-implantacao]'));
+  setVal('implantCompanyFilter', companyId);
+  renderCadastros();
+}
+
 function renderMasterDashboard() {
   /* getScopedClosings() já exclui excluídos e originais superados por retificação —
      quem entra nas contagens/somas é sempre o valor retificado, não o original. */
-  const activeRows = getScopedClosings({ scope: 'master' });
+  const dashCompanyId = val('dashCompanyFilter') || null;
+  const activeRows = getScopedClosings({ scope: 'master', companyId: dashCompanyId });
+
+  /* KPIs — refletem a empresa filtrada quando selecionada (Empresas ativas continua global) */
+  text('mStores', dashCompanyId ? state.stores.filter((s) => s.companyId === dashCompanyId).length : state.stores.length);
+  text('mClosings', activeRows.length);
+  text('mDiff', money(activeRows.reduce((a, c) => a + Math.abs(Number(c.diff || 0)), 0)));
 
   /* Tendência — fechamentos e divergências por dia (últimos 14 dias) */
   const divRows = activeRows.filter((c) => c.status === 'Divergência');
@@ -108,10 +129,22 @@ function renderMasterDashboard() {
     : '<p class="subtle">Nenhuma divergência pendente de revisão.</p>'
   );
 
-  /* Empresas em implantação */
-  const impl = state.companies.filter((c) => c.status === 'Implantação');
+  /* Empresas em implantação — progresso do checklist + atalho direto para a aba */
+  const impl = state.companies.filter((c) => c.status === 'Implantação' && (!dashCompanyId || c.id === dashCompanyId));
   html('dashImplant', impl.length
-    ? impl.map((c) => `<div class="alert-item info"><strong>${esc(c.name)}</strong><span class="status warning">Implantação</span></div>`).join('')
+    ? impl.map((c) => {
+        const { done, total } = implantProgress(c.id);
+        const pct = total ? Math.round((done / total) * 100) : 0;
+        return `<div class="alert-item info" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:6px" onclick="goToImplantacao('${esc(c.id)}')">
+          <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+            <strong>${esc(c.name)}</strong>
+            <span class="status warning">${done}/${total} etapas</span>
+          </div>
+          <div style="background:#e5e7eb;border-radius:999px;height:6px;overflow:hidden">
+            <div style="background:var(--brand);height:100%;width:${pct}%"></div>
+          </div>
+        </div>`;
+      }).join('')
     : '<p class="subtle">Nenhuma empresa em implantação.</p>'
   );
 
@@ -170,6 +203,26 @@ function renderCadastros() {
   const implantCid = val('implantCompanyFilter') || '';
   const implantStepsData = implantCid ? (state.implantSteps?.[implantCid] || {}) : null;
 
+  /* Resumo: todas as empresas em implantação, com progresso e atalho para o checklist */
+  const implantCompanies = state.companies.filter((c) => c.status === 'Implantação');
+  html('implantSummary', implantCompanies.length
+    ? implantCompanies.map((c) => {
+        const { done, total } = implantProgress(c.id);
+        const pct = total ? Math.round((done / total) * 100) : 0;
+        const highlight = c.id === implantCid ? ';border-color:var(--brand)' : '';
+        return `<div class="alert-item info" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:6px${highlight}" onclick="setVal('implantCompanyFilter','${esc(c.id)}');renderCadastros()">
+          <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+            <strong>${esc(c.name)}</strong>
+            <span class="status ${done === total ? 'success' : 'warning'}">${done}/${total} etapas</span>
+          </div>
+          <div style="background:#e5e7eb;border-radius:999px;height:6px;overflow:hidden">
+            <div style="background:var(--brand);height:100%;width:${pct}%"></div>
+          </div>
+        </div>`;
+      }).join('')
+    : '<p class="subtle">Nenhuma empresa em implantação no momento.</p>'
+  );
+
   /* Wizard: overview das etapas da empresa selecionada */
   html('setupWizard', IMPLANT_STEP_LIST.map((s, i) => {
     const statusVal = implantStepsData?.[s.key]?.status || 'Pendente';
@@ -202,6 +255,27 @@ function renderCadastros() {
     }).join(''));
   } else {
     html('implantBody', `<tr><td colspan="5" style="text-align:center;padding:24px" class="subtle">Selecione uma empresa para ver e editar o checklist.</td></tr>`);
+  }
+
+  /* Barra de progresso da empresa selecionada + atalho para ativar quando 100% */
+  if (implantCid) {
+    const implantCompany = state.companies.find((c) => c.id === implantCid);
+    const { done, total } = implantProgress(implantCid);
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    const complete = total > 0 && done === total;
+    html('implantProgressBar', `
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px;background:#e5e7eb;border-radius:999px;height:8px;overflow:hidden">
+          <div style="background:${complete ? 'var(--success)' : 'var(--brand)'};height:100%;width:${pct}%"></div>
+        </div>
+        <span class="subtle" style="font-size:13px">${done}/${total} etapas concluídas</span>
+        ${complete && implantCompany?.status === 'Implantação'
+          ? `<button class="btn btn-brand btn-sm" onclick="activateCompanyFromImplant('${esc(implantCid)}')">✓ Marcar empresa como Ativa</button>`
+          : ''}
+      </div>`
+    );
+  } else {
+    html('implantProgressBar', '');
   }
 }
 
@@ -1207,4 +1281,5 @@ Object.assign(window, {
   renderUsersByCompany, renderOperacao, renderFechamentos, renderSistema, renderFornecedoresCategorias,
   renderAdminViews, renderOperatorViews, renderModuleManager, switchCentral,
   renderDocumentos, sortResumo, sortExtrato, toggleOptionCompanyField,
+  implantProgress, goToImplantacao,
 });
