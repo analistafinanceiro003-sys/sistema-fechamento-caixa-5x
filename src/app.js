@@ -179,7 +179,7 @@ Object.assign(window, {
   /* Exportações */
   exportCSV, exportDivergencesCSV, exportTransfersCSV, exportExpensesCSV,
   exportAuditCSV, exportClientMovementsCSV, exportClientDivergencesCSV,
-  exportContaAzulCSV, exportConsolidadoCSV,
+  exportContaAzulXLSX, exportConsolidadoCSV,
 });
 
 /* PWA: registra o service worker com segurança — não bloqueia nem quebra o app */

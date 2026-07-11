@@ -290,6 +290,7 @@ tr:hover td{background:#fafbfc}
 .option-items{display:flex;gap:8px;flex-wrap:wrap}
 .option-pill{display:inline-flex;align-items:center;gap:7px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:999px;padding:6px 10px;font-size:13px;color:#344054}
 .option-pill button{border:0;background:#fee2e2;color:#991b1b;border-radius:999px;width:20px;height:20px;cursor:pointer;font-weight:700;font-size:13px}
+.option-pill button.edit-btn{background:#dbeafe;color:#1e40af}
 .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:#f2f4f7;color:#344054;padding:5px 10px;font-size:12px;font-weight:700}
 
 /* ============================================================

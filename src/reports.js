@@ -300,9 +300,36 @@ function exportClientDivergencesCSV() {
   const rows = closingRows(reportFilteredClosings(true).filter((c) => Math.abs(Number(c.diff || 0)) > 0));
   exportGenericCSV('divergencias_cliente_5x.csv', CLOSING_HEADERS, rows);
 }
-function exportContaAzulCSV() {
-  const rows = allMovementRows(reportFilteredClosings()).map((r) => contaAzulRow(r, 'Importado Central de Caixa 5X'));
-  exportGenericCSV('modelo_conta_azul_5x.csv', CONTA_AZUL_HEADERS, rows);
+/* Repasses são transferência de custódia, não lançamento contábil —
+   por isso ficam de fora do modelo Conta Azul (usar o relatório de Repasses). */
+const CONTA_AZUL_ORIENTACOES = [
+  'Orientações de preenchimento da planilha:',
+  '* A data de pagamento precisa ser igual ou inferior a data de hoje, caso a mesma seja superior ao dia de hoje o lançamento será importado com o status: "Em Aberto".',
+  '* Não utilizar caracteres especiais, como por exemplo: \' " ! @ #  %  ¨  &  *  (  )  ª  º  §  + _  - ? ° [ { } ] : ;',
+  '* Cole as informações planilha utilizando a função "Colar Especial > Colar Valores" para não perder a formatação padrão das células;',
+  '* Verificar se não ficou espaços entre os dados informados, principalmente quando as informações são coladas;',
+  '* As células não podem conter fórmulas;',
+];
+function exportContaAzulXLSX() {
+  const rows = allMovementRows(reportFilteredClosings())
+    .filter((r) => r.Tipo === 'Entrada' || r.Tipo === 'Saída')
+    .map((r) => contaAzulRow(r, 'Importado Central de Caixa 5X'));
+
+  if (typeof XLSX === 'undefined') {
+    exportGenericCSV('modelo_conta_azul_5x.csv', CONTA_AZUL_HEADERS, rows);
+    if (window.toast) toast('Biblioteca de exportação Excel indisponível — gerado em CSV.', 'warning');
+    return;
+  }
+
+  const dadosSheet = XLSX.utils.aoa_to_sheet([
+    CONTA_AZUL_HEADERS,
+    ...rows.map((r) => CONTA_AZUL_HEADERS.map((h) => r[h] ?? '')),
+  ]);
+  const orientSheet = XLSX.utils.aoa_to_sheet(CONTA_AZUL_ORIENTACOES.map((l) => [l]));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, dadosSheet, 'Dados');
+  XLSX.utils.book_append_sheet(wb, orientSheet, 'Orientações');
+  XLSX.writeFile(wb, 'modelo_conta_azul_5x.xlsx');
 }
 
 function exportConsolidadoCSV() {
@@ -1024,7 +1051,7 @@ Object.assign(window, {
   closingRows, allMovementRows, diffRead, diffAction,
   exportCSV, exportDivergencesCSV, exportTransfersCSV, exportExpensesCSV,
   exportAuditCSV, exportClientMovementsCSV, exportClientDivergencesCSV,
-  exportContaAzulCSV, exportConsolidadoCSV,
+  exportContaAzulXLSX, exportConsolidadoCSV,
   generatePDF, exportManualPDF, exportManualTabPDF,
   exportFechamentoPDF, exportDivergencesPDF, exportTransfersPDF, exportExpensesPDF,
   exportConsolidadoPDF, exportAuditPDF, exportClientMovementsPDF, exportClientDivergencesPDF,

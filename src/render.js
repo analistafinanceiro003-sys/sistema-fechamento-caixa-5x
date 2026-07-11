@@ -534,7 +534,6 @@ function renderSistema() {
     cashTypes:'Tipos de caixa', operationModes:'Modos de fechamento',
     ruleTypes:'Tipos de regra', shifts:'Turnos',
     implantSteps:'Etapas de implantação', implantStatus:'Status de implantação',
-    expenseCategories:'Categorias de saída', fornecedores:'Fornecedores',
   };
   setOptions('optionCompany', visibleCompanies().map((c) => [c.id, c.name]), 'Selecione a empresa');
   const optionCompanyId = val('optionCompany');
@@ -573,6 +572,28 @@ function renderSistema() {
   html('auditLogBody', [...(state.audit || [])].reverse().slice(0,100).map((a) =>
     `<tr><td>${new Date(a.date).toLocaleString('pt-BR')}</td><td>${esc(a.user)}</td><td>${tag(a.role)}</td><td>${esc(a.action)}</td><td>${esc(a.detail)}</td></tr>`
   ).join('') || emptyRow(5));
+
+  renderFornecedoresCategorias();
+}
+
+/* --- Fornecedores e Categorias por empresa (aba dedicada em Sistema → Configurações) --- */
+function renderFornecedoresCategorias() {
+  if (!$('fcCompanyFilter')) return;
+  setOptions('fcCompanyFilter', visibleCompanies().map((c) => [c.id, c.name]), 'Selecione a empresa');
+  const companyId = val('fcCompanyFilter');
+
+  const renderList = (elId, category, emptyLabel) => {
+    if (!companyId) { html(elId, `<p class="subtle">Selecione uma empresa acima.</p>`); return; }
+    const values = optionsForCompany(companyId, category);
+    html(elId, values.length
+      ? values.map((v) => `<span class="option-pill">${esc(v)}
+          <button class="edit-btn" title="Editar" onclick="promptRenameCompanyOption('${category}','${esc(companyId)}','${esc(v)}')">✎</button>
+          <button title="Excluir" onclick="removeCompanyOption('${category}','${esc(companyId)}','${esc(v)}')">×</button>
+        </span>`).join('')
+      : `<p class="subtle">${emptyLabel}</p>`);
+  };
+  renderList('fcFornecedoresList', 'fornecedores', 'Nenhum fornecedor cadastrado para esta empresa.');
+  renderList('fcCategoriasList', 'expenseCategories', 'Nenhuma categoria cadastrada para esta empresa.');
 }
 
 /* --- ADMIN --- */
@@ -1088,7 +1109,7 @@ function renderDocumentos() {
 
 Object.assign(window, {
   renderAll, renderMetrics, renderMasterDashboard, renderCadastros,
-  renderUsersByCompany, renderOperacao, renderFechamentos, renderSistema,
+  renderUsersByCompany, renderOperacao, renderFechamentos, renderSistema, renderFornecedoresCategorias,
   renderAdminViews, renderOperatorViews, renderModuleManager, switchCentral,
   renderDocumentos, sortResumo, sortExtrato, toggleOptionCompanyField,
 });

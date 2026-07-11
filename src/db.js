@@ -1805,6 +1805,105 @@ async function removeSelectOption(key, value) {
   renderAll();
 }
 
+/* --- Fornecedores e Categorias por empresa (aba dedicada em Sistema → Configurações) --- */
+async function addCompanyOption(category, companyId, value) {
+  value = (value || '').trim();
+  if (!companyId) return alert('Selecione a empresa.');
+  if (!value) return alert('Informe um valor.');
+  state.companySelectOptions[companyId] = state.companySelectOptions[companyId] || {};
+  state.companySelectOptions[companyId][category] = state.companySelectOptions[companyId][category] || [];
+  if (state.companySelectOptions[companyId][category].includes(value)) return alert('Este item já está cadastrado para esta empresa.');
+  state.companySelectOptions[companyId][category].push(value);
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await saveCompanyOptionsToSupabase(companyId, category);
+    } catch (e) {
+      state.companySelectOptions[companyId][category] = state.companySelectOptions[companyId][category].filter((v) => v !== value);
+      renderAll();
+      return alert(`Não foi possível salvar a alteração. Tente novamente.\n(${e.message})`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    state.companySelectOptions[companyId][category] = state.companySelectOptions[companyId][category].filter((v) => v !== value);
+    return alert('Supabase Auth/Sessão obrigatório em produção para salvar opções.');
+  }
+  save();
+  renderAll();
+}
+
+async function addFornecedor() {
+  const companyId = val('fcCompanyFilter');
+  const value = val('fcNewFornecedor').trim();
+  if (!companyId) return alert('Selecione a empresa.');
+  if (!value) return alert('Informe o nome do fornecedor.');
+  const before = (state.companySelectOptions?.[companyId]?.fornecedores || []).length;
+  await addCompanyOption('fornecedores', companyId, value);
+  if ((state.companySelectOptions?.[companyId]?.fornecedores || []).length > before) clear('fcNewFornecedor');
+}
+
+async function addCategoria() {
+  const companyId = val('fcCompanyFilter');
+  const value = val('fcNewCategoria').trim();
+  if (!companyId) return alert('Selecione a empresa.');
+  if (!value) return alert('Informe o nome da categoria.');
+  const before = (state.companySelectOptions?.[companyId]?.expenseCategories || []).length;
+  await addCompanyOption('expenseCategories', companyId, value);
+  if ((state.companySelectOptions?.[companyId]?.expenseCategories || []).length > before) clear('fcNewCategoria');
+}
+
+async function removeCompanyOption(category, companyId, value) {
+  const backup = [...(state.companySelectOptions[companyId]?.[category] || [])];
+  state.companySelectOptions[companyId] = state.companySelectOptions[companyId] || {};
+  state.companySelectOptions[companyId][category] = backup.filter((v) => v !== value);
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await saveCompanyOptionsToSupabase(companyId, category);
+    } catch (e) {
+      state.companySelectOptions[companyId][category] = backup;
+      renderAll();
+      return alert(`Não foi possível salvar a alteração. Tente novamente.\n(${e.message})`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    state.companySelectOptions[companyId][category] = backup;
+    return alert('Supabase Auth/Sessão obrigatório em produção para salvar opções.');
+  }
+  save();
+  renderAll();
+}
+
+async function renameCompanyOption(category, companyId, oldValue, newValue) {
+  newValue = (newValue || '').trim();
+  if (!newValue || newValue === oldValue) return;
+  const list = state.companySelectOptions?.[companyId]?.[category] || [];
+  const idx = list.indexOf(oldValue);
+  if (idx === -1) return;
+  if (list.includes(newValue)) return alert('Já existe um item com esse nome para esta empresa.');
+  const backup = [...list];
+  const updated = [...list];
+  updated[idx] = newValue;
+  state.companySelectOptions[companyId][category] = updated;
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await saveCompanyOptionsToSupabase(companyId, category);
+    } catch (e) {
+      state.companySelectOptions[companyId][category] = backup;
+      renderAll();
+      return alert(`Não foi possível salvar a alteração. Tente novamente.\n(${e.message})`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    state.companySelectOptions[companyId][category] = backup;
+    return alert('Supabase Auth/Sessão obrigatório em produção para salvar opções.');
+  }
+  save();
+  renderAll();
+}
+
+function promptRenameCompanyOption(category, companyId, oldValue) {
+  const label = category === 'fornecedores' ? 'fornecedor' : 'categoria';
+  const newValue = prompt(`Novo nome para o ${label} "${oldValue}":`, oldValue);
+  if (newValue === null) return;
+  renameCompanyOption(category, companyId, oldValue, newValue);
+}
+
 async function resetSelectOptions() {
   if (!confirm('Restaurar opções padrão?')) return;
   state.selectOptions = defaultSelectOptions();
@@ -2293,6 +2392,8 @@ Object.assign(window, {
   deleteSelectedUser, deleteUser,
   createRule, deleteRule, saveImplantStep, upsertImplantStep, saveOperationConfig,
   addSelectOption, removeSelectOption, resetSelectOptions, optionsForCompany,
+  addCompanyOption, removeCompanyOption, renameCompanyOption, promptRenameCompanyOption,
+  addFornecedor, addCategoria,
   openLimparDadosModal, closeLimparDadosModal, clearCompanyData,
   exportBackup, importBackup, resetSystem,
   storeOptionsForCompany, operatorOptionsForCompany, setOptions, fillSelects,

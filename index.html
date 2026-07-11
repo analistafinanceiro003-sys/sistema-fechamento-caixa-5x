@@ -583,8 +583,8 @@
       <div class="inner-tab-panel hidden" id="rel-conta-azul">
         <div class="report-card" style="max-width:480px">
           <h4>Exportação modelo Conta Azul</h4>
-          <p class="subtle">Gera os lançamentos no modelo de planilha para importação no Conta Azul.</p>
-          <div class="btn-row"><button class="btn btn-primary" onclick="exportContaAzulCSV()">Exportar CSV</button></div>
+          <p class="subtle">Gera os lançamentos (entradas e saídas) no modelo de planilha Excel para importação no Conta Azul. Repasses não entram aqui — use o relatório de Repasses.</p>
+          <div class="btn-row"><button class="btn btn-primary" onclick="exportContaAzulXLSX()">Exportar Excel (.xlsx)</button></div>
         </div>
       </div>
     </section>
@@ -595,6 +595,7 @@
     <section class="page hidden" id="sistema">
       <div class="inner-tabs">
         <button class="inner-tab-btn active" onclick="showSubTab('sistema','sis-configuracoes',this)">Configurações Gerais</button>
+        <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-fornecedores',this)">Fornecedores e Categorias</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-backup',this)">Backup e Manutenção</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-logs',this)">Logs de Auditoria</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-documentos',this)">Documentos</button>
@@ -617,8 +618,6 @@
                 <option value="shifts">Turnos de fechamento</option>
                 <option value="implantSteps">Etapas de implantação</option>
                 <option value="implantStatus">Status de implantação</option>
-                <option value="expenseCategories">Categorias de saída (por empresa)</option>
-                <option value="fornecedores">Fornecedores (por empresa)</option>
               </select>
             </div>
             <div class="field hidden" id="optionCompanyField">
@@ -637,6 +636,35 @@
             <div class="management-card"><h4>Lojas / caixas</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Loja</th><th>Ação</th></tr></thead><tbody id="settingsStoresBody"></tbody></table></div></div>
             <div class="management-card"><h4>Usuários</h4><div class="table-wrap compact-table"><table><thead><tr><th>Usuário</th><th>Perfil</th><th>Ação</th></tr></thead><tbody id="settingsUsersBody"></tbody></table></div></div>
             <div class="management-card"><h4>Regras operacionais</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Tipo</th><th>Ação</th></tr></thead><tbody id="settingsRulesBody"></tbody></table></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fornecedores e Categorias (por empresa) -->
+      <div class="inner-tab-panel hidden" id="sis-fornecedores">
+        <div class="card">
+          <h3 class="section-title">Fornecedores e Categorias de saída</h3>
+          <p class="subtle" style="margin-bottom:14px">Cada empresa tem sua própria lista de fornecedores e categorias, usada no Fechamento Diário. Selecione a empresa para cadastrar, alterar ou excluir.</p>
+          <div class="form-grid three" style="margin-bottom:14px">
+            <div class="field"><label>Empresa</label><select id="fcCompanyFilter" onchange="renderFornecedoresCategorias()"></select></div>
+          </div>
+          <div class="management-grid">
+            <div class="management-card">
+              <h4>Fornecedores</h4>
+              <div class="option-manager" style="margin-bottom:10px">
+                <div class="field"><label>Novo fornecedor</label><input id="fcNewFornecedor" placeholder="Nome do fornecedor"/></div>
+                <button class="btn btn-brand" onclick="addFornecedor()">Adicionar</button>
+              </div>
+              <div class="option-list" id="fcFornecedoresList"></div>
+            </div>
+            <div class="management-card">
+              <h4>Categorias de saída</h4>
+              <div class="option-manager" style="margin-bottom:10px">
+                <div class="field"><label>Nova categoria</label><input id="fcNewCategoria" placeholder="Nome da categoria"/></div>
+                <button class="btn btn-brand" onclick="addCategoria()">Adicionar</button>
+              </div>
+              <div class="option-list" id="fcCategoriasList"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -931,8 +959,8 @@
           </div>
           <div class="report-card" id="rpt_azul" data-submod-card="sub_rel_azul">
             <h4>Exportação Conta Azul</h4>
-            <p class="subtle">Lançamentos no modelo de planilha para importação no Conta Azul.</p>
-            <div class="btn-row"><button class="btn" onclick="exportContaAzulCSV()">Exportar CSV</button></div>
+            <p class="subtle">Lançamentos (entradas e saídas) no modelo de planilha Excel para importação no Conta Azul. Repasses não entram aqui — use o relatório de Repasses.</p>
+            <div class="btn-row"><button class="btn" onclick="exportContaAzulXLSX()">Exportar Excel (.xlsx)</button></div>
           </div>
           <div class="report-card" id="rpt_aud" data-submod-card="sub_rel_aud">
             <h4>Auditoria Operacional</h4>
@@ -2185,6 +2213,8 @@
 <!-- PDF export -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<!-- Excel (.xlsx) export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="src/utils.js"></script>
 <script src="src/supabaseClient.js"></script>
