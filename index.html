@@ -361,6 +361,7 @@
         <button class="inner-tab-btn active" onclick="showSubTab('operacao','op-regras',this)">Regras Operacionais</button>
         <button class="inner-tab-btn" onclick="showSubTab('operacao','op-config',this)">Configuração Operacional</button>
         <button class="inner-tab-btn" onclick="showSubTab('operacao','op-modulos',this)">Módulos por Cliente</button>
+        <button class="inner-tab-btn" onclick="showSubTab('operacao','op-ajustes',this)">Ajustes e Correções</button>
       </div>
 
       <!-- Regras -->
@@ -405,6 +406,10 @@
               <div class="field full"><label>Saídas permitidas</label><textarea id="operationAllowed" placeholder="Ex: ajuda de custo, taxa de entrega, compra emergencial."></textarea></div>
               <div class="field full"><label>Mensagem padrão para o operador</label><textarea id="operationMessage" placeholder="Informe todas as saídas com descrição e comprovante quando houver."></textarea></div>
               <div class="field"><label>Prazo para retificação (dias) <span class="subtle">— 0 = mesmo mês</span></label><input id="operationRectificationDays" type="number" value="0" min="0" step="1"/></div>
+              <div class="field full" style="display:flex;align-items:center;gap:8px;margin-top:6px">
+                <input id="operationAllowBackdated" type="checkbox" style="width:18px;height:18px;flex:none;accent-color:var(--brand);cursor:pointer"/>
+                <label for="operationAllowBackdated" style="margin:0;cursor:pointer">Permitir lançamentos retroativos (Admin/Operador podem escolher uma data passada no Fechamento Diário) — libere temporariamente, ex. para preencher dias anteriores à implantação</label>
+              </div>
             </div>
             <div class="btn-row">
               <button class="btn btn-brand" onclick="saveOperationConfig()">Salvar configuração</button>
@@ -430,6 +435,37 @@
           </div>
           <div class="module-grid" id="moduleManager" style="margin-top:16px"></div>
           <div class="btn-row"><button class="btn btn-primary" onclick="saveModules()">Salvar módulos</button></div>
+        </div>
+      </div>
+
+      <!-- Ajustes e Correções -->
+      <div class="inner-tab-panel hidden" id="op-ajustes">
+        <div class="card">
+          <h3 class="section-title">Reatribuir loja de fechamentos em massa</h3>
+          <p class="subtle" style="margin-bottom:14px">Use quando uma operadora lançou fechamentos na loja errada (ex: troca de operadoras entre lojas). Cada fechamento é retificado individualmente — o original fica preservado, uma versão corrigida assume a loja certa.</p>
+          <div class="form-grid">
+            <div class="field"><label>Loja de origem (errada)</label><select id="bulkReassignSourceStore"></select></div>
+            <div class="field"><label>Loja de destino (correta)</label><select id="bulkReassignTargetStore"></select></div>
+            <div class="field"><label>Responsável (opcional, filtra só os lançamentos dela)</label><input id="bulkReassignResponsibleFilter" placeholder="Ex: Maria"/></div>
+            <div class="field"><label>Novo responsável (opcional)</label><input id="bulkReassignNewResponsible" placeholder="Deixe em branco para manter o mesmo"/></div>
+            <div class="field"><label>Data inicial</label><input id="bulkReassignStart" type="date"/></div>
+            <div class="field"><label>Data final</label><input id="bulkReassignEnd" type="date"/></div>
+            <div class="field full"><label>Motivo <span style="color:#dc2626">*</span></label><textarea id="bulkReassignReason" placeholder="Ex: troca de operadoras entre lojas em 05/07."></textarea></div>
+          </div>
+          <div class="btn-row">
+            <button class="btn" onclick="previewBulkReassign()">Pré-visualizar</button>
+            <button class="btn btn-brand" onclick="applyBulkReassignStore()">Aplicar reatribuição</button>
+          </div>
+          <div id="bulkReassignPreview" style="margin-top:14px"></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h3 class="section-title">Recalcular cadeia de saldos</h3>
+          <p class="subtle" style="margin-bottom:14px">Depois de reatribuir loja ou lançar fechamentos retroativos, os fechamentos SEGUINTES de uma loja podem ficar com "saldo anterior"/divergência de abertura desatualizados. Esta ferramenta percorre os fechamentos da loja em ordem de data e corrige a cadeia (não altera valores lançados).</p>
+          <div class="form-grid">
+            <div class="field"><label>Loja</label><select id="recalcChainStore"></select></div>
+          </div>
+          <div class="btn-row"><button class="btn btn-brand" onclick="handleRecalculateStoreChain()">Recalcular cadeia de saldos</button></div>
         </div>
       </div>
     </section>
@@ -1991,9 +2027,12 @@
         <!-- COLUNA ESQUERDA: Formulário -->
         <div class="card">
           <h3 class="section-title">Fechamento diário</h3>
-          <input id="closingDate" type="hidden"/>
           <div class="form-grid">
-            <div class="field"><label>Loja</label><select id="closingStore" onchange="fillClosingResponsible5X();suggestInitialBalance();calc()"></select></div>
+            <div class="field hidden" id="closingDateField">
+              <label>Data do fechamento <span class="subtle">— lançamento retroativo autorizado</span></label>
+              <input id="closingDate" type="date" onchange="suggestInitialBalance();calc()"/>
+            </div>
+            <div class="field"><label>Loja</label><select id="closingStore" onchange="fillClosingResponsible5X();updateClosingDateFieldVisibility();suggestInitialBalance();calc()"></select></div>
             <div class="field"><label>Turno do fechamento</label><select id="closingShift" required onchange="suggestInitialBalance();calc()"><option>Manhã</option><option>Tarde</option><option>Noite</option><option selected>Integral</option><option>Outro</option></select></div>
             <div class="field"><label>Responsável</label><select id="closingResponsible"><option value="">Selecione o responsável</option></select></div>
           </div>

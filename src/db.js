@@ -285,6 +285,7 @@ function mapOperationConfig(row) {
     receiver: row.transfer_receiver || '',
     allowed: row.allowed_expenses || '',
     message: row.operator_message || '',
+    allowBackdatedClosings: !!row.allow_backdated_closings,
   };
 }
 
@@ -525,16 +526,61 @@ function addAudit(action, detail = '') {
   }
 }
 
-/* --- Realtime --- */
+/* --- Realtime ---
+   Duas otimizações sobre o comportamento original (que recarregava TODAS
+   as 15 tabelas e redesenhava a tela inteira a cada mudança, de qualquer
+   empresa, de qualquer usuário):
+   1. Debounce: uma ação do usuário costuma gerar várias mudanças em
+      sequência (ex.: salvar um fechamento grava em closings + entries +
+      expenses + attachments = 4 eventos). Em vez de recarregar 4 vezes,
+      agrupa tudo que chegar num intervalo curto num único recarregamento.
+   2. Relevância: quando a linha alterada tem company_id/store_id e o
+      usuário não é Master, ignora a mudança se ela não afeta nada que
+      esse usuário possa ver (evita recarregar para uma mudança em outra
+      empresa, que de qualquer forma nem apareceria nos dados dele). */
+let realtimeReloadTimer = null;
+const REALTIME_DEBOUNCE_MS = 1200;
+
+function realtimeChangeIsRelevant(payload) {
+  if (role === 'master') return true;
+  const row = (payload.new && Object.keys(payload.new).length) ? payload.new : payload.old;
+  if (!row) return true; // sem dados para decidir — recarrega por segurança
+
+  if (role === 'operator') {
+    if ('store_id' in row && row.store_id) return row.store_id === currentUser?.storeId;
+    if ('company_id' in row && row.company_id) return row.company_id === currentUser?.companyId;
+    return true;
+  }
+  if (role === 'admin') {
+    if ('company_id' in row && row.company_id) return row.company_id === currentUser?.companyId;
+    return true;
+  }
+  if (role === 'analyst') {
+    if ('company_id' in row && row.company_id) {
+      return visibleCompanies().some((c) => c.id === row.company_id);
+    }
+    return true;
+  }
+  return true;
+}
+
+function scheduleRealtimeReload() {
+  clearTimeout(realtimeReloadTimer);
+  realtimeReloadTimer = setTimeout(async () => {
+    await load();
+    renderAll();
+    flash('Atualizado');
+  }, REALTIME_DEBOUNCE_MS);
+}
+
 function setupRealtimeSync() {
   if (!sb || realtimeChannel) return;
   realtimeChannel = sb.channel('caixa5x-sync-v2')
-    .on('postgres_changes', { event: '*', schema: 'public' }, async (payload) => {
+    .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
       if (!NORMALIZED_TABLES.includes(payload.table)) return;
       if (Date.now() - lastOwnSave < 2000) return;
-      await load();
-      renderAll();
-      flash('Atualizado');
+      if (!realtimeChangeIsRelevant(payload)) return;
+      scheduleRealtimeReload();
     })
     .subscribe((status) => {
       text('realtimeStatus', status === 'SUBSCRIBED' ? '● Ao vivo' : '○ Local');
@@ -542,6 +588,7 @@ function setupRealtimeSync() {
 }
 
 function stopRealtimeSync() {
+  clearTimeout(realtimeReloadTimer);
   if (sb && realtimeChannel) {
     try { realtimeChannel.unsubscribe(); } catch {}
     sb.removeChannel(realtimeChannel);
@@ -575,6 +622,7 @@ function cfg(companyId) {
     tolerance: 5, mode: 'Diário',
     receiver: '', allowed: '', message: '',
     rectificationDeadlineDays: 0,
+    allowBackdatedClosings: false,
     ...(state?.operationConfigs?.[companyId] || {}),
   };
 }
@@ -844,6 +892,7 @@ async function saveOperationConfigToSupabase(companyId, config) {
     transfer_receiver: config.receiver || '',
     allowed_expenses: config.allowed || '',
     operator_message: config.message || '',
+    allow_backdated_closings: !!config.allowBackdatedClosings,
   }, { onConflict: 'company_id' }).select().single();
   if (error) throw error;
   lastOwnSave = Date.now();
@@ -1095,6 +1144,20 @@ async function updateClosing(id, closing) {
 
 async function softDeleteClosing(id) {
   return supabaseWrite('closings', 'update', { type: 'Excluído' }, { id });
+}
+
+/* Atualiza só os campos da "cadeia de saldos" de um fechamento já existente
+   (saldo anterior/divergência de abertura) — usado por recalculateStoreChain().
+   Não mexe em valores lançados (initial/entries/expenses/transfer), só nos
+   campos derivados que dependem de qual fechamento veio antes. */
+async function updateClosingChainFields(id, patch) {
+  return supabaseWrite('closings', 'update', cleanPayload({
+    previous_closing_id: patch.previousClosingId === undefined
+      ? undefined
+      : (isUuid(patch.previousClosingId) ? patch.previousClosingId : null),
+    previous_final_after_transfer: patch.previousFinalAfterTransfer,
+    opening_divergence: patch.openingDivergence,
+  }), { id });
 }
 
 async function createCashOpeningAdjustment(adjustment) {
@@ -1914,6 +1977,7 @@ async function saveOperationConfig() {
     allowed: val('operationAllowed'),
     message: val('operationMessage'),
     rectificationDeadlineDays: Number(val('operationRectificationDays') ?? 0) || 0,
+    allowBackdatedClosings: !!$('operationAllowBackdated')?.checked,
   };
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
     try {
@@ -2437,6 +2501,17 @@ function fillSelects() {
   fillUserManageSelect();
   fillClientReportStore();
   fillClientReportOperator();
+  fillOperationalAdjustmentStores();
+}
+
+/* Selects de loja usados em Operação → Ajustes e Correções — mostram todas
+   as lojas (Master gerencia todas as empresas), com o nome da empresa junto
+   para não confundir lojas de clientes diferentes com o mesmo nome. */
+function fillOperationalAdjustmentStores() {
+  const options = (state.stores || []).map((s) => [s.id, `${companyName(s.companyId)} — ${s.name}`]);
+  ['bulkReassignSourceStore', 'bulkReassignTargetStore', 'recalcChainStore'].forEach((id) =>
+    setOptions(id, options, 'Selecione a loja')
+  );
 }
 
 function fillStoreSelect() {

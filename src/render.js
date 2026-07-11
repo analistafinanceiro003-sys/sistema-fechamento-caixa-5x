@@ -325,7 +325,7 @@ function renderOperacao() {
     const deadline = Number(c.rectificationDeadlineDays ?? 0);
     return `<div class="kpi-alert" style="margin-bottom:10px">
       <strong>${esc(companyName(cid))}</strong>
-      <p class="subtle">Modo: ${esc(c.mode)} | Tolerância div.: ${money(c.tolerance)} | Tolerância repasse: ${money(c.transferTolerance || 0)} | Repasse: ${esc(c.receiver || '-')} | Retificação: ${deadline === 0 ? 'mesmo mês' : deadline + ' dias'}</p>
+      <p class="subtle">Modo: ${esc(c.mode)} | Tolerância div.: ${money(c.tolerance)} | Tolerância repasse: ${money(c.transferTolerance || 0)} | Repasse: ${esc(c.receiver || '-')} | Retificação: ${deadline === 0 ? 'mesmo mês' : deadline + ' dias'} | Lançamento retroativo: ${c.allowBackdatedClosings ? '<strong style="color:var(--warning)">liberado</strong>' : 'bloqueado'}</p>
     </div>`;
   }).join('') || '<p class="subtle">Nenhuma configuração salva.</p>');
 }

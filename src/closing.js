@@ -36,11 +36,22 @@ function closingSortValue(c) {
 
 function findPreviousClosing(storeId, dateISO, shift) {
   const rank = shiftRank(shift);
+  /* Um original retificado (inclusive quando a retificação muda a loja, via
+     reatribuição em massa) nunca deve contar como "o fechamento anterior" —
+     ele foi substituído. Sem isso, um original que "ficou pra trás" na loja
+     de origem depois de uma reatribuição continuaria aparecendo na cadeia
+     dessa loja, mesmo sua versão corrigida já morando em outra loja. */
+  const supersededIds = new Set(
+    (state.closings || [])
+      .filter((c) => c.type === 'Retificado' && c.originalClosingId)
+      .map((c) => c.originalClosingId)
+  );
   return [...(state.closings || [])]
     .filter((c) => {
       const d = parseBR(c.date), r = shiftRank(c.shift || 'Integral');
       return c.storeId === storeId &&
         (c.type === 'Original' || c.type === 'Retificado' || !c.type) &&
+        !supersededIds.has(c.id) &&
         (d < dateISO || (d === dateISO && r < rank));
     })
     .sort((a, b) => closingSortValue(b).localeCompare(closingSortValue(a)))[0] || null;
@@ -59,20 +70,20 @@ function findOpeningAdjustment(storeId, dateISO, shift) {
     )[0] || null;
 }
 
-function openingReference() {
-  const store   = selectedStore();
-  const dateISO = parseBR(val('closingDate'));
-  const shift   = selectedShift();
-  if (!store || !dateISO) return { previous: null, adjustment: null, amount: 0, origin: 'Caixa inicial' };
+/* Versão parametrizada — reusada pela retificação com troca de loja e pelo
+   recálculo de cadeia, que precisam calcular a referência de abertura de um
+   fechamento que NÃO é o do formulário atualmente aberto na tela. */
+function computeOpeningReference(storeId, dateISO, shift) {
+  if (!storeId || !dateISO) return { previous: null, adjustment: null, amount: 0, origin: 'Caixa inicial' };
 
-  const previous = findPreviousClosing(store.id, dateISO, shift);
+  const previous = findPreviousClosing(storeId, dateISO, shift);
   if (previous) return {
     previous, adjustment: null,
     amount: Number(previous.finalAfterTransfer ?? previous.cashBalance ?? 0),
     origin: `${previous.date} / ${previous.shift || 'Integral'} / ${previous.responsible || storeName(previous.storeId)}`,
   };
 
-  const adjustment = findOpeningAdjustment(store.id, dateISO, shift);
+  const adjustment = findOpeningAdjustment(storeId, dateISO, shift);
   if (adjustment) return {
     previous: null, adjustment,
     amount: Number(adjustment.amount || 0),
@@ -80,6 +91,14 @@ function openingReference() {
   };
 
   return { previous: null, adjustment: null, amount: 0, origin: 'Caixa inicial' };
+}
+
+function openingReference() {
+  const store   = selectedStore();
+  const dateISO = parseBR(val('closingDate'));
+  const shift   = selectedShift();
+  if (!store) return { previous: null, adjustment: null, amount: 0, origin: 'Caixa inicial' };
+  return computeOpeningReference(store.id, dateISO, shift);
 }
 
 /* Lê totais das linhas de lançamento */
@@ -158,8 +177,28 @@ function closingStatus(diff, companyId) {
 /* ================================================================
    SUGESTÃO DE SALDO INICIAL
 ================================================================ */
+/* Mostra o campo de data (editável) só quando o lançamento retroativo está
+   liberado — Master sempre pode; Admin/Operador só quando a empresa da loja
+   selecionada tiver "Permitir lançamentos retroativos" habilitado. Fora
+   disso, a data continua travada em hoje (fluxo padrão, sem mudança). */
+function canBackdateClosing(companyId) {
+  return role === 'master' || (['admin', 'operator'].includes(role) && !!cfg(companyId).allowBackdatedClosings);
+}
+
+function updateClosingDateFieldVisibility() {
+  const wrap  = $('closingDateField');
+  const input = $('closingDate');
+  if (!wrap || !input) return;
+  const store = selectedStore();
+  const allow = canBackdateClosing(store?.companyId);
+  wrap.classList.toggle('hidden', !allow);
+  input.max = todayISO();
+  if (!input.value) input.value = todayISO();
+}
+
 function suggestInitialBalance() {
   const store   = selectedStore();
+  updateClosingDateFieldVisibility();
   const dateInput = $('closingDate');
   if (dateInput && !dateInput.value) dateInput.value = todayISO();
   const dateISO = parseBR(val('closingDate'));
@@ -217,6 +256,7 @@ function bindClosingEvents() {
 function calc() {
   ensureExpenseCategories();
   ensureEntryCategories();
+  updateClosingDateFieldVisibility();
 
   const cc  = getClosingCalculation();
   const ref = cc.openingRef;
@@ -549,11 +589,18 @@ async function saveClosing() {
   if (role === 'admin' && store.companyId !== currentUser?.companyId)
     return alert('Esta loja não pertence ao seu acesso.');
 
-  const closingDate = todayISO();
+  /* Lançamento retroativo: só usa a data escolhida no campo quando o perfil
+     está autorizado (Master sempre; Admin/Operador só com a empresa
+     liberada) — do contrário, força hoje, igual ao comportamento original. */
+  const allowBackdate = canBackdateClosing(store.companyId);
+  const chosenDate     = val('closingDate');
+  const closingDate    = (allowBackdate && chosenDate) ? chosenDate : todayISO();
+  if (closingDate > todayISO()) return alert('Não é possível registrar fechamento com data futura.');
   const dateInput = $('closingDate');
   if (dateInput) dateInput.value = closingDate;
   const dateISO     = parseBR(closingDate);
   if (!dateISO) return alert('Data de fechamento inválida.');
+  const isBackdated = allowBackdate && dateISO !== todayISO();
 
   const shift       = selectedShift();
   const responsible = val('closingResponsible') || currentUser?.name || '';
@@ -705,6 +752,14 @@ async function saveClosing() {
 
   save();
   renderAll();
+
+  /* Lançamento retroativo: fechamentos posteriores dessa loja podem ter sido
+     calculados sem considerar este registro — corrige a cadeia de saldos. */
+  if (isBackdated) {
+    await recalculateStoreChain(store.id);
+    renderAll();
+  }
+
   alert(`Fechamento ${closingType === 'Retificado' ? 'retificado' : 'salvo'} com sucesso!`);
 }
 
@@ -803,15 +858,18 @@ function openRectifyModal(id) {
   const modal = $('rectifyClosingModal');
   const body  = $('rectifyModalBody');
   if (body) {
+    const storeOpts = (state.stores || [])
+      .map((s) => `<option value="${esc(s.id)}"${s.id === closing.storeId ? ' selected' : ''}>${esc(companyName(s.companyId))} — ${esc(s.name)}</option>`)
+      .join('');
     body.innerHTML = `<table class="table"><tbody>
-      <tr><th>Loja</th><td>${esc(storeName(closing.storeId))}</td></tr>
       <tr><th>Data</th><td>${esc(closing.date)}</td></tr>
       <tr><th>Turno</th><td>${esc(closing.shift || 'Integral')}</td></tr>
-      <tr><th>Responsável</th><td>${esc(closing.responsible)}</td></tr>
       <tr><th>Status atual</th><td>${tag(closing.status)} — Divergência: ${money(closing.fundDivergence ?? closing.diff)}</td></tr>
       ${closing.notes ? `<tr><th>Obs. original</th><td>${esc(closing.notes)}</td></tr>` : ''}
     </tbody></table>
     <div class="form-grid" style="margin-top:12px">
+      <div class="field"><label>Loja <span class="subtle">— corrige troca de loja/operadora</span></label><select id="rectifyStore">${storeOpts}</select></div>
+      <div class="field"><label>Responsável</label><input id="rectifyResponsible" value="${esc(closing.responsible || '')}"/></div>
       <div class="field"><label>Saldo inicial (R$)</label><input id="rectifyInitial" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*"/></div>
       <div class="field"><label>Entradas (R$)</label><input id="rectifyEntries" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*"/></div>
       <div class="field"><label>Saídas (R$)</label><input id="rectifyExpenses" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*"/></div>
@@ -836,56 +894,56 @@ function closeRectifyModal() {
   _rectifyTargetId = null;
 }
 
-async function saveRectification() {
-  if (role !== 'master') return alert('Apenas Gestão 5X pode retificar fechamentos.');
-  const id = _rectifyTargetId;
-  if (!id) return;
-  const original = (state.closings || []).find((c) => c.id === id);
-  if (!original) return alert('Fechamento original não encontrado.');
-  const motivo = ($('rectifyReason')?.value || '').trim();
-  if (!motivo) return alert('O motivo da retificação é obrigatório.');
-  const novasObs = ($('rectifyNotes')?.value || '').trim();
+/* Gera e persiste uma versão "Retificado" de um fechamento, preservando o
+   original intacto — usado tanto pelo modal de retificação individual quanto
+   pela reatribuição de loja em massa. Quando a loja muda, recalcula fundo
+   padrão, divergência de fundo, status e toda a cadeia de saldo anterior
+   (referente à NOVA loja), reaproveitando a mesma lógica de uma criação normal. */
+async function createStoreRectification(original, { newStoreId, newResponsible, notes, initial, entries, expenses, transfer }) {
+  const newStore = state.stores.find((s) => s.id === newStoreId) || state.stores.find((s) => s.id === original.storeId);
 
-  const newInitial  = safeMoneyNumber(val('rectifyInitial'));
-  const newEntries  = safeMoneyNumber(val('rectifyEntries'));
-  const newExpenses = safeMoneyNumber(val('rectifyExpenses'));
-  const newTransfer = safeMoneyNumber(val('rectifyTransfer'));
-
-  const store              = state.stores.find((s) => s.id === original.storeId);
-  const standardFund       = Number(store?.standardFund || 0);
-  const cashBeforeTransfer = newInitial + newEntries - newExpenses;
-  const finalAfterTransfer = cashBeforeTransfer - newTransfer;
+  const cashBeforeTransfer = initial + entries - expenses;
+  const finalAfterTransfer = cashBeforeTransfer - transfer;
+  const standardFund       = Number(newStore?.standardFund || 0);
   const fundDivergence     = finalAfterTransfer - standardFund;
-  const newStatus          = closingStatus(fundDivergence, original.companyId);
+  const status             = closingStatus(fundDivergence, newStore?.companyId ?? original.companyId);
 
-  const entryItems = newEntries !== Number(original.entries || 0)
-    ? [{ description: 'Valor retificado', category: '', client: '', value: newEntries }]
+  const dateISO = parseBR(original.date);
+  const openRef = computeOpeningReference(newStore?.id ?? original.storeId, dateISO, original.shift || 'Integral');
+
+  const entryItems = entries !== Number(original.entries || 0)
+    ? [{ description: 'Valor retificado', category: '', client: '', value: entries }]
     : (original.entryItems || []);
-  const expenseItems = newExpenses !== Number(original.expenses || 0)
-    ? [{ description: 'Valor retificado', category: '', supplier: '', value: newExpenses }]
+  const expenseItems = expenses !== Number(original.expenses || 0)
+    ? [{ description: 'Valor retificado', category: '', supplier: '', value: expenses }]
     : (original.expenseItems || []);
 
   const retificado = {
     ...original,
-    id:               uid('cl'),
-    type:             'Retificado',
+    id:                uid('cl'),
+    type:              'Retificado',
     originalClosingId: original.id,
-    initial:          newInitial,
-    entries:          newEntries,
-    expenses:         newExpenses,
-    transfer:         newTransfer,
-    expected:         cashBeforeTransfer,
+    companyId:         newStore?.companyId ?? original.companyId,
+    storeId:           newStore?.id ?? original.storeId,
+    responsible:       newResponsible || original.responsible,
+    initial, entries, expenses, transfer,
+    expected:          cashBeforeTransfer,
     finalAfterTransfer,
-    cashBalance:      finalAfterTransfer,
+    cashBalance:       finalAfterTransfer,
     standardFund,
     fundDivergence,
-    diff:             fundDivergence,
-    balance:          fundDivergence,
-    status:           newStatus,
-    notes:            `[Retificação por ${currentUser?.name || 'master'} em ${new Date().toLocaleDateString('pt-BR')}] Motivo: ${motivo}${novasObs ? ` | Obs: ${novasObs}` : ''}`,
-    reviewStatus:     'Retificado',
-    createdAt:        new Date().toISOString(),
-    attachments:      [],
+    diff:              fundDivergence,
+    balance:           fundDivergence,
+    status,
+    previousClosingId:          openRef.previous?.id || null,
+    previousFinalAfterTransfer: Number(openRef.amount || 0),
+    openingDivergence:          initial - Number(openRef.amount || 0),
+    openingReferenceOrigin:     openRef.origin,
+    openingAdjustmentId:        openRef.adjustment?.id || null,
+    notes,
+    reviewStatus:      'Retificado',
+    createdAt:         new Date().toISOString(),
+    attachments:       [],
     entryItems,
     expenseItems,
   };
@@ -897,23 +955,236 @@ async function saveRectification() {
       await createClosing(retificado);
     } catch (e) {
       state.closings = state.closings.filter((c) => c.id !== retificado.id);
-      renderAll();
-      return alert(`Erro ao salvar retificação: ${e.message}`);
+      throw e;
     }
   } else if (!DEV_LOCAL_MODE) {
     state.closings = state.closings.filter((c) => c.id !== retificado.id);
+    throw new Error('Supabase obrigatório em produção.');
+  }
+
+  return retificado;
+}
+
+async function saveRectification() {
+  if (role !== 'master') return alert('Apenas Gestão 5X pode retificar fechamentos.');
+  const id = _rectifyTargetId;
+  if (!id) return;
+  const original = (state.closings || []).find((c) => c.id === id);
+  if (!original) return alert('Fechamento original não encontrado.');
+  const motivo = ($('rectifyReason')?.value || '').trim();
+  if (!motivo) return alert('O motivo da retificação é obrigatório.');
+  const novasObs = ($('rectifyNotes')?.value || '').trim();
+
+  const newStoreId      = val('rectifyStore') || original.storeId;
+  const newResponsible  = (val('rectifyResponsible') || '').trim() || original.responsible;
+  const newInitial  = safeMoneyNumber(val('rectifyInitial'));
+  const newEntries  = safeMoneyNumber(val('rectifyEntries'));
+  const newExpenses = safeMoneyNumber(val('rectifyExpenses'));
+  const newTransfer = safeMoneyNumber(val('rectifyTransfer'));
+
+  const storeChanged = newStoreId !== original.storeId;
+  const respChanged  = newResponsible !== original.responsible;
+  const notes =
+    `[Retificação por ${currentUser?.name || 'master'} em ${new Date().toLocaleDateString('pt-BR')}] Motivo: ${motivo}` +
+    (storeChanged ? ` | Loja: ${storeName(original.storeId)} → ${storeName(newStoreId)}` : '') +
+    (respChanged  ? ` | Responsável: ${original.responsible} → ${newResponsible}` : '') +
+    (novasObs ? ` | Obs: ${novasObs}` : '');
+
+  let retificado;
+  try {
+    retificado = await createStoreRectification(original, {
+      newStoreId, newResponsible, notes,
+      initial: newInitial, entries: newEntries, expenses: newExpenses, transfer: newTransfer,
+    });
+  } catch (e) {
     renderAll();
-    return alert('Supabase obrigatório em produção.');
+    return alert(`Erro ao salvar retificação: ${e.message}`);
   }
 
   addAudit(
     'Retificação de fechamento',
-    `${storeName(original.storeId)} / ${original.date} — Motivo: ${motivo} — Valor anterior: ${money(original.fundDivergence ?? original.diff)}`
+    `${storeName(original.storeId)}${storeChanged ? ` → ${storeName(newStoreId)}` : ''} / ${original.date} — Motivo: ${motivo} — Valor anterior: ${money(original.fundDivergence ?? original.diff)}`
   );
 
   closeRectifyModal();
   save(); renderAll();
+
+  /* Loja mudou: a cadeia de saldos das DUAS lojas (de onde saiu e para onde
+     foi) pode ter fechamentos posteriores que dependiam desse registro. */
+  if (storeChanged) {
+    await recalculateStoreChain(original.storeId);
+    await recalculateStoreChain(newStoreId);
+    renderAll();
+  }
+
   alert('Retificação salva com sucesso! O fechamento original foi preservado.');
+}
+
+/* ================================================================
+   RECÁLCULO DE CADEIA DE SALDOS (Operação → Ajustes e Correções)
+   Depois de reatribuir loja ou lançar fechamentos retroativos, os
+   fechamentos SEGUINTES de uma loja podem apontar para um "saldo anterior"
+   que não é mais o correto. Esta função percorre os fechamentos ativos da
+   loja em ordem cronológica e recalcula só os campos derivados da cadeia
+   (previousClosingId, previousFinalAfterTransfer, openingDivergence) — os
+   valores lançados (initial/entries/expenses/transfer) nunca são alterados.
+================================================================ */
+function activeClosingsForStore(storeId) {
+  const supersededIds = new Set(
+    (state.closings || [])
+      .filter((c) => c.type === 'Retificado' && c.originalClosingId)
+      .map((c) => c.originalClosingId)
+  );
+  return (state.closings || [])
+    .filter((c) => c.storeId === storeId && c.type !== 'Excluído' && !supersededIds.has(c.id))
+    .sort((a, b) => closingSortValue(a).localeCompare(closingSortValue(b)));
+}
+
+/* Sem checagem de role aqui de propósito: além do botão em Operação →
+   Ajustes e Correções (esse sim restrito a Master), esta função também é
+   chamada automaticamente depois que um Admin/Operador autorizado salva um
+   fechamento retroativo — precisa rodar para esse perfil também. Ela só
+   recalcula campos derivados (cadeia de saldo anterior) de fechamentos que
+   o próprio usuário já tem acesso a ver; não expõe nem altera nada novo. */
+async function recalculateStoreChain(storeId) {
+  const rows = activeClosingsForStore(storeId);
+  let updated = 0;
+
+  for (const c of rows) {
+    const dateISO = parseBR(c.date);
+    const ref = computeOpeningReference(storeId, dateISO, c.shift || 'Integral');
+    const newPreviousId     = ref.previous?.id || null;
+    const newPreviousAmount = Number(ref.amount || 0);
+    const newOpeningDiv     = Number(c.initial || 0) - newPreviousAmount;
+
+    const changed = (c.previousClosingId || null) !== newPreviousId
+      || Number(c.previousFinalAfterTransfer || 0) !== newPreviousAmount
+      || Number(c.openingDivergence || 0) !== newOpeningDiv;
+
+    if (!changed) continue;
+
+    c.previousClosingId          = newPreviousId;
+    c.previousFinalAfterTransfer = newPreviousAmount;
+    c.openingDivergence          = newOpeningDiv;
+    c.openingReferenceOrigin     = ref.origin;
+    c.openingAdjustmentId        = ref.adjustment?.id || null;
+    updated++;
+
+    if (sb && !USE_LOCAL_FALLBACK && currentUser?.authId) {
+      try {
+        await updateClosingChainFields(c.id, {
+          previousClosingId: newPreviousId,
+          previousFinalAfterTransfer: newPreviousAmount,
+          openingDivergence: newOpeningDiv,
+        });
+      } catch (e) {
+        console.warn('Falha ao recalcular cadeia do fechamento', c.id, e);
+      }
+    }
+  }
+
+  if (updated) save();
+  return { updated, total: rows.length };
+}
+
+async function handleRecalculateStoreChain() {
+  if (role !== 'master') return alert('Apenas Gestão 5X pode recalcular a cadeia de saldos.');
+  const storeId = val('recalcChainStore');
+  if (!storeId) return alert('Selecione a loja.');
+  if (!confirm(`Recalcular a cadeia de saldos de "${storeName(storeId)}"?\n\nIsso corrige o "saldo anterior" e a divergência de abertura de todos os fechamentos dessa loja, em ordem cronológica. Valores lançados (entradas/saídas/repasse) não são alterados.`)) return;
+  const { updated, total } = await recalculateStoreChain(storeId);
+  renderAll();
+  toast(`Cadeia recalculada: ${updated} de ${total} fechamento(s) atualizados.`);
+}
+
+/* ================================================================
+   REATRIBUIÇÃO DE LOJA EM MASSA (Operação → Ajustes e Correções)
+   Corrige vários fechamentos de uma vez quando uma operadora lançou na
+   loja errada — cada um é retificado individualmente (original preservado),
+   reaproveitando createStoreRectification(). Depois, recalcula a cadeia de
+   saldos das duas lojas afetadas.
+================================================================ */
+function findBulkRectifyMatches({ storeId, startISO, endISO, responsibleFilter }) {
+  const filterLower = (responsibleFilter || '').trim().toLowerCase();
+  return activeClosingsForStore(storeId).filter((c) => {
+    const d = parseBR(c.date);
+    if (startISO && d < startISO) return false;
+    if (endISO && d > endISO) return false;
+    if (filterLower && !(c.responsible || '').toLowerCase().includes(filterLower)) return false;
+    return true;
+  });
+}
+
+function _readBulkReassignFilters() {
+  return {
+    storeId:           val('bulkReassignSourceStore'),
+    startISO:          parseBR(val('bulkReassignStart')),
+    endISO:            parseBR(val('bulkReassignEnd')),
+    responsibleFilter: val('bulkReassignResponsibleFilter'),
+  };
+}
+
+function previewBulkReassign() {
+  const { storeId, startISO, endISO, responsibleFilter } = _readBulkReassignFilters();
+  if (!storeId) { html('bulkReassignPreview', '<p class="subtle">Selecione a loja de origem.</p>'); return; }
+  const matches = findBulkRectifyMatches({ storeId, startISO, endISO, responsibleFilter });
+  html('bulkReassignPreview', matches.length
+    ? `<p class="subtle" style="margin-bottom:8px">${matches.length} fechamento(s) encontrado(s):</p>
+       <div class="table-wrap" style="max-height:240px;overflow-y:auto">
+         <table><thead><tr><th>Data</th><th>Turno</th><th>Responsável</th><th>Status</th></tr></thead>
+         <tbody>${matches.map((c) => `<tr><td>${esc(c.date)}</td><td>${esc(c.shift || 'Integral')}</td><td>${esc(c.responsible)}</td><td>${tag(c.status)}</td></tr>`).join('')}</tbody></table>
+       </div>`
+    : '<p class="subtle">Nenhum fechamento encontrado com esses filtros.</p>'
+  );
+}
+
+async function applyBulkReassignStore() {
+  if (role !== 'master') return alert('Apenas Gestão 5X pode reatribuir fechamentos em massa.');
+  const { storeId: sourceStoreId, startISO, endISO, responsibleFilter } = _readBulkReassignFilters();
+  const targetStoreId    = val('bulkReassignTargetStore');
+  const newResponsible   = (val('bulkReassignNewResponsible') || '').trim();
+  const motivo           = (val('bulkReassignReason') || '').trim();
+
+  if (!sourceStoreId || !targetStoreId) return alert('Selecione a loja de origem e a loja de destino.');
+  if (sourceStoreId === targetStoreId) return alert('A loja de destino precisa ser diferente da loja de origem.');
+  if (!motivo) return alert('Informe o motivo da reatribuição.');
+
+  const matches = findBulkRectifyMatches({ storeId: sourceStoreId, startISO, endISO, responsibleFilter });
+  if (!matches.length) return alert('Nenhum fechamento encontrado com esses filtros.');
+  if (!confirm(`Confirma reatribuir ${matches.length} fechamento(s) de "${storeName(sourceStoreId)}" para "${storeName(targetStoreId)}"?\n\nCada um será retificado — o original fica preservado, e uma versão corrigida assume a loja certa.`)) return;
+
+  let ok = 0, fail = 0;
+  for (const original of matches) {
+    const respChanged = !!newResponsible && newResponsible !== original.responsible;
+    const notes =
+      `[Reatribuição em massa por ${currentUser?.name || 'master'} em ${new Date().toLocaleDateString('pt-BR')}] Motivo: ${motivo}` +
+      ` | Loja: ${storeName(sourceStoreId)} → ${storeName(targetStoreId)}` +
+      (respChanged ? ` | Responsável: ${original.responsible} → ${newResponsible}` : '');
+    try {
+      await createStoreRectification(original, {
+        newStoreId: targetStoreId,
+        newResponsible: newResponsible || original.responsible,
+        notes,
+        initial: Number(original.initial || 0),
+        entries: Number(original.entries || 0),
+        expenses: Number(original.expenses || 0),
+        transfer: Number(original.transfer || 0),
+      });
+      ok++;
+    } catch (e) {
+      fail++;
+      console.warn('Falha ao reatribuir fechamento', original.id, e);
+    }
+  }
+
+  addAudit('Reatribuição de loja em massa', `${storeName(sourceStoreId)} → ${storeName(targetStoreId)} — ${ok} fechamento(s) — Motivo: ${motivo}`);
+  save(); renderAll();
+
+  await recalculateStoreChain(sourceStoreId);
+  await recalculateStoreChain(targetStoreId);
+  renderAll();
+
+  alert(`Reatribuição concluída: ${ok} fechamento(s) corrigido(s)${fail ? `, ${fail} com erro (veja o console)` : ''}. A cadeia de saldos das duas lojas foi recalculada.`);
 }
 
 /* ================================================================
@@ -1152,6 +1423,9 @@ Object.assign(window, {
   confirmDeleteClosing, openRectifyModal, closeRectifyModal, saveRectification,
   openOperatorRectifyModal, closeOperatorRectifyModal, submitRectificationRequest,
   approveRectification, rejectRectification,
+  computeOpeningReference, canBackdateClosing, updateClosingDateFieldVisibility,
+  recalculateStoreChain, handleRecalculateStoreChain,
+  previewBulkReassign, applyBulkReassignStore,
 });
 
 

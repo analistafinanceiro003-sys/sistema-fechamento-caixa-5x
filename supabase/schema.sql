@@ -212,9 +212,12 @@ create table if not exists public.operation_configs (
   transfer_receiver    text,
   allowed_expenses     text,
   operator_message     text,
+  allow_backdated_closings boolean not null default false,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
 );
+-- Migração: adiciona a coluna se a tabela já existia sem ela
+alter table public.operation_configs add column if not exists allow_backdated_closings boolean not null default false;
 
 create index if not exists idx_op_configs_company on public.operation_configs(company_id);
 
