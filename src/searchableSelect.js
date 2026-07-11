@@ -17,7 +17,7 @@ const COMPANY_SELECT_IDS = [
   'operationCompany', 'moduleCompany', 'masterMovementCompanyFilter',
   'masterExtractCompany', 'masterResumoCompany', 'masterRepasseCompany',
   'masterDivergenceCompanyFilter', 'reportCompany', 'optionCompany',
-  'fcCompanyFilter', 'docFilterCompany',
+  'fcCompanyFilter', 'docFilterCompany', 'openingAdjustmentCompany',
 ];
 
 function enhanceSearchableSelect(select) {

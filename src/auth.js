@@ -90,7 +90,7 @@ async function enterApp() {
 
   /* 2. Fallback local — testa todos os perfis em ordem */
   if (!user && window.DEV_LOCAL_MODE) {
-    for (const tryRole of ['master', 'admin', 'operator']) {
+    for (const tryRole of ['master', 'analyst', 'admin', 'operator']) {
       const localUser = tryLocalLogin(loginVal, passVal, tryRole);
       if (localUser) {
         user = {

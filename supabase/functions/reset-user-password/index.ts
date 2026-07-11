@@ -50,8 +50,17 @@ Deno.serve(async (req) => {
     .eq('user_id', authUser.user.id)
     .maybeSingle();
 
-  if (!requester || requester.role !== 'master' || requester.status === 'Inativo') {
-    return friendlyError(req, 'Apenas o perfil Master pode redefinir senhas.', 403);
+  if (!requester || !['master', 'analyst'].includes(requester.role) || requester.status === 'Inativo') {
+    return friendlyError(req, 'Apenas Master ou Analista podem redefinir senhas.', 403);
+  }
+
+  let analystCompanyIds: string[] = [];
+  if (requester.role === 'analyst') {
+    const { data: links } = await admin
+      .from('analyst_companies')
+      .select('company_id')
+      .eq('profile_id', requester.id);
+    analystCompanyIds = (links || []).map((l: { company_id: string }) => l.company_id);
   }
 
   let body: Record<string, unknown>;
@@ -70,11 +79,18 @@ Deno.serve(async (req) => {
 
   const { data: targetProfile } = await admin
     .from('profiles')
-    .select('id, name, email, company_id, store_id')
+    .select('id, name, email, role, company_id, store_id')
     .eq('user_id', userId)
     .maybeSingle();
 
   if (!targetProfile) return friendlyError(req, 'Usuário não encontrado.', 404);
+
+  /* Analista só redefine senha de Admin/Operador de empresas às quais tem acesso. */
+  if (requester.role === 'analyst') {
+    if (!['admin', 'operator'].includes(targetProfile.role) || !analystCompanyIds.includes(targetProfile.company_id)) {
+      return friendlyError(req, 'Você só pode redefinir senhas de usuários de empresas às quais tem acesso.', 403);
+    }
+  }
 
   const { error: updateError } = await admin.auth.admin.updateUserById(userId, { password: newPassword });
   if (updateError) return friendlyError(req, 'Não foi possível redefinir a senha.', 500);

@@ -165,6 +165,8 @@ function getModuleConfig(companyId, profile) {
 ============================================================ */
 function isPageAllowed(page) {
   if (role === 'master') return true;
+  /* Analista: mesmo acesso do Master, exceto a página Sistema. */
+  if (role === 'analyst') return page !== 'sistema';
   if (!currentUser) return false;
   const cfg = getModuleConfig(currentUser.companyId, role);
   if ((cfg.status || 'Ativo') === 'Bloqueado') return false;
@@ -202,6 +204,7 @@ function isCardAllowed(pageId, cardId) {
 }
 
 function firstAllowedPage() {
+  if (role === 'analyst') return 'dashboard';
   const tree = MODULE_TREE[role] || [];
   const cfg = role !== 'master' ? getModuleConfig(currentUser?.companyId, role) : {};
   if ((cfg.status || 'Ativo') === 'Bloqueado') return null;
@@ -248,6 +251,13 @@ function renderSidebarByPermissions() {
     return;
   }
 
+  if (role === 'analyst') {
+    nav.innerHTML =
+      `<div class="nav-title">Analista</div>` +
+      MASTER_NAV.filter((m) => m.page !== 'sistema').map(({ page, label }) => navBtn(page, label)).join('');
+    return;
+  }
+
   const tree = MODULE_TREE[role] || [];
   const cfg = getModuleConfig(currentUser?.companyId, role);
   const isBloqueado = (cfg.status || 'Ativo') === 'Bloqueado';
@@ -275,7 +285,7 @@ function renderSidebarByPermissions() {
 /* Aplica visibilidade de sub-abas e cards conforme permissões */
 function applyModuleAccess() {
   renderSidebarByPermissions();
-  if (role === 'master') return;
+  if (role === 'master' || role === 'analyst') return;
 
   /* Ocultar sub-abas sem permissão */
   document.querySelectorAll('.inner-tab-btn[data-subtab]').forEach((btn) => {
@@ -323,7 +333,7 @@ const PAGE_TITLES = {
    grupo está em exibição. */
 function renderMasterOpsGroupNav(activeId) {
   document.querySelectorAll('.master-ops-group-nav').forEach((el) => el.remove());
-  if (role !== 'master' || !MASTER_OPS_GROUP.some((g) => g.page === activeId)) return;
+  if ((role !== 'master' && role !== 'analyst') || !MASTER_OPS_GROUP.some((g) => g.page === activeId)) return;
   const section = $(activeId);
   if (!section) return;
   const bar = document.createElement('div');
@@ -400,12 +410,14 @@ function showSubTab(pageId, tabId, btn) {
 function setupMenu() {
   text('profileChip',
     role === 'master' ? 'Perfil: Gestão 5X'
+    : role === 'analyst' ? 'Perfil: Analista'
     : role === 'admin' ? 'Perfil: Administrador Cliente'
     : 'Perfil: Operador'
   );
   text('userName', currentUser?.name || '-');
   text('userAccess',
     role === 'master' ? 'Todas as empresas'
+    : role === 'analyst' ? (window.visibleCompanies ? `${visibleCompanies().length} empresa(s)` : '-')
     : role === 'admin' ? (window.companyName ? companyName(currentUser?.companyId) : '-')
     : (window.storeName ? storeName(currentUser?.storeId) : '-')
   );

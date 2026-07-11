@@ -129,14 +129,21 @@
     ============================================================ -->
     <section class="page hidden" id="dashboard">
       <div class="grid cards">
-        <div class="card"><div class="metric-label">Empresas ativas</div><div class="metric-value" id="mCompanies">0</div><div class="metric-hint">Clientes em operação</div></div>
-        <div class="card"><div class="metric-label">Lojas / caixas</div><div class="metric-value" id="mStores">0</div><div class="metric-hint">Pontos de fechamento</div></div>
-        <div class="card"><div class="metric-label">Fechamentos</div><div class="metric-value" id="mClosings">0</div><div class="metric-hint">Registros salvos</div></div>
-        <div class="card"><div class="metric-label">Divergência total</div><div class="metric-value" id="mDiff">0,00 R$</div><div class="metric-hint">Soma absoluta</div></div>
+        <div class="card clickable-card" onclick="showPage('cadastros',document.querySelector('.nav button[data-page=cadastros]'));showSubTab('cadastros','cad-empresas',document.querySelector('[data-subtab=cad-empresas]'))"><div class="metric-label">Empresas ativas</div><div class="metric-value" id="mCompanies">0</div><div class="metric-hint">Clientes em operação</div></div>
+        <div class="card clickable-card" onclick="showPage('cadastros',document.querySelector('.nav button[data-page=cadastros]'));showSubTab('cadastros','cad-lojas',document.querySelector('[data-subtab=cad-lojas]'))"><div class="metric-label">Lojas / caixas</div><div class="metric-value" id="mStores">0</div><div class="metric-hint">Pontos de fechamento</div></div>
+        <div class="card clickable-card" onclick="showPage('fechamentos',document.querySelector('.nav button[data-page=fechamentos]'))"><div class="metric-label">Fechamentos</div><div class="metric-value" id="mClosings">0</div><div class="metric-hint">Registros salvos</div></div>
+        <div class="card clickable-card" onclick="showPage('fechamentos',document.querySelector('.nav button[data-page=fechamentos]'));showSubTab('fechamentos','fech-divergencias',document.querySelector('[data-subtab=fech-divergencias]'))"><div class="metric-label">Divergência total</div><div class="metric-value" id="mDiff">0,00 R$</div><div class="metric-hint">Soma absoluta</div></div>
       </div>
-      <div class="panel-grid">
+
+      <div class="card" style="margin-top:16px">
+        <h3 class="section-title">Tendência — últimos 14 dias</h3>
+        <div id="dashTrend"></div>
+      </div>
+
+      <div class="panel-grid" style="margin-top:16px">
         <div class="card">
           <h3 class="section-title">Alertas críticos</h3>
+          <p class="subtle" style="margin-bottom:10px">Divergências pendentes de revisão, mais urgentes primeiro.</p>
           <div id="dashAlerts"><p class="subtle">Carregando…</p></div>
         </div>
         <div class="card">
@@ -144,9 +151,10 @@
           <div id="dashImplant"><p class="subtle">Carregando…</p></div>
         </div>
       </div>
+
       <div class="card" style="margin-top:16px">
-        <h3 class="section-title">Resumo executivo</h3>
-        <div id="dashSummary"></div>
+        <h3 class="section-title">Atividade recente</h3>
+        <div id="dashActivity"></div>
       </div>
     </section>
 
@@ -156,8 +164,8 @@
     <section class="page hidden" id="cadastros">
       <div class="inner-tabs">
         <button class="inner-tab-btn active" onclick="showSubTab('cadastros','cad-setup',this)">Cadastro Guiado</button>
-        <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-empresas',this)">Empresas</button>
-        <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-lojas',this)">Lojas e Caixas</button>
+        <button class="inner-tab-btn" data-subtab="cad-empresas" onclick="showSubTab('cadastros','cad-empresas',this)">Empresas</button>
+        <button class="inner-tab-btn" data-subtab="cad-lojas" onclick="showSubTab('cadastros','cad-lojas',this)">Lojas e Caixas</button>
         <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-usuarios-cadastro',this)">Cadastrar Usuário</button>
         <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-usuarios-lista',this)">Usuários e Acessos</button>
         <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-implantacao',this)">Implantação</button>
@@ -234,12 +242,12 @@
           </div>
           <div class="card">
             <h3 class="section-title">Lojas cadastradas</h3>
-            <div class="filter-bar-5x" style="margin-bottom:10px">
-              <div class="field"><label>Filtrar por nome</label><input id="storeFilter" placeholder="Nome da loja..." oninput="renderCadastros()"/></div>
-            </div>
             <div class="table-wrap">
               <table><thead><tr><th>Empresa</th><th>Loja</th><th>Código</th><th>Tipo</th><th>Fundo padrão</th><th>Status</th><th>Ações</th></tr></thead>
               <tbody id="storesBody"></tbody></table>
+            </div>
+            <div class="filter-bar-5x" style="margin-top:10px">
+              <div class="field"><label>Filtrar por nome</label><input id="storeFilter" placeholder="Nome da loja..." oninput="renderCadastros()"/></div>
             </div>
           </div>
           <!-- Modal edição de loja -->
@@ -425,7 +433,7 @@
         <button class="inner-tab-btn" onclick="showSubTab('fechamentos','fech-extrato',this)">Extrato</button>
         <button class="inner-tab-btn" onclick="showSubTab('fechamentos','fech-resumo',this)">Resumo por Fechamento</button>
         <button class="inner-tab-btn" onclick="showSubTab('fechamentos','fech-repasses',this)">Repasses</button>
-        <button class="inner-tab-btn" onclick="showSubTab('fechamentos','fech-divergencias',this)">Divergências</button>
+        <button class="inner-tab-btn" data-subtab="fech-divergencias" onclick="showSubTab('fechamentos','fech-divergencias',this)">Divergências</button>
       </div>
 
       <!-- Movimentações -->
@@ -433,8 +441,9 @@
         <div class="card">
           <h3 class="section-title">Movimentações de caixa</h3>
           <div class="filter-bar-5x">
-            <div class="field"><label>Empresa</label><select id="masterMovementCompanyFilter" onchange="fillMasterMovementStore();renderFechamentos()"></select></div>
+            <div class="field"><label>Empresa</label><select id="masterMovementCompanyFilter" onchange="fillMasterMovementStore();fillMasterMovementOperator();renderFechamentos()"></select></div>
             <div class="field"><label>Loja / caixa</label><select id="masterMovementStoreFilter" onchange="renderFechamentos()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Operador</label><select id="masterMovementOperatorFilter" onchange="renderFechamentos()"><option value="">Todos</option></select></div>
             <div class="field"><label>Data inicial</label><input id="masterFechStart" type="date" onchange="renderFechamentos()"/></div>
             <div class="field"><label>Data final</label><input id="masterFechEnd" type="date" onchange="renderFechamentos()"/></div>
           </div>
@@ -450,8 +459,9 @@
         <div class="card">
           <h3 class="section-title">Extrato de Movimentações</h3>
           <div class="filter-bar-5x">
-            <div class="field"><label>Empresa</label><select id="masterExtractCompany" onchange="fillMasterExtractStore();renderFechamentos()"></select></div>
+            <div class="field"><label>Empresa</label><select id="masterExtractCompany" onchange="fillMasterExtractStore();fillMasterExtractOperator();renderFechamentos()"></select></div>
             <div class="field"><label>Loja</label><select id="masterExtractStore" onchange="renderFechamentos()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Operador</label><select id="masterExtractOperatorFilter" onchange="renderFechamentos()"><option value="">Todos</option></select></div>
             <div class="field"><label>Tipo</label><select id="masterExtractType" onchange="renderFechamentos()"><option value="">Todos</option><option>Entrada</option><option>Saída</option><option>Repasse / Transferência</option></select></div>
             <div class="field"><label>Data inicial</label><input id="masterExtractStart" type="date" onchange="renderFechamentos()"/></div>
             <div class="field"><label>Data final</label><input id="masterExtractEnd" type="date" onchange="renderFechamentos()"/></div>
@@ -478,8 +488,9 @@
           <h3 class="section-title">Resumo por Fechamento</h3>
           <div id="resumoSaldoDashboard" style="margin-bottom:14px"></div>
           <div class="filter-bar-5x">
-            <div class="field"><label>Empresa</label><select id="masterResumoCompany" onchange="fillMasterResumoStore();renderFechamentos()"></select></div>
+            <div class="field"><label>Empresa</label><select id="masterResumoCompany" onchange="fillMasterResumoStore();fillMasterResumoOperator();renderFechamentos()"></select></div>
             <div class="field"><label>Loja</label><select id="masterResumoStore" onchange="renderFechamentos()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Operador</label><select id="masterResumoOperatorFilter" onchange="renderFechamentos()"><option value="">Todos</option></select></div>
             <div class="field"><label>Data inicial</label><input id="masterResumoStart" type="date" onchange="renderFechamentos()"/></div>
             <div class="field"><label>Data final</label><input id="masterResumoEnd" type="date" onchange="renderFechamentos()"/></div>
           </div>
@@ -509,8 +520,9 @@
           <h3 class="section-title">Repasses — visão geral</h3>
           <div id="masterRepassesDashboard" style="margin-bottom:14px"></div>
           <div class="filter-bar-5x" style="margin-bottom:12px">
-            <div class="field"><label>Empresa</label><select id="masterRepasseCompany" onchange="fillMasterRepasseStore();renderFechamentos()"></select></div>
+            <div class="field"><label>Empresa</label><select id="masterRepasseCompany" onchange="fillMasterRepasseStore();fillMasterRepasseOperator();renderFechamentos()"></select></div>
             <div class="field"><label>Loja</label><select id="masterRepasseStore" onchange="renderFechamentos()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Operador</label><select id="masterRepasseOperatorFilter" onchange="renderFechamentos()"><option value="">Todos</option></select></div>
             <div class="field"><label>Data inicial</label><input id="masterRepasseStart" type="date" onchange="renderFechamentos()"/></div>
             <div class="field"><label>Data final</label><input id="masterRepasseEnd" type="date" onchange="renderFechamentos()"/></div>
             <div class="field"><label>Status</label><select id="masterRepasseStatus" onchange="renderFechamentos()"><option value="">Todos</option><option value="Recebido">Confirmados</option><option value="Pendente">Pendentes</option></select></div>
@@ -528,8 +540,9 @@
         <div class="card">
           <h3 class="section-title">Divergências e leitura operacional</h3>
           <div class="filter-bar-5x">
-            <div class="field"><label>Empresa</label><select id="masterDivergenceCompanyFilter" onchange="fillMasterDivergenceStore();renderFechamentos()"></select></div>
+            <div class="field"><label>Empresa</label><select id="masterDivergenceCompanyFilter" onchange="fillMasterDivergenceStore();fillMasterDivergenceOperator();renderFechamentos()"></select></div>
             <div class="field"><label>Loja / caixa</label><select id="masterDivergenceStoreFilter" onchange="renderFechamentos()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Operador</label><select id="masterDivergenceOperatorFilter" onchange="renderFechamentos()"><option value="">Todos</option></select></div>
             <div class="field"><label>Data inicial</label><input id="masterDivStart" type="date" onchange="renderFechamentos()"/></div>
             <div class="field"><label>Data final</label><input id="masterDivEnd" type="date" onchange="renderFechamentos()"/></div>
           </div>
@@ -564,11 +577,11 @@
 
       <div class="inner-tab-panel active" id="rel-principal">
         <div class="report-grid">
-          <div class="report-card"><h4>Fechamento por loja</h4><p class="subtle">Saldo inicial, entradas, saídas, repasses, saldo final e divergência por unidade.</p><div class="btn-row"><button class="btn btn-primary" onclick="exportCSV()">Exportar CSV</button><button class="btn" onclick="exportFechamentoPDF()">Exportar PDF</button></div></div>
-          <div class="report-card"><h4>Divergências do período</h4><p class="subtle">Diferenças por data, loja, responsável e status de revisão.</p><div class="btn-row"><button class="btn" onclick="exportDivergencesCSV()">Exportar CSV</button><button class="btn" onclick="exportDivergencesPDF()">Exportar PDF</button></div></div>
-          <div class="report-card"><h4>Repasses ao caixa central</h4><p class="subtle">Valores entregues por data, loja, responsável e status.</p><div class="btn-row"><button class="btn" onclick="exportTransfersCSV()">Exportar CSV</button><button class="btn" onclick="exportTransfersPDF()">Exportar PDF</button></div></div>
-          <div class="report-card"><h4>Saídas por descrição</h4><p class="subtle">Consolida saídas por categoria, motoboy, compras e outros.</p><div class="btn-row"><button class="btn" onclick="exportExpensesCSV()">Exportar CSV</button><button class="btn" onclick="exportExpensesPDF()">Exportar PDF</button></div></div>
-          <div class="report-card"><h4>Auditoria operacional</h4><p class="subtle">Log de ações: fechamentos, usuários, configs e alterações.</p><div class="btn-row"><button class="btn" onclick="exportAuditCSV()">Exportar CSV</button><button class="btn" onclick="exportAuditPDF()">Exportar PDF</button></div></div>
+          <div class="report-card"><h4>Fechamento por loja</h4><p class="subtle">Saldo inicial, entradas, saídas, repasses, saldo final e divergência por unidade.</p><div class="btn-row"><button class="btn btn-primary" onclick="exportFechamentoXLSX()">Exportar Excel</button><button class="btn" onclick="exportFechamentoPDF()">Exportar PDF</button></div></div>
+          <div class="report-card"><h4>Divergências do período</h4><p class="subtle">Diferenças por data, loja, responsável e status de revisão.</p><div class="btn-row"><button class="btn" onclick="exportDivergencesXLSX()">Exportar Excel</button><button class="btn" onclick="exportDivergencesPDF()">Exportar PDF</button></div></div>
+          <div class="report-card"><h4>Repasses ao caixa central</h4><p class="subtle">Valores entregues por data, loja, responsável e status.</p><div class="btn-row"><button class="btn" onclick="exportTransfersXLSX()">Exportar Excel</button><button class="btn" onclick="exportTransfersPDF()">Exportar PDF</button></div></div>
+          <div class="report-card"><h4>Saídas por descrição</h4><p class="subtle">Consolida saídas por categoria, motoboy, compras e outros.</p><div class="btn-row"><button class="btn" onclick="exportExpensesXLSX()">Exportar Excel</button><button class="btn" onclick="exportExpensesPDF()">Exportar PDF</button></div></div>
+          <div class="report-card"><h4>Auditoria operacional</h4><p class="subtle">Log de ações: fechamentos, usuários, configs e alterações.</p><div class="btn-row"><button class="btn" onclick="exportAuditXLSX()">Exportar Excel</button><button class="btn" onclick="exportAuditPDF()">Exportar PDF</button></div></div>
         </div>
       </div>
 
@@ -576,7 +589,7 @@
         <div class="report-card" style="max-width:480px">
           <h4>Consolidado por empresa</h4>
           <p class="subtle">Total de entradas, saídas, repasses, saldo final, divergência de fundo e divergência física por empresa no período selecionado.</p>
-          <div class="btn-row"><button class="btn btn-primary" onclick="exportConsolidadoCSV()">Exportar CSV</button><button class="btn" onclick="exportConsolidadoPDF()">Exportar PDF</button></div>
+          <div class="btn-row"><button class="btn btn-primary" onclick="exportConsolidadoXLSX()">Exportar Excel</button><button class="btn" onclick="exportConsolidadoPDF()">Exportar PDF</button></div>
         </div>
       </div>
 
@@ -595,6 +608,7 @@
     <section class="page hidden" id="sistema">
       <div class="inner-tabs">
         <button class="inner-tab-btn active" onclick="showSubTab('sistema','sis-configuracoes',this)">Configurações Gerais</button>
+        <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-analistas',this)">Analistas</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-fornecedores',this)">Fornecedores e Categorias</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-backup',this)">Backup e Manutenção</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-logs',this)">Logs de Auditoria</button>
@@ -604,39 +618,96 @@
 
       <!-- Configurações -->
       <div class="inner-tab-panel active" id="sis-configuracoes">
-        <div class="card">
-          <h3 class="section-title">Opções das caixas de seleção</h3>
-          <div class="option-manager">
-            <div class="field">
-              <label>Campo de seleção</label>
-              <select id="optionCategory" onchange="toggleOptionCompanyField();renderSistema()">
-                <option value="segments">Segmentos de empresa</option>
-                <option value="plans">Planos / modelos</option>
-                <option value="companyStatus">Status da empresa</option>
-                <option value="cashTypes">Tipos de caixa</option>
-                <option value="operationModes">Modos de fechamento</option>
-                <option value="ruleTypes">Tipos de regra</option>
-                <option value="shifts">Turnos de fechamento</option>
-                <option value="implantSteps">Etapas de implantação</option>
-                <option value="implantStatus">Status de implantação</option>
-              </select>
-            </div>
-            <div class="field hidden" id="optionCompanyField">
-              <label>Empresa</label>
-              <select id="optionCompany" onchange="renderSistema()"></select>
-            </div>
-            <div class="field"><label>Nova opção</label><input id="optionNewValue" placeholder="Digite a nova opção"/></div>
-            <button class="btn btn-brand" onclick="addSelectOption()">Adicionar</button>
-          </div>
-          <div class="option-list" id="optionGroups"></div>
+        <div class="inner-tabs">
+          <button class="inner-tab-btn active" onclick="showSubTab('sis-configuracoes','sisconf-opcoes',this)">Opções de Seleção</button>
+          <button class="inner-tab-btn" onclick="showSubTab('sis-configuracoes','sisconf-exclusoes',this)">Exclusões e Manutenção</button>
         </div>
-        <div class="management-block">
-          <div class="card"><h3 class="section-title">Exclusões e manutenção de cadastros</h3><p class="subtle">Use com cuidado — a exclusão remove os registros da base.</p></div>
-          <div class="management-grid">
-            <div class="management-card"><h4>Empresas</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Status</th><th>Ação</th></tr></thead><tbody id="settingsCompaniesBody"></tbody></table></div></div>
-            <div class="management-card"><h4>Lojas / caixas</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Loja</th><th>Ação</th></tr></thead><tbody id="settingsStoresBody"></tbody></table></div></div>
-            <div class="management-card"><h4>Usuários</h4><div class="table-wrap compact-table"><table><thead><tr><th>Usuário</th><th>Perfil</th><th>Ação</th></tr></thead><tbody id="settingsUsersBody"></tbody></table></div></div>
-            <div class="management-card"><h4>Regras operacionais</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Tipo</th><th>Ação</th></tr></thead><tbody id="settingsRulesBody"></tbody></table></div></div>
+
+        <div class="inner-tab-panel active" id="sisconf-opcoes">
+          <div class="card">
+            <h3 class="section-title">Opções das caixas de seleção</h3>
+            <div class="option-manager">
+              <div class="field">
+                <label>Campo de seleção</label>
+                <select id="optionCategory" onchange="toggleOptionCompanyField();renderSistema()">
+                  <option value="segments">Segmentos de empresa</option>
+                  <option value="plans">Planos / modelos</option>
+                  <option value="companyStatus">Status da empresa</option>
+                  <option value="cashTypes">Tipos de caixa</option>
+                  <option value="operationModes">Modos de fechamento</option>
+                  <option value="ruleTypes">Tipos de regra</option>
+                  <option value="shifts">Turnos de fechamento</option>
+                  <option value="implantSteps">Etapas de implantação</option>
+                  <option value="implantStatus">Status de implantação</option>
+                </select>
+              </div>
+              <div class="field hidden" id="optionCompanyField">
+                <label>Empresa</label>
+                <select id="optionCompany" onchange="renderSistema()"></select>
+              </div>
+              <div class="field"><label>Nova opção</label><input id="optionNewValue" placeholder="Digite a nova opção"/></div>
+              <button class="btn btn-brand" onclick="addSelectOption()">Adicionar</button>
+            </div>
+            <div class="option-list" id="optionGroups"></div>
+          </div>
+        </div>
+
+        <div class="inner-tab-panel hidden" id="sisconf-exclusoes">
+          <div class="management-block">
+            <div class="card"><h3 class="section-title">Exclusões e manutenção de cadastros</h3><p class="subtle">Use com cuidado — a exclusão remove os registros da base.</p></div>
+            <div class="management-grid">
+              <div class="management-card"><h4>Empresas</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Status</th><th>Ação</th></tr></thead><tbody id="settingsCompaniesBody"></tbody></table></div></div>
+              <div class="management-card"><h4>Lojas / caixas</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Loja</th><th>Ação</th></tr></thead><tbody id="settingsStoresBody"></tbody></table></div></div>
+              <div class="management-card"><h4>Usuários</h4><div class="table-wrap compact-table"><table><thead><tr><th>Usuário</th><th>Perfil</th><th>Ação</th></tr></thead><tbody id="settingsUsersBody"></tbody></table></div></div>
+              <div class="management-card"><h4>Regras operacionais</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Tipo</th><th>Ação</th></tr></thead><tbody id="settingsRulesBody"></tbody></table></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analistas (perfil multiempresa) -->
+      <div class="inner-tab-panel hidden" id="sis-analistas">
+        <div class="panel-grid">
+          <div class="card">
+            <h3 class="section-title">Criar Analista</h3>
+            <p class="subtle" style="margin-bottom:14px">Mesmo acesso de edição do Master, exceto esta aba (Sistema). Selecione as empresas que este Analista poderá acessar.</p>
+            <div class="form-grid">
+              <div class="field"><label>Nome</label><input id="analystName"/></div>
+              <div class="field"><label>Login (e-mail)</label><input id="analystLogin"/></div>
+              <div class="field"><label>Senha</label><input id="analystPass" type="password" placeholder="Defina uma senha"/></div>
+            </div>
+            <div class="field full" style="margin-top:10px">
+              <label>Empresas liberadas</label>
+              <div class="option-list company-checklist" id="analystCompanyChecklist" style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;padding:10px"></div>
+            </div>
+            <div class="btn-row"><button class="btn btn-primary" onclick="createAnalystUser()">Criar Analista</button></div>
+          </div>
+          <div class="card">
+            <h3 class="section-title">Analistas cadastrados</h3>
+            <div class="table-wrap">
+              <table><thead><tr><th>Nome</th><th>Login</th><th>Empresas</th><th>Status</th><th>Ação</th></tr></thead>
+              <tbody id="analystsBody"></tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card hidden" id="analystEditPanel" style="margin-top:16px">
+          <h3 class="section-title">Editar Analista</h3>
+          <input type="hidden" id="editAnalystId"/>
+          <div class="form-grid">
+            <div class="field"><label>Nome</label><input id="editAnalystName"/></div>
+            <div class="field"><label>Status</label><select id="editAnalystStatus"><option>Ativo</option><option>Inativo</option></select></div>
+            <div class="field"><label>Nova senha</label><input id="editAnalystPass" type="password" placeholder="Preencha só se quiser alterar"/></div>
+          </div>
+          <div class="field full" style="margin-top:10px">
+            <label>Empresas liberadas</label>
+            <div class="option-list company-checklist" id="editAnalystCompanyChecklist" style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;padding:10px"></div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="saveAnalystEdit()">Salvar alteração</button>
+            <button class="btn" onclick="resetAnalystPassword()">Redefinir senha pelo Auth</button>
+            <button class="btn btn-danger" onclick="deleteAnalystUser()">Excluir Analista</button>
+            <button class="btn" onclick="closeAnalystEditPanel()">Cancelar</button>
           </div>
         </div>
       </div>
@@ -649,38 +720,52 @@
           <div class="form-grid three" style="margin-bottom:14px">
             <div class="field"><label>Empresa</label><select id="fcCompanyFilter" onchange="renderFornecedoresCategorias()"></select></div>
           </div>
-          <div class="management-grid">
-            <div class="management-card">
-              <div class="option-group-head"><h4>Fornecedores</h4><span class="pill" id="fcFornecedoresCount">0</span></div>
-              <div class="option-manager">
-                <div class="field"><label>Novo fornecedor</label><input id="fcNewFornecedor" placeholder="Nome do fornecedor"/></div>
-                <button class="btn btn-brand" onclick="addFornecedor()">Adicionar</button>
+
+          <div class="fc-group">
+            <h4 class="fc-group-title fc-group-title-saida">Saída</h4>
+            <div class="management-grid">
+              <div class="management-card">
+                <div class="option-group-head"><h4>Fornecedores</h4><span class="pill" id="fcFornecedoresCount">0</span></div>
+                <div class="option-manager">
+                  <div class="field"><label>Novo fornecedor</label><input id="fcNewFornecedor" placeholder="Nome do fornecedor"/></div>
+                  <button class="btn btn-brand" onclick="addFornecedor()">Adicionar</button>
+                </div>
+                <input class="fc-search" id="fcFornecedoresSearch" placeholder="Buscar fornecedor..." oninput="renderFornecedoresCategorias()"/>
+                <div class="table-wrap compact-table fc-table-wrap"><table><thead><tr><th>Fornecedor</th><th>Ação</th></tr></thead><tbody id="fcFornecedoresBody"></tbody></table></div>
               </div>
-              <div class="table-wrap compact-table"><table><thead><tr><th>Fornecedor</th><th>Ação</th></tr></thead><tbody id="fcFornecedoresBody"></tbody></table></div>
+              <div class="management-card">
+                <div class="option-group-head"><h4>Categorias de saída</h4><span class="pill" id="fcCategoriasCount">0</span></div>
+                <div class="option-manager">
+                  <div class="field"><label>Nova categoria</label><input id="fcNewCategoria" placeholder="Nome da categoria"/></div>
+                  <button class="btn btn-brand" onclick="addCategoria()">Adicionar</button>
+                </div>
+                <input class="fc-search" id="fcCategoriasSearch" placeholder="Buscar categoria..." oninput="renderFornecedoresCategorias()"/>
+                <div class="table-wrap compact-table fc-table-wrap"><table><thead><tr><th>Categoria</th><th>Ação</th></tr></thead><tbody id="fcCategoriasBody"></tbody></table></div>
+              </div>
             </div>
-            <div class="management-card">
-              <div class="option-group-head"><h4>Categorias de saída</h4><span class="pill" id="fcCategoriasCount">0</span></div>
-              <div class="option-manager">
-                <div class="field"><label>Nova categoria</label><input id="fcNewCategoria" placeholder="Nome da categoria"/></div>
-                <button class="btn btn-brand" onclick="addCategoria()">Adicionar</button>
+          </div>
+
+          <div class="fc-group">
+            <h4 class="fc-group-title fc-group-title-entrada">Entrada</h4>
+            <div class="management-grid">
+              <div class="management-card">
+                <div class="option-group-head"><h4>Clientes</h4><span class="pill" id="fcClientesCount">0</span></div>
+                <div class="option-manager">
+                  <div class="field"><label>Novo cliente</label><input id="fcNewCliente" placeholder="Nome do cliente"/></div>
+                  <button class="btn btn-brand" onclick="addCliente()">Adicionar</button>
+                </div>
+                <input class="fc-search" id="fcClientesSearch" placeholder="Buscar cliente..." oninput="renderFornecedoresCategorias()"/>
+                <div class="table-wrap compact-table fc-table-wrap"><table><thead><tr><th>Cliente</th><th>Ação</th></tr></thead><tbody id="fcClientesBody"></tbody></table></div>
               </div>
-              <div class="table-wrap compact-table"><table><thead><tr><th>Categoria</th><th>Ação</th></tr></thead><tbody id="fcCategoriasBody"></tbody></table></div>
-            </div>
-            <div class="management-card">
-              <div class="option-group-head"><h4>Clientes</h4><span class="pill" id="fcClientesCount">0</span></div>
-              <div class="option-manager">
-                <div class="field"><label>Novo cliente</label><input id="fcNewCliente" placeholder="Nome do cliente"/></div>
-                <button class="btn btn-brand" onclick="addCliente()">Adicionar</button>
+              <div class="management-card">
+                <div class="option-group-head"><h4>Categorias de entrada</h4><span class="pill" id="fcCategoriasEntradaCount">0</span></div>
+                <div class="option-manager">
+                  <div class="field"><label>Nova categoria</label><input id="fcNewCategoriaEntrada" placeholder="Nome da categoria"/></div>
+                  <button class="btn btn-brand" onclick="addCategoriaEntrada()">Adicionar</button>
+                </div>
+                <input class="fc-search" id="fcCategoriasEntradaSearch" placeholder="Buscar categoria..." oninput="renderFornecedoresCategorias()"/>
+                <div class="table-wrap compact-table fc-table-wrap"><table><thead><tr><th>Categoria</th><th>Ação</th></tr></thead><tbody id="fcCategoriasEntradaBody"></tbody></table></div>
               </div>
-              <div class="table-wrap compact-table"><table><thead><tr><th>Cliente</th><th>Ação</th></tr></thead><tbody id="fcClientesBody"></tbody></table></div>
-            </div>
-            <div class="management-card">
-              <div class="option-group-head"><h4>Categorias de entrada</h4><span class="pill" id="fcCategoriasEntradaCount">0</span></div>
-              <div class="option-manager">
-                <div class="field"><label>Nova categoria</label><input id="fcNewCategoriaEntrada" placeholder="Nome da categoria"/></div>
-                <button class="btn btn-brand" onclick="addCategoriaEntrada()">Adicionar</button>
-              </div>
-              <div class="table-wrap compact-table"><table><thead><tr><th>Categoria</th><th>Ação</th></tr></thead><tbody id="fcCategoriasEntradaBody"></tbody></table></div>
             </div>
           </div>
         </div>
@@ -714,7 +799,7 @@
             <tbody id="auditLogBody"></tbody></table>
           </div>
           <div class="btn-row" style="margin-top:14px">
-            <button class="btn" onclick="exportAuditCSV()">Exportar logs CSV</button>
+            <button class="btn" onclick="exportAuditXLSX()">Exportar logs Excel</button>
           </div>
         </div>
       </div>
@@ -807,13 +892,14 @@
                 <tr><td><strong>Fechamento Diário</strong></td><td>Registro de saldo, entradas, saídas, repasse e cálculo automático de divergência</td><td>Operador / Admin</td></tr>
                 <tr><td><strong>Histórico</strong></td><td>Consulta de fechamentos anteriores com filtros por data e loja</td><td>Admin / Operador</td></tr>
                 <tr><td><strong>Regras Operacionais</strong></td><td>Regras visíveis ao operador: saídas permitidas, checklist de conferência</td><td>Admin (cadastra) / Operador (lê)</td></tr>
-                <tr><td><strong>Movimentações</strong></td><td>Extrato consolidado de entradas, saídas e repasses com filtros de data e loja</td><td>Admin / Master</td></tr>
+                <tr><td><strong>Movimentações</strong></td><td>Extrato consolidado de entradas, saídas e repasses com filtros de data, loja e operador</td><td>Admin / Master / Analista</td></tr>
                 <tr><td><strong>Repasses</strong></td><td>Confirmação dos valores de repasse enviados pelo operador. Mostra status: Confirmado, Pendente, Não repassado ou Dentro da tolerância</td><td>Admin</td></tr>
-                <tr><td><strong>Divergências</strong></td><td>Listagem de divergências de fundo padrão e de abertura, com valor esperado, encontrado e diferença</td><td>Admin / Master</td></tr>
-                <tr><td><strong>Relatórios</strong></td><td>Exportação PDF e CSV: fechamento por loja, consolidado, repasses, saídas, Conta Azul</td><td>Admin / Master</td></tr>
-                <tr><td><strong>Módulos</strong></td><td>Controle do que cada perfil pode ver em cada empresa</td><td>Master</td></tr>
-                <tr><td><strong>Auditoria</strong></td><td>Log completo de todas as ações realizadas no sistema</td><td>Master</td></tr>
-                <tr><td><strong>Retificação</strong></td><td>Substituição de fechamento incorreto preservando o original com badge visual</td><td>Master / Admin</td></tr>
+                <tr><td><strong>Divergências</strong></td><td>Listagem de divergências de fundo padrão e de abertura, com valor esperado, encontrado e diferença</td><td>Admin / Master / Analista</td></tr>
+                <tr><td><strong>Relatórios</strong></td><td>Exportação PDF e Excel: fechamento por loja, consolidado, repasses, saídas, Conta Azul</td><td>Admin / Master / Analista</td></tr>
+                <tr><td><strong>Módulos</strong></td><td>Controle do que cada perfil pode ver em cada empresa</td><td>Master / Analista</td></tr>
+                <tr><td><strong>Auditoria</strong></td><td>Log completo de todas as ações realizadas no sistema — exclusivo da aba Sistema</td><td>Master</td></tr>
+                <tr><td><strong>Retificação</strong></td><td>Substituição de fechamento incorreto preservando o original com badge visual</td><td>Master / Admin / Analista</td></tr>
+                <tr><td><strong>Analistas</strong></td><td>Cadastro de perfis multiempresa: mesmo acesso de edição do Master, exceto a aba Sistema, restrito às empresas selecionadas</td><td>Master (Sistema → Analistas)</td></tr>
               </tbody>
             </table>
           </div>
@@ -823,7 +909,7 @@
       <!-- ── ABA 2: PERFIS ── -->
       <div id="man-perfis" class="inner-tab-panel hidden">
         <div class="card">
-          <h3 class="section-title">Os três perfis do sistema</h3>
+          <h3 class="section-title">Os quatro perfis do sistema</h3>
           <p class="subtle">Cada usuário tem um perfil que determina o que ele vê e o que pode fazer. Os perfis são criados pelo Master e não podem ser alterados pelo próprio usuário.</p>
         </div>
 
@@ -835,16 +921,37 @@
               <p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">O que pode fazer:</p>
               <ul style="font-size:13px;color:#374151;line-height:1.8;padding-left:16px">
                 <li>Ver e gerenciar todas as empresas clientes</li>
-                <li>Criar, editar e excluir usuários (admin e operador)</li>
+                <li>Criar, editar e excluir usuários (admin, operador e analista)</li>
                 <li>Configurar módulos por empresa</li>
                 <li>Visualizar todos os fechamentos e divergências</li>
                 <li>Exportar relatórios consolidados de todas as empresas</li>
                 <li>Acessar logs de auditoria completos</li>
                 <li>Retificar fechamentos</li>
+                <li>Único perfil com acesso à aba Sistema (configurações gerais, fornecedores/categorias, backup, logs, documentos)</li>
               </ul>
             </div>
             <div style="margin-top:10px;background:#fef3c7;border-radius:8px;padding:8px 10px;font-size:12px;color:#92400e">
               <strong>Como criar:</strong> Diretamente no painel do Supabase, tabela <code>profiles</code>, com <code>role = master</code>.
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="background:#eef2ff;color:#4338ca;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;padding:6px 10px;border-radius:8px;display:inline-block;margin-bottom:10px">Analista — Multiempresa</div>
+            <p style="line-height:1.6;color:#374151;font-size:13px">Mesmo acesso de edição do Master, exceto a aba Sistema. Diferente de Admin/Operador, não fica vinculado a uma única empresa — o Master escolhe, na criação, um conjunto de empresas que o Analista poderá acessar.</p>
+            <div style="margin-top:10px">
+              <p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">O que pode fazer:</p>
+              <ul style="font-size:13px;color:#374151;line-height:1.8;padding-left:16px">
+                <li>Ver e editar todas as empresas/lojas liberadas para ele (Cadastros, Operação, Fechamentos &amp; Clientes, Relatórios)</li>
+                <li>Criar, editar e excluir usuários admin/operador das empresas liberadas</li>
+                <li>Configurar módulos por cliente e regras operacionais das empresas liberadas</li>
+                <li>Exportar relatórios (PDF/Excel) das empresas liberadas</li>
+              </ul>
+            </div>
+            <div style="margin-top:10px;background:#fee2e2;border-radius:8px;padding:8px 10px;font-size:12px;color:#991b1b">
+              <strong>Não pode:</strong> acessar a aba Sistema (configurações gerais, escrita em fornecedores/categorias, backup, logs de auditoria, documentos) nem ver empresas fora da lista liberada.
+            </div>
+            <div style="margin-top:8px;background:#fef3c7;border-radius:8px;padding:8px 10px;font-size:12px;color:#92400e">
+              <strong>Como criar:</strong> Sistema → Analistas → nome + e-mail + senha + selecione as empresas liberadas.
             </div>
           </div>
 
@@ -1444,7 +1551,7 @@
             <li><strong>Diariamente:</strong> acessar o Histórico, confirmar repasses pendentes e verificar divergências novas.</li>
             <li><strong>2× por semana:</strong> revisar a aba Divergências e comentar todas que estiverem pendentes.</li>
             <li><strong>Semanalmente:</strong> verificar o Resumo por Fechamento com filtro da semana — identificar operadores com padrão de divergência recorrente.</li>
-            <li><strong>Mensalmente:</strong> exportar o relatório consolidado (PDF ou CSV) para conferência com o financeiro.</li>
+            <li><strong>Mensalmente:</strong> exportar o relatório consolidado (PDF ou Excel) para conferência com o financeiro.</li>
           </ol>
         </div>
 
@@ -1686,6 +1793,7 @@
           <h3 class="section-title">Definir Saldo Inicial do Caixa</h3>
           <p class="subtle" style="margin-bottom:12px">Use para definir o saldo inicial de uma loja ao implantar ou abrir um novo caixa.</p>
           <div class="form-grid">
+            <div class="field hidden" id="openingAdjustmentCompanyField"><label>Empresa</label><select id="openingAdjustmentCompany" onchange="renderAdminViews()"></select></div>
             <div class="field"><label>Loja</label><select id="openingAdjustmentStore"></select></div>
             <div class="field"><label>Data de início</label><input id="openingAdjustmentDate" type="date"/></div>
             <div class="field"><label>Turno de início</label><select id="openingAdjustmentShift"><option>Manhã</option><option>Tarde</option><option>Noite</option><option selected>Integral</option><option>Outro</option></select></div>
@@ -1829,27 +1937,27 @@
           <div class="report-card" id="rpt_fech" data-submod-card="sub_rel_fech">
             <h4>Fechamento por Loja</h4>
             <p class="subtle">Saldo inicial, entradas, saídas, repasse, saldo final e divergência por unidade.</p>
-            <div class="btn-row"><button class="btn" onclick="exportClientMovementsCSV()">Exportar CSV</button><button class="btn" onclick="exportClientMovementsPDF()">Exportar PDF</button></div>
+            <div class="btn-row"><button class="btn" onclick="exportClientMovementsXLSX()">Exportar Excel</button><button class="btn" onclick="exportClientMovementsPDF()">Exportar PDF</button></div>
           </div>
           <div class="report-card" id="rpt_cons" data-submod-card="sub_rel_cons">
             <h4>Consolidado por Empresa</h4>
             <p class="subtle">Total de entradas, saídas, repasses e divergências no período.</p>
-            <div class="btn-row"><button class="btn" onclick="exportConsolidadoCSV()">Exportar CSV</button><button class="btn" onclick="exportConsolidadoPDF()">Exportar PDF</button></div>
+            <div class="btn-row"><button class="btn" onclick="exportConsolidadoXLSX()">Exportar Excel</button><button class="btn" onclick="exportConsolidadoPDF()">Exportar PDF</button></div>
           </div>
           <div class="report-card" id="rpt_rep" data-submod-card="sub_rel_rep">
             <h4>Repasses ao Caixa Central</h4>
             <p class="subtle">Valores entregues por data, loja, responsável e status.</p>
-            <div class="btn-row"><button class="btn" onclick="exportTransfersCSV()">Exportar CSV</button><button class="btn" onclick="exportTransfersPDF()">Exportar PDF</button></div>
+            <div class="btn-row"><button class="btn" onclick="exportTransfersXLSX()">Exportar Excel</button><button class="btn" onclick="exportTransfersPDF()">Exportar PDF</button></div>
           </div>
           <div class="report-card" id="rpt_sai" data-submod-card="sub_rel_sai">
             <h4>Saídas por Descrição</h4>
             <p class="subtle">Consolida saídas por categoria e descrição no período.</p>
-            <div class="btn-row"><button class="btn" onclick="exportExpensesCSV()">Exportar CSV</button><button class="btn" onclick="exportExpensesPDF()">Exportar PDF</button></div>
+            <div class="btn-row"><button class="btn" onclick="exportExpensesXLSX()">Exportar Excel</button><button class="btn" onclick="exportExpensesPDF()">Exportar PDF</button></div>
           </div>
           <div class="report-card" id="rpt_div" data-submod-card="sub_rel_div">
             <h4>Divergências por Loja</h4>
             <p class="subtle">Saldo em caixa, status de revisão e divergências por loja.</p>
-            <div class="btn-row"><button class="btn" onclick="exportClientDivergencesCSV()">Exportar CSV</button><button class="btn" onclick="exportClientDivergencesPDF()">Exportar PDF</button></div>
+            <div class="btn-row"><button class="btn" onclick="exportClientDivergencesXLSX()">Exportar Excel</button><button class="btn" onclick="exportClientDivergencesPDF()">Exportar PDF</button></div>
           </div>
           <div class="report-card" id="rpt_azul" data-submod-card="sub_rel_azul">
             <h4>Exportação Conta Azul</h4>
@@ -1859,7 +1967,7 @@
           <div class="report-card" id="rpt_aud" data-submod-card="sub_rel_aud">
             <h4>Auditoria Operacional</h4>
             <p class="subtle">Log de ações: fechamentos, usuários e alterações do sistema.</p>
-            <div class="btn-row"><button class="btn" onclick="exportAuditCSV()">Exportar CSV</button><button class="btn" onclick="exportAuditPDF()">Exportar PDF</button></div>
+            <div class="btn-row"><button class="btn" onclick="exportAuditXLSX()">Exportar Excel</button><button class="btn" onclick="exportAuditPDF()">Exportar PDF</button></div>
           </div>
         </div>
       </div>
@@ -1906,7 +2014,7 @@
                 <span>Entradas</span>
                 <button class="btn btn-sm" onclick="addEntry()">+ Adicionar entrada</button>
               </div>
-              <div class="launch-row">
+              <div class="launch-row entry-row">
                 <div class="field"><label>Descrição</label><input class="entry-desc" value="Entrada em Dinheiro"/></div>
                 <div class="field"><label>Valor (R$)</label><input class="entry" data-money="br" type="text" inputmode="decimal" pattern="[0-9]*[,.]?[0-9]*" value="0" oninput="calc()"/></div>
                 <button class="btn btn-icon" onclick="removeLaunchRow(this)">×</button>

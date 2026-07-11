@@ -78,6 +78,7 @@ function defaultState() {
     transferReceipts: [],
     storeDocuments: [],
     rectificationRequests: [],
+    analystCompanies: [],
   };
 }
 
@@ -200,7 +201,7 @@ async function cancelTransferReceipt(closingId) {
 
 function normalizeState() {
   state = (state && typeof state === 'object') ? state : defaultState();
-  ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit','transferReceipts','storeDocuments','rectificationRequests'].forEach((k) => {
+  ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit','transferReceipts','storeDocuments','rectificationRequests','analystCompanies'].forEach((k) => {
     if (!Array.isArray(state[k])) state[k] = [];
   });
   /* Migração: importa recibos salvos na chave antiga (localStorage separado) */
@@ -400,7 +401,7 @@ async function loadFromNormalizedSupabase() {
   const [
     companies, stores, profiles, modulePermissions, rules, operationConfigs,
     closings, entries, expenses, attachments, openingAdjustments, reviews, audit, selectOptions,
-    transferReceiptsRows, implantStepsRows, storeDocumentsRows,
+    transferReceiptsRows, implantStepsRows, storeDocumentsRows, analystCompanyRows,
   ] = await Promise.all([
     selectTable('companies'),
     selectTable('stores'),
@@ -422,6 +423,8 @@ async function loadFromNormalizedSupabase() {
     selectTable('implant_steps').catch(() => []),
     /* tabela store_documents — execute o bloco em supabase/schema.sql para ativar */
     selectTable('store_documents').catch(() => []),
+    /* tabela analyst_companies — execute a migração migration_analyst_role.sql para ativar */
+    selectTable('analyst_companies').catch(() => []),
   ]);
 
   const entriesByClosing = groupBy(entries, 'closing_id');
@@ -455,6 +458,7 @@ async function loadFromNormalizedSupabase() {
     })),
     transferReceipts: transferReceiptsRows.map(mapTransferReceipt),
     storeDocuments: storeDocumentsRows.map(mapStoreDocument),
+    analystCompanies: analystCompanyRows.map((r) => ({ id: r.id, profileId: r.profile_id, companyId: r.company_id })),
   };
   applyModuleRows(modulePermissions);
   applySelectOptionRows(selectOptions);
@@ -555,11 +559,14 @@ async function manualRefresh() {
 function companyName(id) { return state?.companies.find((c) => c.id === id)?.name || '-'; }
 function storeName(id) { return state?.stores.find((s) => s.id === id)?.name || '-'; }
 function visibleCompanies() {
-  if (role === 'master') return state.companies;
+  /* Master e Analista: o RLS do Supabase já entrega em state.companies só
+     as empresas permitidas (todas para Master; as vinculadas em
+     analyst_companies para Analista) — não há companyId único para filtrar. */
+  if (role === 'master' || role === 'analyst') return state.companies;
   return state.companies.filter((c) => c.id === currentUser?.companyId);
 }
 function visibleStores() {
-  if (role === 'master') return state.stores;
+  if (role === 'master' || role === 'analyst') return state.stores;
   if (role === 'admin') return state.stores.filter((s) => s.companyId === currentUser?.companyId);
   return state.stores.filter((s) => s.id === currentUser?.storeId);
 }
@@ -1597,6 +1604,7 @@ async function removeUserById(id) {
   }
 
   state.users = state.users.filter((user) => user.id !== id);
+  state.analystCompanies = (state.analystCompanies || []).filter((ac) => ac.profileId !== id);
   setVal('userManageSelect', '');
   save();
   renderAll();
@@ -1612,6 +1620,181 @@ function deleteSelectedUser() {
 
 function deleteUser(id) {
   removeUserById(id);
+}
+
+/* --- ANALISTAS (perfil multiempresa — Sistema → Analistas) ---
+   Diferente de Admin/Operador, o Analista não tem uma única empresa:
+   o vínculo fica em state.analystCompanies (tabela analyst_companies),
+   editável só pelo Master. */
+function renderCompanyChecklist(containerId, checkedIds = null) {
+  const el = $(containerId);
+  if (!el) return;
+  /* Sem checkedIds explícito, preserva o que já estava marcado (evita
+     resetar o formulário a cada renderAll() enquanto o master preenche). */
+  const currentChecked = checkedIds === null ? getCheckedCompanyIds(containerId) : checkedIds;
+  const companies = visibleCompanies();
+  el.innerHTML = companies.length
+    ? companies.map((c) => `
+        <label>
+          <input type="checkbox" value="${esc(c.id)}" ${currentChecked.includes(c.id) ? 'checked' : ''}/> ${esc(c.name)}
+        </label>`).join('')
+    : '<p class="subtle">Nenhuma empresa cadastrada.</p>';
+}
+
+function getCheckedCompanyIds(containerId) {
+  return all(`#${containerId} input[type="checkbox"]:checked`).map((i) => i.value);
+}
+
+function analystCompanyNames(profileId) {
+  return (state.analystCompanies || [])
+    .filter((ac) => ac.profileId === profileId)
+    .map((ac) => companyName(ac.companyId))
+    .filter(Boolean);
+}
+
+function renderAnalysts() {
+  if (!$('analystsBody')) return;
+  renderCompanyChecklist('analystCompanyChecklist');
+  const analysts = state.users.filter((u) => u.role === 'analyst');
+  html('analystsBody', analysts.length
+    ? analysts.map((a) => {
+        const names = analystCompanyNames(a.id);
+        return `<tr>
+          <td>${esc(a.name)}</td><td>${esc(a.login)}</td>
+          <td>${names.length ? esc(names.join(', ')) : '<span class="subtle">Nenhuma</span>'}</td>
+          <td>${tag(a.status)}</td>
+          <td><button class="btn btn-sm" onclick="editAnalyst('${esc(a.id)}')">Editar</button></td>
+        </tr>`;
+      }).join('')
+    : emptyRow(5, 'Nenhum analista cadastrado.'));
+}
+
+async function createAnalystUser() {
+  const name = val('analystName');
+  const login = val('analystLogin');
+  const password = val('analystPass');
+  const companyIds = getCheckedCompanyIds('analystCompanyChecklist');
+  if (!name || !login) return alert('Informe nome e login.');
+  if (state.users.some((u) => String(u.login).toLowerCase() === login.toLowerCase())) {
+    return alert('Já existe usuário com este login.');
+  }
+  if (!password || password.length < 6) return alert('Informe uma senha com pelo menos 6 caracteres.');
+  if (!companyIds.length) return alert('Selecione ao menos uma empresa.');
+
+  if (!DEV_LOCAL_MODE) {
+    try {
+      const profile = await createUserViaEdgeFunction({
+        name, email: login, password, role: 'analyst', company_ids: companyIds,
+      });
+      if (profile) {
+        state.users.push(profile);
+        companyIds.forEach((cid) => state.analystCompanies.push({ id: uid('ac'), profileId: profile.id, companyId: cid }));
+      }
+      ['analystName', 'analystLogin'].forEach(clear);
+      setVal('analystPass', '');
+      addAudit('Cadastro de analista', login);
+      save();
+      renderAll();
+      return toast('Analista cadastrado com sucesso.');
+    } catch (e) {
+      const message = String(e.message || '');
+      if (message.toLowerCase().includes('e-mail') || message.toLowerCase().includes('email') || message.toLowerCase().includes('already')) {
+        return alert('Já existe um usuário cadastrado com este e-mail.');
+      }
+      return alert('Não foi possível cadastrar o analista: ' + message);
+    }
+  }
+
+  const newProfile = { id: uid('u'), companyId: null, storeId: null, name, login, pass: password, role: 'analyst', status: 'Ativo' };
+  state.users.push(newProfile);
+  companyIds.forEach((cid) => state.analystCompanies.push({ id: uid('ac'), profileId: newProfile.id, companyId: cid }));
+  ['analystName', 'analystLogin'].forEach(clear);
+  setVal('analystPass', '');
+  addAudit('Cadastro de analista', login);
+  save();
+  renderAll();
+  toast('Analista cadastrado com sucesso.');
+}
+
+function editAnalyst(id) {
+  const a = state.users.find((u) => u.id === id);
+  if (!a) return;
+  setVal('editAnalystId', id);
+  setVal('editAnalystName', a.name);
+  setVal('editAnalystStatus', a.status || 'Ativo');
+  setVal('editAnalystPass', '');
+  const checkedIds = (state.analystCompanies || []).filter((ac) => ac.profileId === id).map((ac) => ac.companyId);
+  renderCompanyChecklist('editAnalystCompanyChecklist', checkedIds);
+  $('analystEditPanel')?.classList.remove('hidden');
+}
+
+function closeAnalystEditPanel() {
+  $('analystEditPanel')?.classList.add('hidden');
+}
+
+async function saveAnalystEdit() {
+  const id = val('editAnalystId');
+  const a = state.users.find((u) => u.id === id);
+  if (!a) return alert('Selecione um analista.');
+  const newCompanyIds = getCheckedCompanyIds('editAnalystCompanyChecklist');
+  if (!newCompanyIds.length) return alert('Selecione ao menos uma empresa.');
+  a.name = val('editAnalystName');
+  a.status = val('editAnalystStatus') || 'Ativo';
+
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      await updateProfile(a.id, a);
+      const currentIds = (state.analystCompanies || []).filter((ac) => ac.profileId === id).map((ac) => ac.companyId);
+      const toAdd = newCompanyIds.filter((cid) => !currentIds.includes(cid));
+      const toRemove = currentIds.filter((cid) => !newCompanyIds.includes(cid));
+      if (toAdd.length) {
+        const { error } = await sb.from('analyst_companies').insert(toAdd.map((cid) => ({ profile_id: id, company_id: cid })));
+        if (error) throw error;
+      }
+      if (toRemove.length) {
+        const { error } = await sb.from('analyst_companies').delete().eq('profile_id', id).in('company_id', toRemove);
+        if (error) throw error;
+      }
+    } catch (e) {
+      return alert(`Erro ao atualizar analista no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para atualizar analistas.');
+  }
+
+  state.analystCompanies = (state.analystCompanies || [])
+    .filter((ac) => ac.profileId !== id)
+    .concat(newCompanyIds.map((cid) => ({ id: uid('ac'), profileId: id, companyId: cid })));
+  addAudit('Edição de analista', a.login);
+  save();
+  renderAll();
+  closeAnalystEditPanel();
+  toast('Analista atualizado.');
+}
+
+async function resetAnalystPassword() {
+  const id = val('editAnalystId');
+  const a = state.users.find((u) => u.id === id);
+  if (!a) return alert('Selecione um analista.');
+  if (!a.authId) return alert('Este analista não possui vínculo com o Supabase Auth.');
+  const newPass = prompt(`Nova senha para ${a.name}:\n(Mínimo 6 caracteres)`);
+  if (!newPass) return;
+  if (newPass.length < 6) return alert('A senha precisa ter pelo menos 6 caracteres.');
+  try {
+    await resetUserPasswordViaEdgeFunction(a.authId, newPass);
+    addAudit('Reset de senha', a.login);
+    save();
+    toast('Senha redefinida com sucesso.');
+  } catch (e) {
+    alert('Erro ao redefinir senha: ' + (e.message || 'tente novamente.'));
+  }
+}
+
+function deleteAnalystUser() {
+  const id = val('editAnalystId');
+  if (!id) return alert('Selecione um analista.');
+  removeUserById(id);
+  closeAnalystEditPanel();
 }
 
 /* --- CRUD — Regras --- */
@@ -2194,7 +2377,7 @@ function storeOptionsForCompany(companyId) {
 
 function operatorOptionsForCompany(companyId) {
   return (state.users || [])
-    .filter((u) => u.role === 'operator' && u.companyId === companyId && u.status !== 'Inativo')
+    .filter((u) => u.role === 'operator' && (!companyId || u.companyId === companyId) && u.status !== 'Inativo')
     .map((u) => [u.authId || u.id, u.name]);
 }
 
@@ -2225,6 +2408,11 @@ function fillSelects() {
   fillMasterDivergenceStore();
   fillMasterResumoStore();
   fillMasterRepasseStore();
+  fillMasterExtractOperator();
+  fillMasterMovementOperator();
+  fillMasterDivergenceOperator();
+  fillMasterResumoOperator();
+  fillMasterRepasseOperator();
   fillUserManageSelect();
   fillClientReportStore();
   fillClientReportOperator();
@@ -2274,6 +2462,12 @@ function fillMasterMovementStore() { setOptions('masterMovementStoreFilter', sto
 function fillMasterDivergenceStore() { setOptions('masterDivergenceStoreFilter', storeOptionsForCompany(val('masterDivergenceCompanyFilter')), 'Todas'); }
 function fillMasterResumoStore()  { setOptions('masterResumoStore',  storeOptionsForCompany(val('masterResumoCompany')),  'Todas'); }
 function fillMasterRepasseStore() { setOptions('masterRepasseStore', storeOptionsForCompany(val('masterRepasseCompany')), 'Todas'); }
+
+function fillMasterExtractOperator()    { setOptions('masterExtractOperatorFilter',    operatorOptionsForCompany(val('masterExtractCompany')),         'Todos'); }
+function fillMasterMovementOperator()   { setOptions('masterMovementOperatorFilter',   operatorOptionsForCompany(val('masterMovementCompanyFilter')),  'Todos'); }
+function fillMasterDivergenceOperator() { setOptions('masterDivergenceOperatorFilter', operatorOptionsForCompany(val('masterDivergenceCompanyFilter')),'Todos'); }
+function fillMasterResumoOperator()     { setOptions('masterResumoOperatorFilter',     operatorOptionsForCompany(val('masterResumoCompany')),          'Todos'); }
+function fillMasterRepasseOperator()    { setOptions('masterRepasseOperatorFilter',    operatorOptionsForCompany(val('masterRepasseCompany')),         'Todos'); }
 function fillUserManageSelect() {
   const cid = val('userManageCompany');
   setOptions('userManageSelect', state.users.filter((u) => !cid || u.companyId === cid).map((u) => [u.id, `${u.name} — ${u.login}`]));
@@ -2484,6 +2678,9 @@ Object.assign(window, {
   createUserFromMaster, loadUserToEdit, saveUserEdit,
   resetSelectedUserPassword, resetUserPasswordViaEdgeFunction, removeUserById,
   deleteSelectedUser, deleteUser,
+  renderCompanyChecklist, getCheckedCompanyIds, analystCompanyNames, renderAnalysts,
+  createAnalystUser, editAnalyst, closeAnalystEditPanel, saveAnalystEdit,
+  resetAnalystPassword, deleteAnalystUser,
   createRule, deleteRule, saveImplantStep, upsertImplantStep, saveOperationConfig,
   addSelectOption, removeSelectOption, renameSelectOption, promptRenameSelectOption, resetSelectOptions, optionsForCompany,
   addCompanyOption, removeCompanyOption, renameCompanyOption, promptRenameCompanyOption,

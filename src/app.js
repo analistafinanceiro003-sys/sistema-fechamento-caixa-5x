@@ -196,11 +196,6 @@ Object.assign(window, {
   confirmTransfer, handleSaveClosingClick, saveClosing, saveOpeningAdjustment, reviewDivergence, handleAttachments,
   /* Formatação — usadas por onblur/onfocus inline */
   formatCurrencyInput, selectOnFocus, parseCurrencyBR, bindCurrencyInputs,
-
-  /* Exportações */
-  exportCSV, exportDivergencesCSV, exportTransfersCSV, exportExpensesCSV,
-  exportAuditCSV, exportClientMovementsCSV, exportClientDivergencesCSV,
-  exportContaAzulXLSX, exportConsolidadoCSV,
 });
 
 /* PWA: registra o service worker com segurança — não bloqueia nem quebra o app */

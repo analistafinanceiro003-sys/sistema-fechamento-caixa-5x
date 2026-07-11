@@ -202,8 +202,17 @@ tr:hover td{background:#fafbfc}
 .exec-stat strong{display:block;font-size:22px;font-weight:650;margin-top:4px}
 .alert-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:#fff;margin-bottom:8px;font-size:13px}
 .alert-item.danger{border-color:#fecdca;background:#fff5f5}
+.alert-item.warning{border-color:#fde68a;background:#fffbeb}
 .alert-item.info{border-color:#bfdbfe;background:#eff6ff}
 .alert-item strong{flex:1}
+
+/* Dashboard — tendência em barras (sem lib de gráficos) */
+.trend-blocks{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.trend-block h4{font-size:13px;font-weight:650;color:var(--muted);margin-bottom:10px}
+.trend-chart{display:flex;align-items:flex-end;gap:4px;height:70px;border-bottom:1px solid var(--line)}
+.trend-bar{flex:1;background:var(--brand);border-radius:3px 3px 0 0;min-height:2px;cursor:default;transition:opacity .15s}
+.trend-bar:hover{opacity:.7}
+.trend-bar.danger{background:var(--danger)}
 
 /* ============================================================
    FECHAMENTO 5X — blocos de conferência
@@ -220,7 +229,7 @@ tr:hover td{background:#fafbfc}
 .launch-box-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .launch-box-header span{font-size:13px;font-weight:700;color:#344054}
 .launch-row{display:grid;grid-template-columns:1.5fr 1fr auto;gap:10px;align-items:end;margin-top:8px}
-.launch-row.expense-row{grid-template-columns:1.3fr 1fr 1fr 1fr auto}
+.launch-row.expense-row,.launch-row.entry-row{grid-template-columns:1.3fr 1fr 1fr 1fr auto}
 .closing-insight{font-size:13px;color:var(--muted);white-space:pre-wrap;line-height:1.6;font-family:var(--font)}
 /* Campos calculados: display-only, nunca editáveis pelo operador */
 .conf-block .summary-line strong,
@@ -312,6 +321,19 @@ tr:hover td{background:#fafbfc}
 .compact-table table{min-width:560px}
 .option-group-head h4{margin-bottom:0}
 .row-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+/* Fornecedores/Categorias — grupos Saída/Entrada com busca e lista rolável */
+.fc-group{margin-bottom:18px}
+.fc-group:last-child{margin-bottom:0}
+.fc-group-title{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+.fc-group-title-saida{color:var(--danger);border-color:rgba(220,38,38,.25)}
+.fc-group-title-entrada{color:var(--success);border-color:rgba(22,163,74,.25)}
+.fc-search{margin-bottom:8px}
+.fc-table-wrap{max-height:260px;overflow-y:auto}
+
+/* Checklist de empresas (Analistas) — sobrescreve o input{width:100%} global */
+.company-checklist label{display:flex;align-items:center;gap:8px;padding:4px 0;font-weight:400;cursor:pointer}
+.company-checklist input[type="checkbox"]{width:16px;height:16px;flex:none;accent-color:var(--brand);cursor:pointer}
 .config-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
 .mini-actions{display:flex;gap:8px;flex-wrap:wrap}
 
@@ -460,7 +482,7 @@ tr:hover td{background:#fafbfc}
 @media(max-width:700px){
   .cards{grid-template-columns:1fr}
   .form-grid,.form-grid.three,.user-edit-grid,.filter-bar-5x{grid-template-columns:1fr}
-  .launch-row,.launch-row.expense-row{grid-template-columns:1fr}
+  .launch-row,.launch-row.expense-row,.launch-row.entry-row{grid-template-columns:1fr}
   .report-grid,.client-report-grid{grid-template-columns:1fr}
   .main{padding:12px!important;padding-top:0!important;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))!important}
   .top{flex-direction:row;flex-wrap:nowrap}

@@ -230,7 +230,7 @@ function calc() {
   if (openAlert) {
     const abs = Math.abs(cc.openingDivergence);
     openAlert.style.display = abs > 0 ? '' : 'none';
-    openAlert.className     = 'kpi-alert warning';
+    openAlert.className     = 'kpi-alert warning operator-hidden';
     openAlert.textContent   = `Divergência de abertura: ${money(cc.openingDivergence)}. Saldo informado difere do saldo autorizado.`;
   }
 

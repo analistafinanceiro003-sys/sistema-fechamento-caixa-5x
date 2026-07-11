@@ -76,10 +76,11 @@ function masterFilteredClosings() {
   const { startISO, endISO, error } = readDateRange('masterFechStart', 'masterFechEnd');
   if (error) { flash(error); return []; }
   return getScopedClosings({
-    companyId: val('masterMovementCompanyFilter'),
-    storeId:   val('masterMovementStoreFilter'),
-    startDate: startISO,
-    endDate:   endISO,
+    companyId:  val('masterMovementCompanyFilter'),
+    storeId:    val('masterMovementStoreFilter'),
+    operatorId: val('masterMovementOperatorFilter'),
+    startDate:  startISO,
+    endDate:    endISO,
   });
 }
 
@@ -87,10 +88,11 @@ function extractFilteredClosings() {
   const { startISO, endISO, error } = readDateRange('masterExtractStart', 'masterExtractEnd');
   if (error) { flash(error); return []; }
   return getScopedClosings({
-    companyId: val('masterExtractCompany'),
-    storeId:   val('masterExtractStore'),
-    startDate: startISO,
-    endDate:   endISO,
+    companyId:  val('masterExtractCompany'),
+    storeId:    val('masterExtractStore'),
+    operatorId: val('masterExtractOperatorFilter'),
+    startDate:  startISO,
+    endDate:    endISO,
   });
 }
 
@@ -98,10 +100,11 @@ function divergenceFilteredClosings() {
   const { startISO, endISO, error } = readDateRange('masterDivStart', 'masterDivEnd');
   if (error) { flash(error); return []; }
   return getScopedClosings({
-    companyId: val('masterDivergenceCompanyFilter'),
-    storeId:   val('masterDivergenceStoreFilter'),
-    startDate: startISO,
-    endDate:   endISO,
+    companyId:  val('masterDivergenceCompanyFilter'),
+    storeId:    val('masterDivergenceStoreFilter'),
+    operatorId: val('masterDivergenceOperatorFilter'),
+    startDate:  startISO,
+    endDate:    endISO,
     onlyDivergences: true,
   });
 }
@@ -122,10 +125,11 @@ function fechResumoFilteredClosings() {
   const { startISO, endISO, error } = readDateRange('masterResumoStart', 'masterResumoEnd');
   if (error) { flash(error); return []; }
   return getScopedClosings({
-    companyId: val('masterResumoCompany'),
-    storeId:   val('masterResumoStore'),
-    startDate: startISO,
-    endDate:   endISO,
+    companyId:  val('masterResumoCompany'),
+    storeId:    val('masterResumoStore'),
+    operatorId: val('masterResumoOperatorFilter'),
+    startDate:  startISO,
+    endDate:    endISO,
   });
 }
 
@@ -243,6 +247,23 @@ function diffAction(c) {
   return 'Dentro da tolerância permitida.';
 }
 
+/* Exportador Excel genérico — usa a biblioteca SheetJS (já carregada via CDN).
+   Substitui exportGenericCSV() nos relatórios: só PDF e Excel são oferecidos ao usuário. */
+function exportGenericXLSX(filename, headers, rows, sheetName = 'Dados') {
+  if (typeof XLSX === 'undefined') {
+    exportGenericCSV(filename.replace(/\.xlsx$/, '.csv'), headers, rows);
+    if (window.toast) toast('Biblioteca de exportação Excel indisponível — gerado em CSV.', 'warning');
+    return;
+  }
+  const sheet = XLSX.utils.aoa_to_sheet([
+    headers,
+    ...rows.map((r) => headers.map((h) => r[h] ?? '')),
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheet, sheetName);
+  XLSX.writeFile(wb, filename);
+}
+
 /* --- Exportações --- */
 const CLOSING_HEADERS = [
   'Empresa','Loja','Data','Turno','Tipo','Responsável','Saldo Inicial','Ultimo Saldo Fechado','Divergencia Abertura','Origem Abertura','Entradas','Saídas',
@@ -274,15 +295,15 @@ function contaAzulRow(r, obsPrefix) {
     'Observações': `${obsPrefix} - ${r.Empresa} - ID ${r['ID Fechamento'] || ''}`,
   };
 }
-function exportCSV() {
+function exportFechamentoXLSX() {
   const rows = allMovementRows(reportFilteredClosings()).map((r) => contaAzulRow(r, 'Fechamento de caixa 5X'));
-  exportGenericCSV('fechamento_por_loja_conta_azul_5x.csv', CONTA_AZUL_HEADERS, rows);
+  exportGenericXLSX('fechamento_por_loja_conta_azul_5x.xlsx', CONTA_AZUL_HEADERS, rows);
 }
-function exportDivergencesCSV() {
+function exportDivergencesXLSX() {
   const rows = closingRows(reportFilteredClosings().filter((c) => Math.abs(Number(c.diff || 0)) > 0));
-  exportGenericCSV('divergencias_5x.csv', CLOSING_HEADERS, rows);
+  exportGenericXLSX('divergencias_5x.xlsx', CLOSING_HEADERS, rows);
 }
-function exportTransfersCSV() {
+function exportTransfersXLSX() {
   const headers = ['Empresa','Loja','Data','Responsável','Repasse','Status'];
   const rows = reportFilteredClosings()
     .filter((c) => Number(c.transfer))
@@ -290,26 +311,26 @@ function exportTransfersCSV() {
       Empresa: companyName(c.companyId), Loja: storeName(c.storeId),
       Data: c.date, 'Responsável': c.responsible, Repasse: c.transfer, Status: c.status,
     }));
-  exportGenericCSV('repasses_5x.csv', headers, rows);
+  exportGenericXLSX('repasses_5x.xlsx', headers, rows);
 }
-function exportExpensesCSV() {
+function exportExpensesXLSX() {
   const rows = allMovementRows(reportFilteredClosings()).filter((r) => r.Tipo === 'Saída');
-  exportGenericCSV('saidas_5x.csv', MOVEMENT_HEADERS, rows);
+  exportGenericXLSX('saidas_5x.xlsx', MOVEMENT_HEADERS, rows);
 }
-function exportAuditCSV() {
+function exportAuditXLSX() {
   const headers = ['Data','Usuário','Perfil','Ação','Detalhe'];
   const rows = (state?.audit || []).map((a) => ({
     Data: a.date, 'Usuário': a.user, Perfil: a.role, 'Ação': a.action, Detalhe: a.detail,
   }));
-  exportGenericCSV('auditoria_5x.csv', headers, rows);
+  exportGenericXLSX('auditoria_5x.xlsx', headers, rows);
 }
-function exportClientMovementsCSV() {
+function exportClientMovementsXLSX() {
   const rows = allMovementRows(reportFilteredClosings(true));
-  exportGenericCSV('movimentacoes_cliente_5x.csv', MOVEMENT_HEADERS, rows);
+  exportGenericXLSX('movimentacoes_cliente_5x.xlsx', MOVEMENT_HEADERS, rows);
 }
-function exportClientDivergencesCSV() {
+function exportClientDivergencesXLSX() {
   const rows = closingRows(reportFilteredClosings(true).filter((c) => Math.abs(Number(c.diff || 0)) > 0));
-  exportGenericCSV('divergencias_cliente_5x.csv', CLOSING_HEADERS, rows);
+  exportGenericXLSX('divergencias_cliente_5x.xlsx', CLOSING_HEADERS, rows);
 }
 /* Repasses são transferência de custódia, não lançamento contábil —
    por isso ficam de fora do modelo Conta Azul (usar o relatório de Repasses). */
@@ -343,7 +364,7 @@ function exportContaAzulXLSX() {
   XLSX.writeFile(wb, 'modelo_conta_azul_5x.xlsx');
 }
 
-function exportConsolidadoCSV() {
+function exportConsolidadoXLSX() {
   const companies = visibleCompanies();
   const headers = ['Empresa','Período','Entradas','Saídas','Repasses','Saldo Final','Div. Fundo'];
   const start = val('reportStart') || val('clientReportStart') || '';
@@ -360,13 +381,14 @@ function exportConsolidadoCSV() {
       'Div. Fundo': closings.reduce((a, c) => a + Number(c.fundDivergence ?? c.diff ?? 0), 0),
     };
   });
-  exportGenericCSV('consolidado_empresa_5x.csv', headers, rows);
+  exportGenericXLSX('consolidado_empresa_5x.xlsx', headers, rows);
 }
 
 /* ============================================================
    EXPORTAÇÃO PDF — jsPDF + autoTable (CDN)
 ============================================================ */
 let _logoB64 = null;
+let _logoDims = null; // { w, h } em pixels — usado para não esticar o logo nos PDFs
 
 async function _loadLogo() {
   if (_logoB64) return _logoB64;
@@ -378,11 +400,22 @@ async function _loadLogo() {
       c.width = img.naturalWidth; c.height = img.naturalHeight;
       c.getContext('2d').drawImage(img, 0, 0);
       _logoB64 = c.toDataURL('image/png');
+      _logoDims = { w: img.naturalWidth, h: img.naturalHeight };
       resolve(_logoB64);
     };
     img.onerror = () => resolve(null);
     img.src = '/assets/logo-gestao5x-transparente.png';
   });
+}
+
+/* Ajusta o logo a uma caixa máxima (mm) preservando a proporção real —
+   evita o logo esticado/achatado que aparecia com addImage em tamanho fixo. */
+function _logoFit(maxW, maxH) {
+  if (!_logoDims) return { w: maxW, h: maxH };
+  const aspect = _logoDims.w / _logoDims.h;
+  return aspect > maxW / maxH
+    ? { w: maxW, h: maxW / aspect }
+    : { w: maxH * aspect, h: maxH };
 }
 
 function _fmtM(v) {
@@ -409,7 +442,10 @@ async function generatePDF({ title, companyLabel = '', periodLabel = '', headers
   doc.rect(0, 0, W, 22, 'F');
 
   const logo = await _loadLogo();
-  if (logo) doc.addImage(logo, 'PNG', 6, 3, 34, 16);
+  if (logo) {
+    const { w, h } = _logoFit(34, 16);
+    doc.addImage(logo, 'PNG', 6, (22 - h) / 2, w, h);
+  }
 
   doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.setTextColor(255, 255, 255);
   doc.text('GESTÃO 5X', W - 10, 10, { align: 'right' });
@@ -566,25 +602,9 @@ async function exportManualPDF(onlySection = null) {
 
   /* Carrega logo e calcula dimensões reais para não esticar */
   const logoB64 = await _loadLogo();
-  let logoW = 65, logoH = 32;
-  if (logoB64) {
-    await new Promise(resolve => {
-      const img = new Image();
-      img.onload = () => {
-        const aspect = img.naturalWidth / img.naturalHeight;
-        const maxW = 78, maxH = 44;
-        if (aspect > maxW / maxH) { logoW = maxW; logoH = maxW / aspect; }
-        else { logoH = maxH; logoW = maxH * aspect; }
-        resolve();
-      };
-      img.onerror = resolve;
-      img.src = logoB64;
-    });
-  }
+  const { w: logoW, h: logoH } = _logoFit(78, 44);
   /* Tamanho do logo no cabeçalho de página (cabe em 22×12mm) */
-  const hA = logoW / logoH;
-  const hLW = hA > 22 / 12 ? 22 : 12 * hA;
-  const hLH = hA > 22 / 12 ? 22 / hA : 12;
+  const { w: hLW, h: hLH } = _logoFit(22, 12);
 
   const _footer = () => {
     const n = doc.internal.getNumberOfPages();
@@ -701,7 +721,7 @@ async function exportManualPDF(onlySection = null) {
             ['Movimentações', 'Extrato consolidado com filtros de data e loja', 'Admin / Master'],
             ['Repasses', 'Confirmação dos repasses pelo gestor', 'Admin'],
             ['Divergências', 'Listagem de fechamentos fora da tolerância', 'Admin / Master'],
-            ['Relatórios', 'Exportação PDF/CSV por loja, consolidado, repasses, saídas', 'Admin / Master'],
+            ['Relatórios', 'Exportação PDF/Excel por loja, consolidado, repasses, saídas', 'Admin / Master'],
             ['Módulos', 'Controle do que cada perfil pode ver por empresa', 'Master'],
             ['Auditoria', 'Log completo de todas as ações realizadas', 'Master'],
           ],
@@ -907,7 +927,7 @@ async function exportManualPDF(onlySection = null) {
             ['Diariamente', 'Acessar o Histórico, confirmar repasses pendentes e verificar divergências novas.'],
             ['2× por semana', 'Revisar a aba Divergências e comentar todas as pendentes.'],
             ['Semanalmente', 'Verificar o Resumo por Fechamento — identificar padrões de divergência recorrente.'],
-            ['Mensalmente', 'Exportar relatório consolidado (PDF ou CSV) para conferência com o financeiro.'],
+            ['Mensalmente', 'Exportar relatório consolidado (PDF ou Excel) para conferência com o financeiro.'],
           ],
           colStyles: { 0: { cellWidth: 38 } },
         },
@@ -1059,10 +1079,10 @@ Object.assign(window, {
   masterFilteredClosings, extractFilteredClosings,
   divergenceFilteredClosings, adminMovFilteredClosings,
   operatorHistoryClosings, reportFilteredClosings, validateAndExport,
-  closingRows, allMovementRows, diffRead, diffAction,
-  exportCSV, exportDivergencesCSV, exportTransfersCSV, exportExpensesCSV,
-  exportAuditCSV, exportClientMovementsCSV, exportClientDivergencesCSV,
-  exportContaAzulXLSX, exportConsolidadoCSV,
+  closingRows, allMovementRows, diffRead, diffAction, exportGenericXLSX,
+  exportFechamentoXLSX, exportDivergencesXLSX, exportTransfersXLSX, exportExpensesXLSX,
+  exportAuditXLSX, exportClientMovementsXLSX, exportClientDivergencesXLSX,
+  exportContaAzulXLSX, exportConsolidadoXLSX,
   generatePDF, exportManualPDF, exportManualTabPDF,
   exportFechamentoPDF, exportDivergencesPDF, exportTransfersPDF, exportExpensesPDF,
   exportConsolidadoPDF, exportAuditPDF, exportClientMovementsPDF, exportClientDivergencesPDF,

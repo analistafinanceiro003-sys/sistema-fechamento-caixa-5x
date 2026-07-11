@@ -40,31 +40,92 @@ function renderMetrics() {
 }
 
 /* --- MASTER DASHBOARD --- */
+
+/* Dias corridos entre a data do fechamento (dd/mm/aaaa) e hoje */
+function _daysSince(dateBR) {
+  const iso = parseBR(dateBR);
+  if (!iso) return 0;
+  const ms = new Date(`${todayISO()}T00:00:00`) - new Date(`${iso}T00:00:00`);
+  return Math.max(0, Math.round(ms / 86400000));
+}
+
+/* Sparkline em barras CSS — sem dependência de biblioteca de gráficos */
+function _trendBarsHTML(rows, { days = 14, dangerColor = false } = {}) {
+  const buckets = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    buckets.push({ iso, label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }), count: 0 });
+  }
+  rows.forEach((c) => {
+    const iso = parseBR(c.date);
+    const b = buckets.find((x) => x.iso === iso);
+    if (b) b.count++;
+  });
+  const max = Math.max(1, ...buckets.map((b) => b.count));
+  return buckets.map((b) => {
+    const pct = Math.round((b.count / max) * 100);
+    return `<div class="trend-bar${dangerColor && b.count ? ' danger' : ''}" style="height:${Math.max(pct, b.count ? 6 : 2)}%" title="${esc(b.label)}: ${b.count}"></div>`;
+  }).join('');
+}
+
 function renderMasterDashboard() {
   /* getScopedClosings() já exclui excluídos e originais superados por retificação —
      quem entra nas contagens/somas é sempre o valor retificado, não o original. */
   const activeRows = getScopedClosings({ scope: 'master' });
-  /* Alertas de divergência */
-  const critical = activeRows.filter((c) => c.status === 'Divergência').slice(-5);
-  html('dashAlerts', critical.length
-    ? critical.map((c) => `<div class="alert-item warning"><strong>${esc(companyName(c.companyId))} / ${esc(storeName(c.storeId))}</strong><span>${money(c.diff)}</span><span class="subtle">${esc(c.date)}</span></div>`).join('')
-    : '<p class="subtle">Nenhuma divergência recente.</p>'
+
+  /* Tendência — fechamentos e divergências por dia (últimos 14 dias) */
+  const divRows = activeRows.filter((c) => c.status === 'Divergência');
+  html('dashTrend', `
+    <div class="trend-blocks">
+      <div class="trend-block">
+        <h4>Fechamentos por dia</h4>
+        <div class="trend-chart">${_trendBarsHTML(activeRows)}</div>
+      </div>
+      <div class="trend-block">
+        <h4>Divergências por dia</h4>
+        <div class="trend-chart">${_trendBarsHTML(divRows, { dangerColor: true })}</div>
+      </div>
+    </div>`
   );
+
+  /* Alertas críticos — divergências pendentes de revisão, mais urgentes (mais dias) primeiro */
+  const critical = activeRows
+    .filter((c) => c.status === 'Divergência' && (c.reviewStatus || 'Pendente de revisão') !== 'Revisada')
+    .map((c) => ({ c, days: _daysSince(c.date) }))
+    .sort((a, b) => b.days - a.days)
+    .slice(0, 8);
+  html('dashAlerts', critical.length
+    ? critical.map(({ c, days }) => {
+        const urgency = days > 7 ? 'danger' : days >= 3 ? 'warning' : 'info';
+        const urgencyLabel = days > 7 ? `${days} dias — crítico` : days >= 3 ? `${days} dias` : days === 0 ? 'Hoje' : `${days} dia(s)`;
+        return `<div class="alert-item ${urgency}" style="cursor:pointer" onclick="showPage('fechamentos',document.querySelector('.nav button[data-page=fechamentos]'));showSubTab('fechamentos','fech-divergencias',document.querySelector('[data-subtab=fech-divergencias]'))">
+          <strong>${esc(companyName(c.companyId))} / ${esc(storeName(c.storeId))}</strong>
+          <span>${money(c.diff)}</span>
+          <span class="status ${urgency}">${esc(urgencyLabel)}</span>
+        </div>`;
+      }).join('')
+    : '<p class="subtle">Nenhuma divergência pendente de revisão.</p>'
+  );
+
   /* Empresas em implantação */
   const impl = state.companies.filter((c) => c.status === 'Implantação');
   html('dashImplant', impl.length
     ? impl.map((c) => `<div class="alert-item info"><strong>${esc(c.name)}</strong><span class="status warning">Implantação</span></div>`).join('')
     : '<p class="subtle">Nenhuma empresa em implantação.</p>'
   );
-  /* Resumo executivo */
-  const totalDiv = activeRows.reduce((a, c) => a + Math.abs(Number(c.diff || 0)), 0);
-  html('dashSummary', `
-    <div class="exec-stats">
-      <div class="exec-stat"><span>Empresas ativas</span><strong>${state.companies.filter((c) => c.status !== 'Inativa').length}</strong></div>
-      <div class="exec-stat"><span>Lojas/Caixas</span><strong>${state.stores.length}</strong></div>
-      <div class="exec-stat"><span>Fechamentos</span><strong>${activeRows.length}</strong></div>
-      <div class="exec-stat"><span>Divergência total</span><strong>${money(totalDiv)}</strong></div>
-    </div>`
+
+  /* Atividade recente — últimos fechamentos registrados, de todas as empresas */
+  const recent = [...activeRows]
+    .sort((a, b) => (parseBR(b.date) + (b.shift || '')).localeCompare(parseBR(a.date) + (a.shift || '')))
+    .slice(0, 8);
+  html('dashActivity', recent.length
+    ? recent.map((c) => `<div class="alert-item" style="cursor:pointer" onclick="showPage('fechamentos',document.querySelector('.nav button[data-page=fechamentos]'))">
+        <strong>${esc(companyName(c.companyId))} / ${esc(storeName(c.storeId))}</strong>
+        <span class="subtle">${esc(c.responsible || '-')} · ${esc(c.date)}</span>
+        ${tag(c.status)}
+      </div>`).join('')
+    : '<p class="subtle">Nenhum fechamento registrado ainda.</p>'
   );
 }
 
@@ -426,10 +487,11 @@ function renderFechamentos() {
   const allReceiptsMaster = getTransferReceipts();
   const repComp   = val('masterRepasseCompany');
   const repStore2 = val('masterRepasseStore');
+  const repOp2    = val('masterRepasseOperatorFilter');
   const repStart2 = val('masterRepasseStart');
   const repEnd2   = val('masterRepasseEnd');
   const repStat2  = val('masterRepasseStatus');
-  const masterRepasseRows = getScopedClosings({ scope: 'master' }).filter((c) =>
+  const masterRepasseRows = getScopedClosings({ scope: 'master', operatorId: repOp2 }).filter((c) =>
     Number(c.transfer || 0) > 0 &&
     (!repComp   || c.companyId === repComp) &&
     (!repStore2 || c.storeId === repStore2) &&
@@ -532,6 +594,7 @@ function toggleOptionCompanyField() {
 /* --- SISTEMA (sub-abas: config, backup, logs) --- */
 function renderSistema() {
   toggleOptionCompanyField();
+  if (window.renderAnalysts) renderAnalysts();
   /* Config / opções de seleção */
   const labels = {
     segments:'Segmentos', plans:'Planos', companyStatus:'Status da empresa',
@@ -597,10 +660,12 @@ function renderFornecedoresCategorias() {
   setOptions('fcCompanyFilter', visibleCompanies().map((c) => [c.id, c.name]), 'Selecione a empresa');
   const companyId = val('fcCompanyFilter');
 
-  const renderList = (elId, countId, category, emptyLabel) => {
+  const renderList = (elId, countId, category, emptyLabel, searchId) => {
     if (!companyId) { html(elId, emptyRow(2, 'Selecione uma empresa acima.')); text(countId, '0'); return; }
-    const values = optionsForCompany(companyId, category);
+    let values = optionsForCompany(companyId, category);
     text(countId, String(values.length));
+    const term = (searchId ? val(searchId) : '').trim().toLowerCase();
+    if (term) values = values.filter((v) => v.toLowerCase().includes(term));
     html(elId, values.length
       ? values.map((v) => `<tr>
           <td>${esc(v)}</td>
@@ -609,12 +674,12 @@ function renderFornecedoresCategorias() {
             <button class="btn btn-sm btn-danger" data-opt-action="remove" data-opt-category="${esc(category)}" data-opt-company="${esc(companyId)}" data-opt-value="${esc(v)}">Excluir</button>
           </td>
         </tr>`).join('')
-      : emptyRow(2, emptyLabel));
+      : emptyRow(2, term ? 'Nenhum resultado para a busca.' : emptyLabel));
   };
-  renderList('fcFornecedoresBody', 'fcFornecedoresCount', 'fornecedores', 'Nenhum fornecedor cadastrado para esta empresa.');
-  renderList('fcCategoriasBody', 'fcCategoriasCount', 'expenseCategories', 'Nenhuma categoria cadastrada para esta empresa.');
-  renderList('fcClientesBody', 'fcClientesCount', 'clientes', 'Nenhum cliente cadastrado para esta empresa.');
-  renderList('fcCategoriasEntradaBody', 'fcCategoriasEntradaCount', 'entryCategories', 'Nenhuma categoria cadastrada para esta empresa.');
+  renderList('fcFornecedoresBody', 'fcFornecedoresCount', 'fornecedores', 'Nenhum fornecedor cadastrado para esta empresa.', 'fcFornecedoresSearch');
+  renderList('fcCategoriasBody', 'fcCategoriasCount', 'expenseCategories', 'Nenhuma categoria cadastrada para esta empresa.', 'fcCategoriasSearch');
+  renderList('fcClientesBody', 'fcClientesCount', 'clientes', 'Nenhum cliente cadastrado para esta empresa.', 'fcClientesSearch');
+  renderList('fcCategoriasEntradaBody', 'fcCategoriasEntradaCount', 'entryCategories', 'Nenhuma categoria cadastrada para esta empresa.', 'fcCategoriasEntradaSearch');
 }
 
 /* --- ADMIN --- */
@@ -662,9 +727,18 @@ function renderAdminViews() {
     `<div class="rule"><span class="dot"></span><span><strong>${esc(r.type)}:</strong> ${esc(r.text)}</span></div>`
   ).join('') || '<p class="subtle">Nenhuma regra cadastrada.</p>');
 
-  /* Saldo Inicial autorizado */
-  const adjStores = role === 'master' ? state.stores.filter((s) => s.status !== 'Inativa') : stores;
-  setOptions('openingAdjustmentStore', adjStores.map((s) => [s.id, s.name]), 'Selecione');
+  /* Saldo Inicial autorizado — Master escolhe a empresa primeiro para filtrar as lojas
+     (evita misturar lojas de empresas diferentes numa lista só quando há muitos clientes) */
+  const adjCompanyField = $('openingAdjustmentCompanyField');
+  if (adjCompanyField) adjCompanyField.classList.toggle('hidden', role !== 'master');
+  if (role === 'master') {
+    setOptions('openingAdjustmentCompany', visibleCompanies().map((c) => [c.id, c.name]), 'Selecione a empresa');
+    const adjCompanyId = val('openingAdjustmentCompany');
+    const adjStores = adjCompanyId ? state.stores.filter((s) => s.companyId === adjCompanyId && s.status !== 'Inativa') : [];
+    setOptions('openingAdjustmentStore', adjStores.map((s) => [s.id, s.name]), adjCompanyId ? 'Selecione' : 'Selecione a empresa acima');
+  } else {
+    setOptions('openingAdjustmentStore', stores.map((s) => [s.id, s.name]), 'Selecione');
+  }
   if ($('openingAdjustmentDate') && !val('openingAdjustmentDate')) setVal('openingAdjustmentDate', todayISO());
   html('openingAdjustmentsBody', (state.cashOpeningAdjustments || [])
     .filter((a) => role === 'master' || a.companyId === currentUser?.companyId)

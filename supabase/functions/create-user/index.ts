@@ -59,8 +59,19 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (requesterError) return friendlyError(req, 'Não foi possível validar seu perfil.', 500);
-  if (!requester || requester.role !== 'master' || requester.status === 'Inativo') {
-    return friendlyError(req, 'Apenas o perfil Master pode criar usuários.', 403);
+  if (!requester || !['master', 'analyst'].includes(requester.role) || requester.status === 'Inativo') {
+    return friendlyError(req, 'Apenas Master ou Analista podem criar usuários.', 403);
+  }
+
+  /* Analista só cria Admin/Operador, e só para empresas às quais tem acesso —
+     criar outro Analista continua exclusivo do Master. */
+  let analystCompanyIds: string[] = [];
+  if (requester.role === 'analyst') {
+    const { data: links } = await admin
+      .from('analyst_companies')
+      .select('company_id')
+      .eq('profile_id', requester.id);
+    analystCompanyIds = (links || []).map((l: { company_id: string }) => l.company_id);
   }
 
   let body: Record<string, unknown>;
@@ -76,16 +87,25 @@ Deno.serve(async (req) => {
   const role = String(body.role || '').trim();
   const companyId = body.company_id ? String(body.company_id) : null;
   const storeId = body.store_id ? String(body.store_id) : null;
+  const companyIds = Array.isArray(body.company_ids) ? body.company_ids.map(String) : [];
   const status = String(body.status || 'Ativo').trim() || 'Ativo';
+
+  const allowedRoles = requester.role === 'master' ? ['admin', 'operator', 'analyst'] : ['admin', 'operator'];
 
   if (!name) return friendlyError(req, 'Informe o nome do usuário.');
   if (!email || !isValidEmail(email)) return friendlyError(req, 'Informe um e-mail válido.');
   if (!password || password.length < 6) return friendlyError(req, 'A senha precisa ter pelo menos 6 caracteres.');
-  if (!['admin', 'operator'].includes(role)) return friendlyError(req, 'Perfil inválido. Use Admin ou Operador.');
+  if (!allowedRoles.includes(role)) return friendlyError(req, 'Perfil inválido para o seu nível de acesso.');
   if (!['Ativo', 'Inativo'].includes(status)) return friendlyError(req, 'Status inválido para o usuário.');
   if (role === 'admin' && !companyId) return friendlyError(req, 'Administrador precisa estar vinculado a uma empresa.');
   if (role === 'operator' && (!companyId || !storeId)) {
     return friendlyError(req, 'Operador precisa estar vinculado a uma empresa e uma loja.');
+  }
+  if (role === 'analyst' && companyIds.length === 0) {
+    return friendlyError(req, 'Selecione ao menos uma empresa para o Analista.');
+  }
+  if (requester.role === 'analyst' && companyId && !analystCompanyIds.includes(companyId)) {
+    return friendlyError(req, 'Você só pode cadastrar usuários para empresas às quais tem acesso.');
   }
 
   const { data: existingProfile } = await admin
@@ -95,21 +115,31 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (existingProfile) return friendlyError(req, 'Já existe um perfil cadastrado com este e-mail.');
 
-  const { data: company } = await admin
-    .from('companies')
-    .select('id')
-    .eq('id', companyId)
-    .maybeSingle();
-  if (!company) return friendlyError(req, 'Empresa não encontrada.');
-
-  if (role === 'operator') {
-    const { data: store } = await admin
-      .from('stores')
+  if (role === 'analyst') {
+    const { data: companies } = await admin
+      .from('companies')
       .select('id')
-      .eq('id', storeId)
-      .eq('company_id', companyId)
+      .in('id', companyIds);
+    if (!companies || companies.length !== companyIds.length) {
+      return friendlyError(req, 'Uma ou mais empresas selecionadas não foram encontradas.');
+    }
+  } else {
+    const { data: company } = await admin
+      .from('companies')
+      .select('id')
+      .eq('id', companyId)
       .maybeSingle();
-    if (!store) return friendlyError(req, 'Loja não encontrada para esta empresa.');
+    if (!company) return friendlyError(req, 'Empresa não encontrada.');
+
+    if (role === 'operator') {
+      const { data: store } = await admin
+        .from('stores')
+        .select('id')
+        .eq('id', storeId)
+        .eq('company_id', companyId)
+        .maybeSingle();
+      if (!store) return friendlyError(req, 'Loja não encontrada para esta empresa.');
+    }
   }
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
@@ -131,7 +161,7 @@ Deno.serve(async (req) => {
     name,
     email,
     role,
-    company_id: companyId,
+    company_id: role === 'analyst' ? null : companyId,
     store_id: role === 'operator' ? storeId : null,
     status,
   };
@@ -145,6 +175,17 @@ Deno.serve(async (req) => {
   if (profileError) {
     await admin.auth.admin.deleteUser(created.user.id);
     return friendlyError(req, 'Usuário criado no Auth, mas o perfil falhou. A criação foi desfeita.', 500);
+  }
+
+  if (role === 'analyst') {
+    const { error: linksError } = await admin
+      .from('analyst_companies')
+      .insert(companyIds.map((cid) => ({ profile_id: profile.id, company_id: cid })));
+    if (linksError) {
+      await admin.from('profiles').delete().eq('id', profile.id);
+      await admin.auth.admin.deleteUser(created.user.id);
+      return friendlyError(req, 'Usuário criado, mas o vínculo com as empresas falhou. A criação foi desfeita.', 500);
+    }
   }
 
   return json(req, { ok: true, user_id: created.user.id, profile });
