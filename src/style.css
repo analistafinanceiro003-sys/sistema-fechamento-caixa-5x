@@ -206,13 +206,27 @@ tr:hover td{background:#fafbfc}
 .alert-item.info{border-color:#bfdbfe;background:#eff6ff}
 .alert-item strong{flex:1}
 
-/* Dashboard — tendência em barras (sem lib de gráficos) */
-.trend-blocks{display:grid;grid-template-columns:1fr 1fr;gap:24px}
-.trend-block h4{font-size:13px;font-weight:650;color:var(--muted);margin-bottom:10px}
-.trend-chart{display:flex;align-items:flex-end;gap:4px;height:70px;border-bottom:1px solid var(--line)}
-.trend-bar{flex:1;background:var(--brand);border-radius:3px 3px 0 0;min-height:2px;cursor:default;transition:opacity .15s}
-.trend-bar:hover{opacity:.7}
-.trend-bar.danger{background:var(--danger)}
+/* Dashboard — Movimento Diário (Entradas x Saídas), SVG puro sem lib de gráficos */
+#dashTrend{position:relative}
+.chart-legend{display:flex;align-items:center;gap:18px;font-size:12px;font-weight:650;color:var(--muted);margin-bottom:6px}
+.legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.legend-dot.entries{background:linear-gradient(180deg,#22d3a8,var(--success))}
+.legend-dot.expenses{background:linear-gradient(180deg,#f87171,var(--danger))}
+.daily-chart{width:100%;height:220px;display:block;overflow:visible}
+.chart-bar{transition:opacity .12s,filter .12s}
+.chart-bar-entries{fill:url(#gradEntries)}
+.chart-bar-expenses{fill:url(#gradExpenses)}
+.chart-bar.active{filter:brightness(1.08) drop-shadow(0 2px 4px rgba(0,0,0,.15))}
+.chart-hit{fill:transparent;cursor:pointer}
+.chart-x-label{font-size:9px;fill:var(--muted);font-family:var(--font)}
+.chart-tooltip{display:none;position:absolute;z-index:20;background:#0d1720;color:#fff;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.5;pointer-events:none;box-shadow:0 12px 28px rgba(0,0,0,.22);min-width:200px;max-width:260px}
+.chart-tip-header{font-weight:700;font-size:13px;margin-bottom:6px}
+.chart-tip-totals{display:flex;justify-content:space-between;gap:12px;font-size:11px;font-weight:650;border-bottom:1px solid rgba(255,255,255,.15);padding-bottom:8px;margin-bottom:6px}
+.chart-tip-stores{max-height:160px;overflow-y:auto;display:grid;gap:5px}
+.chart-tip-row{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#e2e8f0}
+.chart-tip-values{white-space:nowrap}
+.chart-tooltip .c-entries{color:#4ade80}
+.chart-tooltip .c-expenses{color:#f87171}
 
 /* ============================================================
    FECHAMENTO 5X — blocos de conferência

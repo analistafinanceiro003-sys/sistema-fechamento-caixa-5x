@@ -66,25 +66,127 @@ function _daysSince(dateBR) {
   return Math.max(0, Math.round(ms / 86400000));
 }
 
-/* Sparkline em barras CSS — sem dependência de biblioteca de gráficos */
-function _trendBarsHTML(rows, { days = 14, dangerColor = false } = {}) {
+/* Dados do último gráfico renderizado (Movimento Diário) — usado pelo hover
+   do tooltip para montar o detalhamento por loja sem precisar recalcular. */
+let _dashDailyChartData = [];
+
+/* Gráfico "Movimento Diário — Entradas x Saídas": SVG puro (sem biblioteca),
+   barras pareadas por dia dos últimos N dias. Passar o mouse sobre a coluna
+   de um dia mostra um tooltip com o detalhamento por loja daquele dia. */
+function _dailyEntriesExpensesChartHTML(rows, days = 14) {
   const buckets = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
     const iso = d.toISOString().slice(0, 10);
-    buckets.push({ iso, label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }), count: 0 });
+    buckets.push({
+      iso, label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+      entries: 0, expenses: 0, byStore: new Map(),
+    });
   }
   rows.forEach((c) => {
     const iso = parseBR(c.date);
     const b = buckets.find((x) => x.iso === iso);
-    if (b) b.count++;
+    if (!b) return;
+    const entries = Number(c.entries || 0);
+    const expenses = Number(c.expenses || 0);
+    b.entries += entries;
+    b.expenses += expenses;
+    if (!b.byStore.has(c.storeId)) b.byStore.set(c.storeId, { storeId: c.storeId, companyId: c.companyId, entries: 0, expenses: 0 });
+    const s = b.byStore.get(c.storeId);
+    s.entries += entries;
+    s.expenses += expenses;
   });
-  const max = Math.max(1, ...buckets.map((b) => b.count));
-  return buckets.map((b) => {
-    const pct = Math.round((b.count / max) * 100);
-    return `<div class="trend-bar${dangerColor && b.count ? ' danger' : ''}" style="height:${Math.max(pct, b.count ? 6 : 2)}%" title="${esc(b.label)}: ${b.count}"></div>`;
+  _dashDailyChartData = buckets;
+
+  const maxVal = Math.max(1, ...buckets.map((b) => Math.max(b.entries, b.expenses)));
+  const W = 900, H = 220, padT = 12, padB = 24, plotH = H - padT - padB;
+  const colW = W / buckets.length;
+  const barGap = Math.max(2, colW * 0.08);
+  const barW = Math.max(3, (colW - barGap * 3) / 2);
+
+  const svgBody = buckets.map((b, i) => {
+    const x0 = i * colW;
+    const hEntries = Math.max(b.entries ? (b.entries / maxVal) * plotH : 0, b.entries ? 2 : 0);
+    const hExpenses = Math.max(b.expenses ? (b.expenses / maxVal) * plotH : 0, b.expenses ? 2 : 0);
+    const xEntries = x0 + barGap;
+    const xExpenses = xEntries + barW + barGap;
+    const showLabel = days <= 10 || i % 2 === 0 || i === buckets.length - 1;
+    return `
+      <rect x="${xEntries.toFixed(1)}" y="${(padT + plotH - hEntries).toFixed(1)}" width="${barW.toFixed(1)}" height="${hEntries.toFixed(1)}" rx="3" class="chart-bar chart-bar-entries" data-idx="${i}"/>
+      <rect x="${xExpenses.toFixed(1)}" y="${(padT + plotH - hExpenses).toFixed(1)}" width="${barW.toFixed(1)}" height="${hExpenses.toFixed(1)}" rx="3" class="chart-bar chart-bar-expenses" data-idx="${i}"/>
+      ${showLabel ? `<text x="${(x0 + colW / 2).toFixed(1)}" y="${H - 6}" class="chart-x-label" text-anchor="middle">${esc(b.label)}</text>` : ''}
+      <rect x="${x0.toFixed(1)}" y="0" width="${colW.toFixed(1)}" height="${H}" class="chart-hit" data-idx="${i}" onmousemove="_showDashChartTooltip(${i}, event)" onmouseleave="_hideDashChartTooltip()"/>
+    `;
   }).join('');
+
+  return `
+    <div class="chart-legend">
+      <span class="legend-dot entries"></span> Entradas
+      <span class="legend-dot expenses"></span> Saídas
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="daily-chart">
+      <defs>
+        <linearGradient id="gradEntries" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#22d3a8"/>
+          <stop offset="100%" stop-color="#16a34a"/>
+        </linearGradient>
+        <linearGradient id="gradExpenses" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f87171"/>
+          <stop offset="100%" stop-color="#dc2626"/>
+        </linearGradient>
+      </defs>
+      ${svgBody}
+    </svg>
+    <div id="dashChartTooltip" class="chart-tooltip"></div>`;
 }
+
+function _showDashChartTooltip(idx, evt) {
+  const b = _dashDailyChartData[idx];
+  const container = document.getElementById('dashTrend');
+  const tip = document.getElementById('dashChartTooltip');
+  if (!b || !container || !tip) return;
+
+  container.querySelectorAll('.chart-bar.active').forEach((el) => el.classList.remove('active'));
+  container.querySelectorAll(`.chart-bar[data-idx="${idx}"]`).forEach((el) => el.classList.add('active'));
+
+  const storeRows = [...b.byStore.values()]
+    .filter((s) => s.entries || s.expenses)
+    .sort((a, c) => (c.entries + c.expenses) - (a.entries + a.expenses))
+    .map((s) => `<div class="chart-tip-row">
+        <span>${esc(companyName(s.companyId))} / ${esc(storeName(s.storeId))}</span>
+        <span class="chart-tip-values"><b class="c-entries">+${money(s.entries)}</b> <b class="c-expenses">-${money(s.expenses)}</b></span>
+      </div>`)
+    .join('') || '<p class="subtle" style="margin:2px 0 0">Sem fechamentos neste dia.</p>';
+
+  tip.innerHTML = `
+    <div class="chart-tip-header">${esc(b.label)}</div>
+    <div class="chart-tip-totals">
+      <span class="c-entries">Entradas: ${money(b.entries)}</span>
+      <span class="c-expenses">Saídas: ${money(b.expenses)}</span>
+    </div>
+    <div class="chart-tip-stores">${storeRows}</div>`;
+  tip.style.display = 'block';
+
+  const cardRect = container.getBoundingClientRect();
+  let left = evt.clientX - cardRect.left + 14;
+  let top  = evt.clientY - cardRect.top - 10;
+  const tipW = tip.offsetWidth, tipH = tip.offsetHeight;
+  if (left + tipW > cardRect.width) left = evt.clientX - cardRect.left - tipW - 14;
+  if (left < 0) left = 4;
+  if (top + tipH > cardRect.height) top = cardRect.height - tipH - 4;
+  if (top < 0) top = 0;
+  tip.style.left = left + 'px';
+  tip.style.top  = top + 'px';
+}
+
+function _hideDashChartTooltip() {
+  const container = document.getElementById('dashTrend');
+  if (!container) return;
+  container.querySelectorAll('.chart-bar.active').forEach((el) => el.classList.remove('active'));
+  const tip = document.getElementById('dashChartTooltip');
+  if (tip) tip.style.display = 'none';
+}
+
 
 /* Quantas etapas de implantação (de IMPLANT_STEP_LIST) estão "Concluído" para a empresa */
 function implantProgress(companyId) {
@@ -113,20 +215,9 @@ function renderMasterDashboard() {
   text('mClosings', activeRows.length);
   text('mDiff', money(activeRows.reduce((a, c) => a + (pendingReviewClosingIds.has(c.id) ? Math.abs(Number(c.diff || 0)) : 0), 0)));
 
-  /* Tendência — fechamentos e divergências por dia (últimos 14 dias) */
-  const divRows = activeRows.filter((c) => c.status === 'Divergência');
-  html('dashTrend', `
-    <div class="trend-blocks">
-      <div class="trend-block">
-        <h4>Fechamentos por dia</h4>
-        <div class="trend-chart">${_trendBarsHTML(activeRows)}</div>
-      </div>
-      <div class="trend-block">
-        <h4>Divergências por dia</h4>
-        <div class="trend-chart">${_trendBarsHTML(divRows, { dangerColor: true })}</div>
-      </div>
-    </div>`
-  );
+  /* Movimento diário — entradas x saídas dos últimos 14 dias, com tooltip
+     por loja ao passar o mouse (ver _dailyEntriesExpensesChartHTML). */
+  html('dashTrend', _dailyEntriesExpensesChartHTML(activeRows));
 
   /* Alertas críticos — divergências pendentes de revisão, mais urgentes (mais dias) primeiro.
      Usa state.divergenceReviews (não c.reviewStatus, que fica travado em "Pendente de revisão"
