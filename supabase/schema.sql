@@ -282,9 +282,14 @@ create table if not exists public.closing_entries (
   id          uuid primary key default gen_random_uuid(),
   closing_id  uuid not null references public.closings(id) on delete cascade,
   description text not null,
+  category    text,
+  client      text,
   amount      numeric not null check (amount >= 0),
   created_at  timestamptz not null default now()
 );
+-- Migração: adiciona category/client se a tabela já existia sem elas
+alter table public.closing_entries add column if not exists category text;
+alter table public.closing_entries add column if not exists client text;
 
 create index if not exists idx_entries_closing on public.closing_entries(closing_id);
 

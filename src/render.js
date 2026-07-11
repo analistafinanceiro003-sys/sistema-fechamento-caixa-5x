@@ -598,6 +598,8 @@ function renderFornecedoresCategorias() {
   };
   renderList('fcFornecedoresList', 'fornecedores', 'Nenhum fornecedor cadastrado para esta empresa.');
   renderList('fcCategoriasList', 'expenseCategories', 'Nenhuma categoria cadastrada para esta empresa.');
+  renderList('fcClientesList', 'clientes', 'Nenhum cliente cadastrado para esta empresa.');
+  renderList('fcCategoriasEntradaList', 'entryCategories', 'Nenhuma categoria cadastrada para esta empresa.');
 }
 
 /* --- ADMIN --- */

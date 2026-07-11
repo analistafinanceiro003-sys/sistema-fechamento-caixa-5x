@@ -196,6 +196,7 @@ function bindClosingEvents() {
       fillClosingResponsible5X();
       suggestInitialBalance();
       refreshExpenseOptionLists();
+      refreshEntryOptionLists();
       calc();
       return;
     }
@@ -204,7 +205,7 @@ function bindClosingEvents() {
       calc();
       return;
     }
-    if (e.target.matches('#closingResponsible,.expense-category')) calc();
+    if (e.target.matches('#closingResponsible,.expense-category,.entry-category')) calc();
   });
 
 }
@@ -215,6 +216,7 @@ function bindClosingEvents() {
 ================================================================ */
 function calc() {
   ensureExpenseCategories();
+  ensureEntryCategories();
 
   const cc  = getClosingCalculation();
   const ref = cc.openingRef;
@@ -277,9 +279,14 @@ const MONEY_ATTRS = `type="text" inputmode="decimal" pattern="[0-9.,]*" value="0
   onblur="formatCurrencyInput(this)" onfocus="selectOnFocus(this)"`;
 
 function addEntry() {
+  const companyId = selectedStore()?.companyId;
+  const catOpts = optionsForCompany(companyId, 'entryCategories').map((v) => `<option>${esc(v)}</option>`).join('');
+  const cliOpts = optionsForCompany(companyId, 'clientes').map((v) => `<option>${esc(v)}</option>`).join('');
   $('entries')?.insertAdjacentHTML('beforeend', `
-    <div class="launch-row">
+    <div class="launch-row entry-row">
       <div class="field"><label>Descrição</label><input class="entry-desc" value="Entrada em Dinheiro"/></div>
+      <div class="field"><label>Categoria</label><select class="entry-category">${catOpts}</select></div>
+      <div class="field"><label>Cliente</label><select class="entry-client"><option value="">Selecione</option>${cliOpts}</select></div>
       <div class="field"><label>Valor (R$)</label>
         <input class="entry" ${MONEY_ATTRS} oninput="calc()"/>
       </div>
@@ -340,6 +347,41 @@ function refreshExpenseOptionLists() {
       const cur = supSel.value;
       supSel.innerHTML = `<option value="">Selecione</option>${supOpts.map((v) => `<option>${esc(v)}</option>`).join('')}`;
       if (supOpts.includes(cur)) supSel.value = cur;
+    }
+  });
+}
+
+function ensureEntryCategories(root = document) {
+  const companyId = selectedStore()?.companyId;
+  all('#entries .launch-row', root).forEach((row) => {
+    if (row.querySelector('.entry-category')) return;
+    const vf      = row.querySelector('.entry')?.closest('.field');
+    const catOpts = optionsForCompany(companyId, 'entryCategories').map((v) => `<option>${esc(v)}</option>`).join('');
+    const cliOpts = optionsForCompany(companyId, 'clientes').map((v) => `<option>${esc(v)}</option>`).join('');
+    vf?.insertAdjacentHTML('beforebegin',
+      `<div class="field"><label>Categoria</label><select class="entry-category">${catOpts}</select></div>` +
+      `<div class="field"><label>Cliente</label><select class="entry-client"><option value="">Selecione</option>${cliOpts}</select></div>`);
+  });
+}
+
+/* Repopula as opções de Categoria/Cliente de todas as linhas de entrada existentes
+   conforme a empresa da loja selecionada (chamado ao trocar a loja do fechamento). */
+function refreshEntryOptionLists() {
+  const companyId = selectedStore()?.companyId;
+  const catOpts = optionsForCompany(companyId, 'entryCategories');
+  const cliOpts = optionsForCompany(companyId, 'clientes');
+  all('#entries .launch-row').forEach((row) => {
+    const catSel = row.querySelector('.entry-category');
+    if (catSel) {
+      const cur = catSel.value;
+      catSel.innerHTML = catOpts.map((v) => `<option>${esc(v)}</option>`).join('');
+      if (catOpts.includes(cur)) catSel.value = cur;
+    }
+    const cliSel = row.querySelector('.entry-client');
+    if (cliSel) {
+      const cur = cliSel.value;
+      cliSel.innerHTML = `<option value="">Selecione</option>${cliOpts.map((v) => `<option>${esc(v)}</option>`).join('')}`;
+      if (cliOpts.includes(cur)) cliSel.value = cur;
     }
   });
 }
@@ -560,6 +602,8 @@ async function saveClosing() {
   const entries = entryRows
     .map((row) => ({
       description: row.querySelector('.entry-desc')?.value?.trim() || 'Entrada em Dinheiro',
+      category:    row.querySelector('.entry-category')?.value || '',
+      client:      row.querySelector('.entry-client')?.value || '',
       value: parseCurrencyBR(row.querySelector('.entry')?.value || '0'),
     })).filter((x) => x.value > 0);
 
@@ -815,7 +859,7 @@ async function saveRectification() {
   const newStatus          = closingStatus(fundDivergence, original.companyId);
 
   const entryItems = newEntries !== Number(original.entries || 0)
-    ? [{ description: 'Valor retificado', value: newEntries }]
+    ? [{ description: 'Valor retificado', category: '', client: '', value: newEntries }]
     : (original.entryItems || []);
   const expenseItems = newExpenses !== Number(original.expenses || 0)
     ? [{ description: 'Valor retificado', category: '', supplier: '', value: newExpenses }]
@@ -1101,7 +1145,7 @@ Object.assign(window, {
   selectedShift, findPreviousClosing, findOpeningAdjustment, openingReference,
   suggestInitialBalance, calc,
   addEntry, addExpense, removeLaunchRow,
-  ensureExpenseCategories,
+  ensureExpenseCategories, ensureEntryCategories,
   confirmTransfer, handleSaveClosingClick, saveClosing, saveOpeningAdjustment, reviewDivergence, createDivergenceReviews,
   recalculateClosingStatuses, handleRecalculateStatuses,
   handleAttachments, renderAttachments, clearAttachmentsUI,

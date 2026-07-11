@@ -41,12 +41,14 @@ function defaultSelectOptions() {
     implantStatus: ['Pendente','Em andamento','Concluído'],
     expenseCategories: ['Ajuda de custo','Taxa de entrega','Compra de mercadoria','Outras saídas'],
     fornecedores: [],
+    entryCategories: ['Venda em Dinheiro','Recebimento de Cliente','Outras entradas'],
+    clientes: [],
   };
 }
 
 /* Categorias cujas opções são específicas por empresa (cada cliente tem sua própria lista).
    As demais categorias do seletor continuam globais para todo o sistema. */
-const COMPANY_SCOPED_OPTION_CATEGORIES = ['expenseCategories', 'fornecedores'];
+const COMPANY_SCOPED_OPTION_CATEGORIES = ['expenseCategories', 'fornecedores', 'entryCategories', 'clientes'];
 
 function defaultState() {
   return {
@@ -292,7 +294,7 @@ function mapClosing(row, entries = [], expenses = [], attachments = []) {
     responsible: row.responsible_name || '',
     initial: Number(row.initial_balance || 0),
     entries: Number(row.total_entries || 0),
-    entryItems: entries.map((e) => ({ id: e.id, description: e.description, value: Number(e.amount || 0) })),
+    entryItems: entries.map((e) => ({ id: e.id, description: e.description, category: e.category || '', client: e.client || '', value: Number(e.amount || 0) })),
     expenses: Number(row.total_expenses || 0),
     expenseItems: expenses.map((e) => ({ id: e.id, description: e.description, category: e.category || '', supplier: e.supplier || '', value: Number(e.amount || 0) })),
     transfer: Number(row.transfer_amount || 0),
@@ -909,7 +911,7 @@ async function getPreviousClosing({ storeId, closingDate, shift }) {
 
 async function createClosingEntries(closingId, entries = []) {
   if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession() || !entries.length) return entries;
-  const { error } = await sb.from('closing_entries').insert(entries.map((e) => ({ closing_id: closingId, description: e.description || 'Entrada', amount: Number(e.value || 0) })));
+  const { error } = await sb.from('closing_entries').insert(entries.map((e) => ({ closing_id: closingId, description: e.description || 'Entrada', category: e.category || '', client: e.client || '', amount: Number(e.value || 0) })));
   if (error) throw error;
   return entries;
 }
@@ -1850,6 +1852,26 @@ async function addCategoria() {
   if ((state.companySelectOptions?.[companyId]?.expenseCategories || []).length > before) clear('fcNewCategoria');
 }
 
+async function addCliente() {
+  const companyId = val('fcCompanyFilter');
+  const value = val('fcNewCliente').trim();
+  if (!companyId) return alert('Selecione a empresa.');
+  if (!value) return alert('Informe o nome do cliente.');
+  const before = (state.companySelectOptions?.[companyId]?.clientes || []).length;
+  await addCompanyOption('clientes', companyId, value);
+  if ((state.companySelectOptions?.[companyId]?.clientes || []).length > before) clear('fcNewCliente');
+}
+
+async function addCategoriaEntrada() {
+  const companyId = val('fcCompanyFilter');
+  const value = val('fcNewCategoriaEntrada').trim();
+  if (!companyId) return alert('Selecione a empresa.');
+  if (!value) return alert('Informe o nome da categoria.');
+  const before = (state.companySelectOptions?.[companyId]?.entryCategories || []).length;
+  await addCompanyOption('entryCategories', companyId, value);
+  if ((state.companySelectOptions?.[companyId]?.entryCategories || []).length > before) clear('fcNewCategoriaEntrada');
+}
+
 async function removeCompanyOption(category, companyId, value) {
   const backup = [...(state.companySelectOptions[companyId]?.[category] || [])];
   state.companySelectOptions[companyId] = state.companySelectOptions[companyId] || {};
@@ -1898,7 +1920,7 @@ async function renameCompanyOption(category, companyId, oldValue, newValue) {
 }
 
 function promptRenameCompanyOption(category, companyId, oldValue) {
-  const label = category === 'fornecedores' ? 'fornecedor' : 'categoria';
+  const label = category === 'fornecedores' ? 'fornecedor' : category === 'clientes' ? 'cliente' : 'categoria';
   const newValue = prompt(`Novo nome para o ${label} "${oldValue}":`, oldValue);
   if (newValue === null) return;
   renameCompanyOption(category, companyId, oldValue, newValue);
@@ -2393,7 +2415,7 @@ Object.assign(window, {
   createRule, deleteRule, saveImplantStep, upsertImplantStep, saveOperationConfig,
   addSelectOption, removeSelectOption, resetSelectOptions, optionsForCompany,
   addCompanyOption, removeCompanyOption, renameCompanyOption, promptRenameCompanyOption,
-  addFornecedor, addCategoria,
+  addFornecedor, addCategoria, addCliente, addCategoriaEntrada,
   openLimparDadosModal, closeLimparDadosModal, clearCompanyData,
   exportBackup, importBackup, resetSystem,
   storeOptionsForCompany, operatorOptionsForCompany, setOptions, fillSelects,

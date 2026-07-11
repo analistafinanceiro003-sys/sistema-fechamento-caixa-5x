@@ -213,7 +213,7 @@ function allMovementRows(rows = []) {
     };
     const entries = (c.entryItems?.length ? c.entryItems : [{ description: 'Entrada em Dinheiro', value: c.entries }])
       .filter((i) => Number(i.value))
-      .map((i) => ({ ...base, Tipo: 'Entrada', 'Descrição': i.description, Categoria: '', Valor: Number(i.value) }));
+      .map((i) => ({ ...base, Tipo: 'Entrada', 'Descrição': i.description, Categoria: i.category || '', Fornecedor: i.client || '', Valor: Number(i.value) }));
     const exits = (c.expenseItems || [])
       .filter((i) => Number(i.value))
       .map((i) => ({ ...base, Tipo: 'Saída', 'Descrição': i.description, Categoria: i.category || '', Fornecedor: i.supplier || '', Valor: -Math.abs(Number(i.value)) }));
@@ -264,7 +264,7 @@ function contaAzulRow(r, obsPrefix) {
     'Data de Vencimento': r.Data,
     'Data de Pagamento': r.Data,
     Valor: r.Valor,
-    Categoria: r.Tipo === 'Entrada' ? 'Receita de Venda - Dinheiro'
+    Categoria: r.Tipo === 'Entrada' ? (r.Categoria || 'Receita de Venda - Dinheiro')
       : r.Tipo === 'Saída' ? (r.Categoria || 'Saída de Caixa')
       : 'Transferência entre contas',
     'Descrição': r['Descrição'],

@@ -643,8 +643,8 @@
       <!-- Fornecedores e Categorias (por empresa) -->
       <div class="inner-tab-panel hidden" id="sis-fornecedores">
         <div class="card">
-          <h3 class="section-title">Fornecedores e Categorias de saída</h3>
-          <p class="subtle" style="margin-bottom:14px">Cada empresa tem sua própria lista de fornecedores e categorias, usada no Fechamento Diário. Selecione a empresa para cadastrar, alterar ou excluir.</p>
+          <h3 class="section-title">Fornecedores, Clientes e Categorias</h3>
+          <p class="subtle" style="margin-bottom:14px">Cada empresa tem sua própria lista de fornecedores, clientes e categorias, usada no Fechamento Diário e na exportação para o Conta Azul. Selecione a empresa para cadastrar, alterar ou excluir.</p>
           <div class="form-grid three" style="margin-bottom:14px">
             <div class="field"><label>Empresa</label><select id="fcCompanyFilter" onchange="renderFornecedoresCategorias()"></select></div>
           </div>
@@ -664,6 +664,22 @@
                 <button class="btn btn-brand" onclick="addCategoria()">Adicionar</button>
               </div>
               <div class="option-list" id="fcCategoriasList"></div>
+            </div>
+            <div class="management-card">
+              <h4>Clientes</h4>
+              <div class="option-manager" style="margin-bottom:10px">
+                <div class="field"><label>Novo cliente</label><input id="fcNewCliente" placeholder="Nome do cliente"/></div>
+                <button class="btn btn-brand" onclick="addCliente()">Adicionar</button>
+              </div>
+              <div class="option-list" id="fcClientesList"></div>
+            </div>
+            <div class="management-card">
+              <h4>Categorias de entrada</h4>
+              <div class="option-manager" style="margin-bottom:10px">
+                <div class="field"><label>Nova categoria</label><input id="fcNewCategoriaEntrada" placeholder="Nome da categoria"/></div>
+                <button class="btn btn-brand" onclick="addCategoriaEntrada()">Adicionar</button>
+              </div>
+              <div class="option-list" id="fcCategoriasEntradaList"></div>
             </div>
           </div>
         </div>
