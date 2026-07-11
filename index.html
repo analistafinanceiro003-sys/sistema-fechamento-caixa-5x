@@ -599,6 +599,7 @@
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-backup',this)">Backup e Manutenção</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-logs',this)">Logs de Auditoria</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-documentos',this)">Documentos</button>
+        <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-manual',this)">Manual 5X</button>
       </div>
 
       <!-- Configurações -->
@@ -730,428 +731,7 @@
           <div id="masterDocFolders"></div>
         </div>
       </div>
-    </section>
-
-    <!-- ============================================================
-         ADMIN: DASHBOARD
-    ============================================================ -->
-    <section class="page hidden" id="adminDashboard">
-      <div class="grid cards">
-        <div class="card clickable-card" onclick="showPage('adminOperacao',document.querySelector('.nav button[data-page=adminOperacao]'));showSubTab('adminOperacao','aop-lojas',document.querySelector('[data-subtab=aop-lojas]'))"><div class="metric-label">Lojas</div><div class="metric-value" id="aStores">0</div></div>
-        <div class="card clickable-card" onclick="showPage('adminFechamento',document.querySelector('.nav button[data-page=adminFechamento]'));showSubTab('adminFechamento','afech-historico',document.querySelector('[data-subtab=afech-historico]'))"><div class="metric-label">Fechamentos</div><div class="metric-value" id="aClosings">0</div></div>
-        <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-divergencias',document.querySelector('[data-subtab=amov-divergencias]'))"><div class="metric-label">Divergências</div><div class="metric-value" id="aDiff">0,00 R$</div></div>
-        <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-repasses',document.querySelector('[data-subtab=amov-repasses]'))"><div class="metric-label">Saldo Central</div><div class="metric-value" id="aSaldoCentral">0,00 R$</div><div class="metric-hint" id="aSaldoCentralHint"></div></div>
-        <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-retificacoes',document.querySelector('[data-subtab=amov-retificacoes]'))"><div class="metric-label">Retificações</div><div class="metric-value" id="adminPendingRects">0</div><div class="metric-hint">pendentes de aprovação</div></div>
-      </div>
-      <div class="kpi-alert warning" id="adminRectificationAlert" style="display:none;margin-bottom:12px"></div>
-      <div class="card">
-        <h3 class="section-title">Dashboard por loja</h3>
-        <div class="store-dashboard-grid" id="adminStoreDashboard"></div>
-      </div>
-      <div class="card" style="margin-top:16px">
-        <h3 class="section-title">Últimas movimentações</h3>
-        <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Saldo Inicial</th><th>Entradas</th><th>Saldo Final</th><th>Divergência</th><th>Status</th></tr></thead><tbody id="adminMovementsBody"></tbody></table></div>
-      </div>
-    </section>
-
-    <!-- ============================================================
-         ADMIN: FECHAMENTO (sub-abas)
-    ============================================================ -->
-    <section class="page hidden" id="adminFechamento">
-      <div class="inner-tabs">
-        <button class="inner-tab-btn active" data-subtab="afech-form"      onclick="showSubTab('adminFechamento','afech-form',this)">Registrar Fechamento</button>
-        <button class="inner-tab-btn"        data-subtab="afech-historico" onclick="showSubTab('adminFechamento','afech-historico',this)">Histórico</button>
-      </div>
-      <div class="inner-tab-panel active" id="afech-form">
-        <div class="card">
-          <p class="subtle" style="margin-bottom:14px">Este módulo só está disponível quando liberado pela Gestão 5X.</p>
-          <!-- Reutiliza o mesmo formulário de fechamento (iframe conceitual - aqui incluído diretamente) -->
-          <div id="adminClosingPlaceholder">
-            <p class="subtle">Use o menu <strong>Fechamento Diário</strong> do perfil Operador para registrar fechamentos, ou solicite que a Gestão 5X libere este módulo.</p>
-          </div>
-        </div>
-      </div>
-      <div class="inner-tab-panel hidden" id="afech-historico">
-        <div class="card">
-          <h3 class="section-title">Histórico de fechamentos da empresa</h3>
-          <div class="filter-bar-5x">
-            <div class="field"><label>Loja</label><select id="adminMovementStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
-            <div class="field"><label>Operador</label><select id="adminMovementOperatorFilter" onchange="renderAdminViews()"><option value="">Todos</option></select></div>
-            <div class="field"><label>Data inicial</label><input id="adminMovStart" type="date" onchange="renderAdminViews()"/></div>
-            <div class="field"><label>Data final</label><input id="adminMovEnd" type="date" onchange="renderAdminViews()"/></div>
-          </div>
-          <div class="table-wrap">
-            <table><thead><tr><th>Data</th><th>Loja</th><th>Turno</th><th>Responsável</th><th>Saldo Inicial</th><th>Entradas</th><th>Saídas</th><th>Repasse</th><th>Saldo Final</th><th>Divergência</th><th>Status</th></tr></thead>
-            <tbody id="adminMovementsDetailBody"></tbody></table>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============================================================
-         ADMIN: OPERAÇÃO (sub-abas)
-    ============================================================ -->
-    <section class="page hidden" id="adminOperacao">
-      <div class="inner-tabs">
-        <button class="inner-tab-btn active" data-subtab="aop-regras" onclick="showSubTab('adminOperacao','aop-regras',this)">Regras</button>
-        <button class="inner-tab-btn"        data-subtab="aop-lojas"  onclick="showSubTab('adminOperacao','aop-lojas',this)">Lojas</button>
-      </div>
-      <div class="inner-tab-panel active" id="aop-regras">
-        <div class="card"><h3 class="section-title">Regras operacionais</h3><div id="adminRulesList"></div></div>
-      </div>
-      <div class="inner-tab-panel hidden" id="aop-lojas">
-        <div class="card">
-          <h3 class="section-title">Lojas da empresa</h3>
-          <div class="table-wrap"><table><thead><tr><th>Loja</th><th>Código</th><th>Tipo</th><th>Fundo padrão</th><th>Status</th></tr></thead><tbody id="adminStoresBody"></tbody></table></div>
-        </div>
-        <div class="card" style="margin-top:16px">
-          <h3 class="section-title">Definir Saldo Inicial do Caixa</h3>
-          <p class="subtle" style="margin-bottom:12px">Use para definir o saldo inicial de uma loja ao implantar ou abrir um novo caixa.</p>
-          <div class="form-grid">
-            <div class="field"><label>Loja</label><select id="openingAdjustmentStore"></select></div>
-            <div class="field"><label>Data de início</label><input id="openingAdjustmentDate" type="date"/></div>
-            <div class="field"><label>Turno de início</label><select id="openingAdjustmentShift"><option>Manhã</option><option>Tarde</option><option>Noite</option><option selected>Integral</option><option>Outro</option></select></div>
-            <div class="field"><label>Valor autorizado</label><input id="openingAdjustmentAmount" data-money="br" type="text" inputmode="decimal" pattern="[0-9]*[,.]?[0-9]*" value="0"/></div>
-            <div class="field"><label>Motivo</label><select id="openingAdjustmentReason"><option>Início da operação no sistema</option><option>Caixa limpo</option><option>Complemento de fundo</option><option>Retirada autorizada</option><option>Ajuste operacional</option><option>Correção de divergência anterior</option><option>Outro</option></select></div>
-            <div class="field full"><label>Observações</label><textarea id="openingAdjustmentNotes"></textarea></div>
-          </div>
-          <div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" onclick="saveOpeningAdjustment()">Salvar saldo autorizado</button></div>
-          <div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Loja</th><th>Data</th><th>Turno</th><th>Valor</th><th>Motivo</th><th>Autorizado por</th></tr></thead><tbody id="openingAdjustmentsBody"></tbody></table></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============================================================
-         ADMIN: MOVIMENTAÇÕES (sub-abas)
-    ============================================================ -->
-    <section class="page hidden" id="adminMovimentacoes">
-      <div class="inner-tabs">
-        <button class="inner-tab-btn active" data-subtab="amov-resumo"        onclick="showSubTab('adminMovimentacoes','amov-resumo',this)">Resumo por Fechamento</button>
-        <button class="inner-tab-btn"        data-subtab="amov-repasses"      onclick="showSubTab('adminMovimentacoes','amov-repasses',this)">Repasses</button>
-        <button class="inner-tab-btn"        data-subtab="amov-divergencias"  onclick="showSubTab('adminMovimentacoes','amov-divergencias',this)">Divergências</button>
-        <button class="inner-tab-btn"        data-subtab="amov-retificacoes"  onclick="showSubTab('adminMovimentacoes','amov-retificacoes',this)">Retificações</button>
-        <button class="inner-tab-btn"        data-subtab="amov-extrato"       onclick="showSubTab('adminMovimentacoes','amov-extrato',this)">Extrato</button>
-        <button class="inner-tab-btn"        data-subtab="amov-documentos"    onclick="showSubTab('adminMovimentacoes','amov-documentos',this)">Documentos</button>
-      </div>
-
-      <!-- Resumo por Fechamento (Admin) -->
-      <div class="inner-tab-panel active" id="amov-resumo">
-        <div class="card">
-          <h3 class="section-title">Resumo por Fechamento</h3>
-          <div id="adminResumoSaldoDashboard" style="margin-bottom:14px"></div>
-          <div class="filter-bar-5x" style="margin-bottom:12px">
-            <div class="field"><label>Loja</label><select id="adminResumoStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
-            <div class="field"><label>Operador</label><select id="adminResumoOperatorFilter" onchange="renderAdminViews()"><option value="">Todos</option></select></div>
-            <div class="field"><label>Data inicial</label><input id="adminResumoStart" type="date" onchange="renderAdminViews()"/></div>
-            <div class="field"><label>Data final</label><input id="adminResumoEnd" type="date" onchange="renderAdminViews()"/></div>
-          </div>
-          <div class="table-wrap"><table><thead><tr>
-            <th class="th-sort" onclick="sortResumo('store','admin')">Loja<span id="rs-a-store"></span></th>
-            <th class="th-sort" onclick="sortResumo('date','admin')">Data / Turno<span id="rs-a-date"></span></th>
-            <th class="th-sort" onclick="sortResumo('responsible','admin')">Responsável<span id="rs-a-responsible"></span></th>
-            <th class="th-sort" onclick="sortResumo('initial','admin')">Saldo Inicial<span id="rs-a-initial"></span></th>
-            <th class="th-sort" onclick="sortResumo('entries','admin')">Entradas<span id="rs-a-entries"></span></th>
-            <th class="th-sort" onclick="sortResumo('expenses','admin')">Saídas<span id="rs-a-expenses"></span></th>
-            <th class="th-sort" onclick="sortResumo('saldoCaixa','admin')">Saldo de Caixa<span id="rs-a-saldoCaixa"></span></th>
-            <th class="th-sort" onclick="sortResumo('repEsperado','admin')">Repasse Esperado<span id="rs-a-repEsperado"></span></th>
-            <th class="th-sort" onclick="sortResumo('transfer','admin')">Repasse Confirmado<span id="rs-a-transfer"></span></th>
-            <th class="th-sort" onclick="sortResumo('saldoFinal','admin')">Saldo Final<span id="rs-a-saldoFinal"></span></th>
-            <th>Diferença</th><th>Recebimento</th>
-          </tr></thead><tbody id="adminResumoBody"></tbody></table></div>
-        </div>
-      </div>
-
-      <!-- Extrato com filtros -->
-      <div class="inner-tab-panel hidden" id="amov-extrato">
-        <div class="card">
-          <h3 class="section-title">Movimentações da empresa</h3>
-          <div class="filter-bar-5x" style="margin-bottom:12px">
-            <div class="field"><label>Loja</label><select id="adminExtratStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
-            <div class="field"><label>Operador</label><select id="adminExtratOperatorFilter" onchange="renderAdminViews()"><option value="">Todos</option></select></div>
-            <div class="field"><label>Data inicial</label><input id="adminExtratStart" type="date" onchange="renderAdminViews()"/></div>
-            <div class="field"><label>Data final</label><input id="adminExtratEnd" type="date" onchange="renderAdminViews()"/></div>
-          </div>
-          <div class="table-wrap"><table><thead><tr>
-            <th class="th-sort" onclick="sortExtrato('date','admin')">Data<span id="ex-a-date"></span></th>
-            <th class="th-sort" onclick="sortExtrato('store','admin')">Loja<span id="ex-a-store"></span></th>
-            <th class="th-sort" onclick="sortExtrato('type','admin')">Tipo<span id="ex-a-type"></span></th>
-            <th class="th-sort" onclick="sortExtrato('desc','admin')">Descrição<span id="ex-a-desc"></span></th>
-            <th class="th-sort" onclick="sortExtrato('value','admin')">Valor<span id="ex-a-value"></span></th>
-            <th class="th-sort" onclick="sortExtrato('resp','admin')">Responsável<span id="ex-a-resp"></span></th>
-            <th>Obs.</th>
-          </tr></thead><tbody id="adminMovementsDetailBody2"></tbody></table></div>
-        </div>
-      </div>
-
-      <!-- Repasses Recebidos -->
-      <div class="inner-tab-panel hidden" id="amov-repasses">
-        <div class="card">
-          <h3 class="section-title">Repasses das lojas</h3>
-          <div id="adminRepassesDashboard" style="margin-bottom:14px"></div>
-          <div class="filter-bar-5x" style="margin-bottom:12px">
-            <div class="field"><label>Loja</label><select id="adminRepasseStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
-            <div class="field"><label>Data inicial</label><input id="adminRepasseStart" type="date" onchange="renderAdminViews()"/></div>
-            <div class="field"><label>Data final</label><input id="adminRepasseEnd" type="date" onchange="renderAdminViews()"/></div>
-            <div class="field"><label>Status</label><select id="adminRepasseStatusFilter" onchange="renderAdminViews()"><option value="">Todos</option><option value="Pendente">Pendente</option><option value="Recebido">Recebido</option></select></div>
-          </div>
-          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Operador</th><th>Saldo Inicial</th><th>Entradas</th><th>Saídas</th><th>Repasse Esperado</th><th>Repasse Informado</th><th>Diferença</th><th>Status</th><th>Confirmado em</th><th>Por</th><th>Ação</th></tr></thead><tbody id="adminRepassesBody"></tbody></table></div>
-        </div>
-      </div>
-
-      <!-- Divergências para revisão -->
-      <div class="inner-tab-panel hidden" id="amov-divergencias">
-        <div class="card">
-          <h3 class="section-title">Divergências para revisão</h3>
-          <div class="filter-bar-5x" style="margin-bottom:8px">
-            <div class="field"><label>Loja</label><select id="adminDivergenceStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
-            <div class="field"><label>Status</label><select id="adminDivergenceStatusFilter" onchange="renderAdminViews()"><option value="Pendente">Pendentes</option><option value="">Todas</option><option value="Revisada">Revisadas</option></select></div>
-          </div>
-          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Responsável</th><th>Tipo</th><th>Esperado</th><th>Encontrado</th><th>Diferença</th><th>Status</th><th>Ação</th></tr></thead><tbody id="adminDivergencesReviewBody"></tbody></table></div>
-        </div>
-      </div>
-
-      <!-- Retificações -->
-      <div class="inner-tab-panel hidden" id="amov-retificacoes">
-        <div class="card">
-          <h3 class="section-title">Solicitações de retificação</h3>
-          <div class="filter-bar-5x" style="margin-bottom:12px">
-            <div class="field"><label>Loja</label><select id="adminRectStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
-            <div class="field"><label>Status</label><select id="adminRectStatusFilter" onchange="renderAdminViews()"><option value="Pendente">Pendentes</option><option value="">Todas</option><option value="Aprovada">Aprovadas</option><option value="Rejeitada">Rejeitadas</option></select></div>
-          </div>
-          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Operador</th><th>Valores (Original → Solicitado)</th><th>Justificativa</th><th>Status</th><th>Ação</th></tr></thead><tbody id="adminRectificationsBody"></tbody></table></div>
-        </div>
-      </div>
-
-      <!-- Documentos por loja -->
-      <div class="inner-tab-panel hidden" id="amov-documentos">
-        <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
-            <h3 class="section-title" style="margin:0">Pasta de documentos por loja</h3>
-            <button id="reloadDocumentsBtn" class="btn btn-sm" onclick="reloadStoreDocuments()">Recarregar</button>
-          </div>
-          <p class="subtle" style="margin-bottom:14px">Arquivos enviados pelos operadores. Visualize, baixe ou limpe a pasta de cada loja.</p>
-          <div id="adminDocFolders"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============================================================
-         ADMIN: RELATÓRIOS
-    ============================================================ -->
-    <section class="page hidden" id="adminRelatorios">
-      <div class="card">
-        <h3 class="section-title">Relatórios do cliente</h3>
-        <div class="form-grid three" style="margin-bottom:18px">
-          <div class="field"><label>Loja / caixa</label><select id="clientReportStore" onchange="renderAll()"><option value="">Todas</option></select></div>
-          <div class="field"><label>Operador</label><select id="clientReportOperator" onchange="renderAll()"><option value="">Todos</option></select></div>
-          <div class="field"><label>Data inicial</label><input id="clientReportStart" type="date" onchange="renderAll()"/></div>
-          <div class="field"><label>Data final</label><input id="clientReportEnd" type="date" onchange="renderAll()"/></div>
-        </div>
-        <div class="report-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
-          <div class="report-card" id="rpt_fech" data-submod-card="sub_rel_fech">
-            <h4>Fechamento por Loja</h4>
-            <p class="subtle">Saldo inicial, entradas, saídas, repasse, saldo final e divergência por unidade.</p>
-            <div class="btn-row"><button class="btn" onclick="exportClientMovementsCSV()">Exportar CSV</button><button class="btn" onclick="exportClientMovementsPDF()">Exportar PDF</button></div>
-          </div>
-          <div class="report-card" id="rpt_cons" data-submod-card="sub_rel_cons">
-            <h4>Consolidado por Empresa</h4>
-            <p class="subtle">Total de entradas, saídas, repasses e divergências no período.</p>
-            <div class="btn-row"><button class="btn" onclick="exportConsolidadoCSV()">Exportar CSV</button><button class="btn" onclick="exportConsolidadoPDF()">Exportar PDF</button></div>
-          </div>
-          <div class="report-card" id="rpt_rep" data-submod-card="sub_rel_rep">
-            <h4>Repasses ao Caixa Central</h4>
-            <p class="subtle">Valores entregues por data, loja, responsável e status.</p>
-            <div class="btn-row"><button class="btn" onclick="exportTransfersCSV()">Exportar CSV</button><button class="btn" onclick="exportTransfersPDF()">Exportar PDF</button></div>
-          </div>
-          <div class="report-card" id="rpt_sai" data-submod-card="sub_rel_sai">
-            <h4>Saídas por Descrição</h4>
-            <p class="subtle">Consolida saídas por categoria e descrição no período.</p>
-            <div class="btn-row"><button class="btn" onclick="exportExpensesCSV()">Exportar CSV</button><button class="btn" onclick="exportExpensesPDF()">Exportar PDF</button></div>
-          </div>
-          <div class="report-card" id="rpt_div" data-submod-card="sub_rel_div">
-            <h4>Divergências por Loja</h4>
-            <p class="subtle">Saldo em caixa, status de revisão e divergências por loja.</p>
-            <div class="btn-row"><button class="btn" onclick="exportClientDivergencesCSV()">Exportar CSV</button><button class="btn" onclick="exportClientDivergencesPDF()">Exportar PDF</button></div>
-          </div>
-          <div class="report-card" id="rpt_azul" data-submod-card="sub_rel_azul">
-            <h4>Exportação Conta Azul</h4>
-            <p class="subtle">Lançamentos (entradas e saídas) no modelo de planilha Excel para importação no Conta Azul. Repasses não entram aqui — use o relatório de Repasses.</p>
-            <div class="btn-row"><button class="btn" onclick="exportContaAzulXLSX()">Exportar Excel (.xlsx)</button></div>
-          </div>
-          <div class="report-card" id="rpt_aud" data-submod-card="sub_rel_aud">
-            <h4>Auditoria Operacional</h4>
-            <p class="subtle">Log de ações: fechamentos, usuários e alterações do sistema.</p>
-            <div class="btn-row"><button class="btn" onclick="exportAuditCSV()">Exportar CSV</button><button class="btn" onclick="exportAuditPDF()">Exportar PDF</button></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============================================================
-         OPERADOR: FECHAMENTO DIÁRIO
-    ============================================================ -->
-    <section class="page hidden" id="closing">
-      <div class="panel-grid">
-
-        <!-- COLUNA ESQUERDA: Formulário -->
-        <div class="card">
-          <h3 class="section-title">Fechamento diário</h3>
-          <input id="closingDate" type="hidden"/>
-          <div class="form-grid">
-            <div class="field"><label>Loja</label><select id="closingStore" onchange="fillClosingResponsible5X();suggestInitialBalance();calc()"></select></div>
-            <div class="field"><label>Turno do fechamento</label><select id="closingShift" required onchange="suggestInitialBalance();calc()"><option>Manhã</option><option>Tarde</option><option>Noite</option><option selected>Integral</option><option>Outro</option></select></div>
-            <div class="field"><label>Responsável</label><select id="closingResponsible"><option value="">Selecione o responsável</option></select></div>
-          </div>
-
-          <!-- Conferência de abertura — inclui saldo inicial informado -->
-          <div class="closing-block">
-            <div class="closing-block-title">Conferência de abertura</div>
-            <div class="summary">
-              <div class="summary-line operator-hidden"><span>Último saldo fechado</span><strong id="previousFinalAfterTransferView">0,00 R$</strong></div>
-              <div class="summary-line operator-hidden"><span>Divergência de abertura</span><strong id="openingDivergenceView">0,00 R$</strong></div>
-              <div class="summary-line"><span>Origem do saldo anterior</span><strong id="openingOriginView">Caixa inicial</strong></div>
-            </div>
-            <div class="kpi-alert warning operator-hidden" id="openingDivergenceAlert" style="display:none;margin-top:10px"></div>
-            <div class="field" style="margin-top:12px">
-              <label>Saldo inicial informado <span class="subtle" id="initialBalanceHint" style="display:none;font-size:12px"></span></label>
-              <input id="initial" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*" value="0"
-                oninput="calc()" onblur="formatCurrencyInput(this)" onfocus="selectOnFocus(this)"/>
-            </div>
-          </div>
-
-          <!-- BLOCO: Movimento do caixa -->
-          <div class="closing-block">
-            <div class="closing-block-title">Movimento do caixa</div>
-
-            <div class="launch-box" id="entries">
-              <div class="launch-box-header">
-                <span>Entradas</span>
-                <button class="btn btn-sm" onclick="addEntry()">+ Adicionar entrada</button>
-              </div>
-              <div class="launch-row">
-                <div class="field"><label>Descrição</label><input class="entry-desc" value="Entrada em Dinheiro"/></div>
-                <div class="field"><label>Valor (R$)</label><input class="entry" data-money="br" type="text" inputmode="decimal" pattern="[0-9]*[,.]?[0-9]*" value="0" oninput="calc()"/></div>
-                <button class="btn btn-icon" onclick="removeLaunchRow(this)">×</button>
-              </div>
-            </div>
-
-            <div class="launch-box" id="expenses" style="margin-top:12px">
-              <div class="launch-box-header">
-                <span>Saídas</span>
-                <button class="btn btn-sm" onclick="addExpense()">+ Adicionar saída</button>
-              </div>
-              <div class="launch-row expense-row">
-                <div class="field"><label>Descrição da saída</label><input class="expense-desc" placeholder="Ex: ajuda de custo motoboy"/></div>
-                <div class="field"><label>Valor (R$)</label><input class="expense" data-money="br" type="text" inputmode="decimal" pattern="[0-9]*[,.]?[0-9]*" value="0" oninput="calc()"/></div>
-                <button class="btn btn-icon" onclick="removeLaunchRow(this)">×</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- BLOCO: Repasse -->
-          <div class="closing-block" style="margin-top:14px">
-            <div class="closing-block-title">Repasse</div>
-            <div class="summary">
-              <div class="summary-line">
-                <span>Repasse sugerido <span class="subtle">(saldo − fundo)</span></span>
-                <strong id="suggestedTransferView">0,00 R$</strong>
-              </div>
-            </div>
-            <div class="field" style="margin-top:10px">
-              <label>Repasse informado</label>
-              <input id="transfer" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*" value="0"
-                oninput="calc()" onblur="formatCurrencyInput(this)" onfocus="selectOnFocus(this)"/>
-            </div>
-            <div class="btn-row" style="margin-top:10px;gap:8px;align-items:center;flex-wrap:wrap">
-              <button class="btn btn-sm" onclick="useSuggestedTransfer()" title="Preenche o repasse com o valor sugerido">+ Usar sugerido</button>
-              <button class="btn btn-primary" id="confirmTransferBtn" onclick="confirmTransfer()">Confirmar repasse</button>
-              <span id="transferConfirmedBadge" class="status success" style="display:none;padding:4px 10px;font-size:13px">✓ Repasse confirmado</span>
-            </div>
-          </div>
-
-          <!-- Observações -->
-          <div class="field full" style="margin-top:14px">
-            <label>Observações <span class="subtle">(obrigatório em divergência crítica)</span></label>
-            <textarea id="closingNotes" placeholder="Ex: entregue ao responsável, ficou no caixa, justificativa da diferença."></textarea>
-          </div>
-
-          <!-- Anexos -->
-          <div class="attachment-box">
-            <h4>Anexos <span class="subtle">(Opcional)</span></h4>
-            <div class="attachment-actions">
-              <label for="closingAttachments">Selecionar arquivo</label>
-              <input accept="image/*,.pdf" id="closingAttachments" multiple type="file" onchange="handleAttachments(this.files)"/>
-              <label for="closingCamera">Tirar foto</label>
-              <input accept="image/*" capture="environment" id="closingCamera" type="file" onchange="handleAttachments(this.files)"/>
-            </div>
-            <div class="attachment-list" id="attachmentList">Nenhum anexo selecionado.</div>
-          </div>
-
-          <div class="btn-row" style="margin-top:16px">
-            <button class="btn btn-brand" id="saveClosingBtn" onclick="handleSaveClosingClick(event)">✓ Realizar fechamento</button>
-          </div>
-        </div>
-
-        <!-- COLUNA DIREITA: Conferência 5X — oculta para operador -->
-        <div class="card operator-hidden" id="conferencia5X">
-          <h3 class="section-title">Conferência 5X</h3>
-
-          <!-- Bloco 1: Movimento calculado -->
-          <div class="conf-block">
-            <div class="conf-block-title">Movimento do caixa</div>
-            <div class="summary">
-              <div class="summary-line"><span>Total de entradas</span><strong id="totalEntries">0,00 R$</strong></div>
-              <div class="summary-line"><span>Total de saídas</span><strong id="totalExpenses">0,00 R$</strong></div>
-              <div class="summary-line summary-line-highlight"><span>Saldo em caixa antes do repasse</span><strong id="expectedCash">0,00 R$</strong></div>
-            </div>
-          </div>
-
-          <!-- Bloco 2: Saldo após repasse -->
-          <div class="conf-block">
-            <div class="conf-block-title">Repasse</div>
-            <div class="summary">
-              <div class="summary-line summary-line-highlight"><span>Saldo final após repasse</span><strong id="cashBalance">0,00 R$</strong></div>
-            </div>
-          </div>
-
-          <!-- Bloco 3: Fundo padrão e divergência -->
-          <div class="conf-block">
-            <div class="conf-block-title">Fundo padrão da loja</div>
-            <div class="summary">
-              <div class="summary-line"><span>Fundo padrão</span><strong id="standardFundView">0,00 R$</strong></div>
-              <div class="summary-line"><span>Divergência 5X (fundo)</span><strong id="fundDivergenceView">0,00 R$</strong></div>
-              <div class="summary-line"><span>Status</span><strong class="status info" id="closingStatusView">-</strong></div>
-            </div>
-          </div>
-
-          <!-- Bloco 4: Regras e leitura automática -->
-          <div class="box" style="margin-top:12px"><h4>Regras para este operador</h4><div id="operatorRules"></div></div>
-          <div class="box" style="margin-top:10px"><h4>Leitura automática 5X</h4><pre class="closing-insight" id="closingInsight">Preencha os valores para gerar a leitura.</pre></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============================================================
-         OPERADOR: MEU HISTÓRICO
-    ============================================================ -->
-    <section class="page hidden" id="operatorHistory">
-      <div class="card">
-        <h3 class="section-title">Meu histórico de fechamentos</h3>
-        <div class="filter-bar-5x">
-          <div class="field"><label>Data inicial</label><input id="opHistStart" type="date" onchange="renderOperatorViews()"/></div>
-          <div class="field"><label>Data final</label><input id="opHistEnd" type="date" onchange="renderOperatorViews()"/></div>
-        </div>
-        <div class="table-wrap">
-          <table><thead><tr><th>Data</th><th>Loja</th><th>Entradas</th><th>Saídas</th><th>Repasse</th><th class="operator-hidden">Divergência</th><th>Tipo</th><th class="operator-hidden">Status</th><th>Retificação</th><th>Anexos</th></tr></thead>
-          <tbody id="operatorHistoryBody"></tbody></table>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============================================================
-         MASTER: MANUAL DE IMPLANTAÇÃO (exclusivo Gestão 5X)
-    ============================================================ -->
-    <section class="page hidden" id="manualImplantacao">
+    <div class="inner-tab-panel hidden" id="sis-manual"><div id="manualImplantacao">
 
       <!-- Cabeçalho do manual com botão PDF -->
       <div class="card" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -2027,7 +1607,428 @@
 
       </div><!-- fim man-operador -->
 
+    </div></div><!-- fim manualImplantacao / sis-manual -->
     </section>
+
+    <!-- ============================================================
+         ADMIN: DASHBOARD
+    ============================================================ -->
+    <section class="page hidden" id="adminDashboard">
+      <div class="grid cards">
+        <div class="card clickable-card" onclick="showPage('adminOperacao',document.querySelector('.nav button[data-page=adminOperacao]'));showSubTab('adminOperacao','aop-lojas',document.querySelector('[data-subtab=aop-lojas]'))"><div class="metric-label">Lojas</div><div class="metric-value" id="aStores">0</div></div>
+        <div class="card clickable-card" onclick="showPage('adminFechamento',document.querySelector('.nav button[data-page=adminFechamento]'));showSubTab('adminFechamento','afech-historico',document.querySelector('[data-subtab=afech-historico]'))"><div class="metric-label">Fechamentos</div><div class="metric-value" id="aClosings">0</div></div>
+        <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-divergencias',document.querySelector('[data-subtab=amov-divergencias]'))"><div class="metric-label">Divergências</div><div class="metric-value" id="aDiff">0,00 R$</div></div>
+        <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-repasses',document.querySelector('[data-subtab=amov-repasses]'))"><div class="metric-label">Saldo Central</div><div class="metric-value" id="aSaldoCentral">0,00 R$</div><div class="metric-hint" id="aSaldoCentralHint"></div></div>
+        <div class="card clickable-card" onclick="showPage('adminMovimentacoes',document.querySelector('.nav button[data-page=adminMovimentacoes]'));showSubTab('adminMovimentacoes','amov-retificacoes',document.querySelector('[data-subtab=amov-retificacoes]'))"><div class="metric-label">Retificações</div><div class="metric-value" id="adminPendingRects">0</div><div class="metric-hint">pendentes de aprovação</div></div>
+      </div>
+      <div class="kpi-alert warning" id="adminRectificationAlert" style="display:none;margin-bottom:12px"></div>
+      <div class="card">
+        <h3 class="section-title">Dashboard por loja</h3>
+        <div class="store-dashboard-grid" id="adminStoreDashboard"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3 class="section-title">Últimas movimentações</h3>
+        <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Saldo Inicial</th><th>Entradas</th><th>Saldo Final</th><th>Divergência</th><th>Status</th></tr></thead><tbody id="adminMovementsBody"></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         ADMIN: FECHAMENTO (sub-abas)
+    ============================================================ -->
+    <section class="page hidden" id="adminFechamento">
+      <div class="inner-tabs">
+        <button class="inner-tab-btn active" data-subtab="afech-form"      onclick="showSubTab('adminFechamento','afech-form',this)">Registrar Fechamento</button>
+        <button class="inner-tab-btn"        data-subtab="afech-historico" onclick="showSubTab('adminFechamento','afech-historico',this)">Histórico</button>
+      </div>
+      <div class="inner-tab-panel active" id="afech-form">
+        <div class="card">
+          <p class="subtle" style="margin-bottom:14px">Este módulo só está disponível quando liberado pela Gestão 5X.</p>
+          <!-- Reutiliza o mesmo formulário de fechamento (iframe conceitual - aqui incluído diretamente) -->
+          <div id="adminClosingPlaceholder">
+            <p class="subtle">Use o menu <strong>Fechamento Diário</strong> do perfil Operador para registrar fechamentos, ou solicite que a Gestão 5X libere este módulo.</p>
+          </div>
+        </div>
+      </div>
+      <div class="inner-tab-panel hidden" id="afech-historico">
+        <div class="card">
+          <h3 class="section-title">Histórico de fechamentos da empresa</h3>
+          <div class="filter-bar-5x">
+            <div class="field"><label>Loja</label><select id="adminMovementStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Operador</label><select id="adminMovementOperatorFilter" onchange="renderAdminViews()"><option value="">Todos</option></select></div>
+            <div class="field"><label>Data inicial</label><input id="adminMovStart" type="date" onchange="renderAdminViews()"/></div>
+            <div class="field"><label>Data final</label><input id="adminMovEnd" type="date" onchange="renderAdminViews()"/></div>
+          </div>
+          <div class="table-wrap">
+            <table><thead><tr><th>Data</th><th>Loja</th><th>Turno</th><th>Responsável</th><th>Saldo Inicial</th><th>Entradas</th><th>Saídas</th><th>Repasse</th><th>Saldo Final</th><th>Divergência</th><th>Status</th></tr></thead>
+            <tbody id="adminMovementsDetailBody"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         ADMIN: OPERAÇÃO (sub-abas)
+    ============================================================ -->
+    <section class="page hidden" id="adminOperacao">
+      <div class="inner-tabs">
+        <button class="inner-tab-btn active" data-subtab="aop-regras" onclick="showSubTab('adminOperacao','aop-regras',this)">Regras</button>
+        <button class="inner-tab-btn"        data-subtab="aop-lojas"  onclick="showSubTab('adminOperacao','aop-lojas',this)">Lojas</button>
+      </div>
+      <div class="inner-tab-panel active" id="aop-regras">
+        <div class="card"><h3 class="section-title">Regras operacionais</h3><div id="adminRulesList"></div></div>
+      </div>
+      <div class="inner-tab-panel hidden" id="aop-lojas">
+        <div class="card">
+          <h3 class="section-title">Lojas da empresa</h3>
+          <div class="table-wrap"><table><thead><tr><th>Loja</th><th>Código</th><th>Tipo</th><th>Fundo padrão</th><th>Status</th></tr></thead><tbody id="adminStoresBody"></tbody></table></div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <h3 class="section-title">Definir Saldo Inicial do Caixa</h3>
+          <p class="subtle" style="margin-bottom:12px">Use para definir o saldo inicial de uma loja ao implantar ou abrir um novo caixa.</p>
+          <div class="form-grid">
+            <div class="field"><label>Loja</label><select id="openingAdjustmentStore"></select></div>
+            <div class="field"><label>Data de início</label><input id="openingAdjustmentDate" type="date"/></div>
+            <div class="field"><label>Turno de início</label><select id="openingAdjustmentShift"><option>Manhã</option><option>Tarde</option><option>Noite</option><option selected>Integral</option><option>Outro</option></select></div>
+            <div class="field"><label>Valor autorizado</label><input id="openingAdjustmentAmount" data-money="br" type="text" inputmode="decimal" pattern="[0-9]*[,.]?[0-9]*" value="0"/></div>
+            <div class="field"><label>Motivo</label><select id="openingAdjustmentReason"><option>Início da operação no sistema</option><option>Caixa limpo</option><option>Complemento de fundo</option><option>Retirada autorizada</option><option>Ajuste operacional</option><option>Correção de divergência anterior</option><option>Outro</option></select></div>
+            <div class="field full"><label>Observações</label><textarea id="openingAdjustmentNotes"></textarea></div>
+          </div>
+          <div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" onclick="saveOpeningAdjustment()">Salvar saldo autorizado</button></div>
+          <div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Loja</th><th>Data</th><th>Turno</th><th>Valor</th><th>Motivo</th><th>Autorizado por</th></tr></thead><tbody id="openingAdjustmentsBody"></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         ADMIN: MOVIMENTAÇÕES (sub-abas)
+    ============================================================ -->
+    <section class="page hidden" id="adminMovimentacoes">
+      <div class="inner-tabs">
+        <button class="inner-tab-btn active" data-subtab="amov-resumo"        onclick="showSubTab('adminMovimentacoes','amov-resumo',this)">Resumo por Fechamento</button>
+        <button class="inner-tab-btn"        data-subtab="amov-repasses"      onclick="showSubTab('adminMovimentacoes','amov-repasses',this)">Repasses</button>
+        <button class="inner-tab-btn"        data-subtab="amov-divergencias"  onclick="showSubTab('adminMovimentacoes','amov-divergencias',this)">Divergências</button>
+        <button class="inner-tab-btn"        data-subtab="amov-retificacoes"  onclick="showSubTab('adminMovimentacoes','amov-retificacoes',this)">Retificações</button>
+        <button class="inner-tab-btn"        data-subtab="amov-extrato"       onclick="showSubTab('adminMovimentacoes','amov-extrato',this)">Extrato</button>
+        <button class="inner-tab-btn"        data-subtab="amov-documentos"    onclick="showSubTab('adminMovimentacoes','amov-documentos',this)">Documentos</button>
+      </div>
+
+      <!-- Resumo por Fechamento (Admin) -->
+      <div class="inner-tab-panel active" id="amov-resumo">
+        <div class="card">
+          <h3 class="section-title">Resumo por Fechamento</h3>
+          <div id="adminResumoSaldoDashboard" style="margin-bottom:14px"></div>
+          <div class="filter-bar-5x" style="margin-bottom:12px">
+            <div class="field"><label>Loja</label><select id="adminResumoStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Operador</label><select id="adminResumoOperatorFilter" onchange="renderAdminViews()"><option value="">Todos</option></select></div>
+            <div class="field"><label>Data inicial</label><input id="adminResumoStart" type="date" onchange="renderAdminViews()"/></div>
+            <div class="field"><label>Data final</label><input id="adminResumoEnd" type="date" onchange="renderAdminViews()"/></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr>
+            <th class="th-sort" onclick="sortResumo('store','admin')">Loja<span id="rs-a-store"></span></th>
+            <th class="th-sort" onclick="sortResumo('date','admin')">Data / Turno<span id="rs-a-date"></span></th>
+            <th class="th-sort" onclick="sortResumo('responsible','admin')">Responsável<span id="rs-a-responsible"></span></th>
+            <th class="th-sort" onclick="sortResumo('initial','admin')">Saldo Inicial<span id="rs-a-initial"></span></th>
+            <th class="th-sort" onclick="sortResumo('entries','admin')">Entradas<span id="rs-a-entries"></span></th>
+            <th class="th-sort" onclick="sortResumo('expenses','admin')">Saídas<span id="rs-a-expenses"></span></th>
+            <th class="th-sort" onclick="sortResumo('saldoCaixa','admin')">Saldo de Caixa<span id="rs-a-saldoCaixa"></span></th>
+            <th class="th-sort" onclick="sortResumo('repEsperado','admin')">Repasse Esperado<span id="rs-a-repEsperado"></span></th>
+            <th class="th-sort" onclick="sortResumo('transfer','admin')">Repasse Confirmado<span id="rs-a-transfer"></span></th>
+            <th class="th-sort" onclick="sortResumo('saldoFinal','admin')">Saldo Final<span id="rs-a-saldoFinal"></span></th>
+            <th>Diferença</th><th>Recebimento</th>
+          </tr></thead><tbody id="adminResumoBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Extrato com filtros -->
+      <div class="inner-tab-panel hidden" id="amov-extrato">
+        <div class="card">
+          <h3 class="section-title">Movimentações da empresa</h3>
+          <div class="filter-bar-5x" style="margin-bottom:12px">
+            <div class="field"><label>Loja</label><select id="adminExtratStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Operador</label><select id="adminExtratOperatorFilter" onchange="renderAdminViews()"><option value="">Todos</option></select></div>
+            <div class="field"><label>Data inicial</label><input id="adminExtratStart" type="date" onchange="renderAdminViews()"/></div>
+            <div class="field"><label>Data final</label><input id="adminExtratEnd" type="date" onchange="renderAdminViews()"/></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr>
+            <th class="th-sort" onclick="sortExtrato('date','admin')">Data<span id="ex-a-date"></span></th>
+            <th class="th-sort" onclick="sortExtrato('store','admin')">Loja<span id="ex-a-store"></span></th>
+            <th class="th-sort" onclick="sortExtrato('type','admin')">Tipo<span id="ex-a-type"></span></th>
+            <th class="th-sort" onclick="sortExtrato('desc','admin')">Descrição<span id="ex-a-desc"></span></th>
+            <th class="th-sort" onclick="sortExtrato('value','admin')">Valor<span id="ex-a-value"></span></th>
+            <th class="th-sort" onclick="sortExtrato('resp','admin')">Responsável<span id="ex-a-resp"></span></th>
+            <th>Obs.</th>
+          </tr></thead><tbody id="adminMovementsDetailBody2"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Repasses Recebidos -->
+      <div class="inner-tab-panel hidden" id="amov-repasses">
+        <div class="card">
+          <h3 class="section-title">Repasses das lojas</h3>
+          <div id="adminRepassesDashboard" style="margin-bottom:14px"></div>
+          <div class="filter-bar-5x" style="margin-bottom:12px">
+            <div class="field"><label>Loja</label><select id="adminRepasseStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Data inicial</label><input id="adminRepasseStart" type="date" onchange="renderAdminViews()"/></div>
+            <div class="field"><label>Data final</label><input id="adminRepasseEnd" type="date" onchange="renderAdminViews()"/></div>
+            <div class="field"><label>Status</label><select id="adminRepasseStatusFilter" onchange="renderAdminViews()"><option value="">Todos</option><option value="Pendente">Pendente</option><option value="Recebido">Recebido</option></select></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Operador</th><th>Saldo Inicial</th><th>Entradas</th><th>Saídas</th><th>Repasse Esperado</th><th>Repasse Informado</th><th>Diferença</th><th>Status</th><th>Confirmado em</th><th>Por</th><th>Ação</th></tr></thead><tbody id="adminRepassesBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Divergências para revisão -->
+      <div class="inner-tab-panel hidden" id="amov-divergencias">
+        <div class="card">
+          <h3 class="section-title">Divergências para revisão</h3>
+          <div class="filter-bar-5x" style="margin-bottom:8px">
+            <div class="field"><label>Loja</label><select id="adminDivergenceStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Status</label><select id="adminDivergenceStatusFilter" onchange="renderAdminViews()"><option value="Pendente">Pendentes</option><option value="">Todas</option><option value="Revisada">Revisadas</option></select></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Responsável</th><th>Tipo</th><th>Esperado</th><th>Encontrado</th><th>Diferença</th><th>Status</th><th>Ação</th></tr></thead><tbody id="adminDivergencesReviewBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Retificações -->
+      <div class="inner-tab-panel hidden" id="amov-retificacoes">
+        <div class="card">
+          <h3 class="section-title">Solicitações de retificação</h3>
+          <div class="filter-bar-5x" style="margin-bottom:12px">
+            <div class="field"><label>Loja</label><select id="adminRectStoreFilter" onchange="renderAdminViews()"><option value="">Todas</option></select></div>
+            <div class="field"><label>Status</label><select id="adminRectStatusFilter" onchange="renderAdminViews()"><option value="Pendente">Pendentes</option><option value="">Todas</option><option value="Aprovada">Aprovadas</option><option value="Rejeitada">Rejeitadas</option></select></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Operador</th><th>Valores (Original → Solicitado)</th><th>Justificativa</th><th>Status</th><th>Ação</th></tr></thead><tbody id="adminRectificationsBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Documentos por loja -->
+      <div class="inner-tab-panel hidden" id="amov-documentos">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+            <h3 class="section-title" style="margin:0">Pasta de documentos por loja</h3>
+            <button id="reloadDocumentsBtn" class="btn btn-sm" onclick="reloadStoreDocuments()">Recarregar</button>
+          </div>
+          <p class="subtle" style="margin-bottom:14px">Arquivos enviados pelos operadores. Visualize, baixe ou limpe a pasta de cada loja.</p>
+          <div id="adminDocFolders"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         ADMIN: RELATÓRIOS
+    ============================================================ -->
+    <section class="page hidden" id="adminRelatorios">
+      <div class="card">
+        <h3 class="section-title">Relatórios do cliente</h3>
+        <div class="form-grid three" style="margin-bottom:18px">
+          <div class="field"><label>Loja / caixa</label><select id="clientReportStore" onchange="renderAll()"><option value="">Todas</option></select></div>
+          <div class="field"><label>Operador</label><select id="clientReportOperator" onchange="renderAll()"><option value="">Todos</option></select></div>
+          <div class="field"><label>Data inicial</label><input id="clientReportStart" type="date" onchange="renderAll()"/></div>
+          <div class="field"><label>Data final</label><input id="clientReportEnd" type="date" onchange="renderAll()"/></div>
+        </div>
+        <div class="report-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+          <div class="report-card" id="rpt_fech" data-submod-card="sub_rel_fech">
+            <h4>Fechamento por Loja</h4>
+            <p class="subtle">Saldo inicial, entradas, saídas, repasse, saldo final e divergência por unidade.</p>
+            <div class="btn-row"><button class="btn" onclick="exportClientMovementsCSV()">Exportar CSV</button><button class="btn" onclick="exportClientMovementsPDF()">Exportar PDF</button></div>
+          </div>
+          <div class="report-card" id="rpt_cons" data-submod-card="sub_rel_cons">
+            <h4>Consolidado por Empresa</h4>
+            <p class="subtle">Total de entradas, saídas, repasses e divergências no período.</p>
+            <div class="btn-row"><button class="btn" onclick="exportConsolidadoCSV()">Exportar CSV</button><button class="btn" onclick="exportConsolidadoPDF()">Exportar PDF</button></div>
+          </div>
+          <div class="report-card" id="rpt_rep" data-submod-card="sub_rel_rep">
+            <h4>Repasses ao Caixa Central</h4>
+            <p class="subtle">Valores entregues por data, loja, responsável e status.</p>
+            <div class="btn-row"><button class="btn" onclick="exportTransfersCSV()">Exportar CSV</button><button class="btn" onclick="exportTransfersPDF()">Exportar PDF</button></div>
+          </div>
+          <div class="report-card" id="rpt_sai" data-submod-card="sub_rel_sai">
+            <h4>Saídas por Descrição</h4>
+            <p class="subtle">Consolida saídas por categoria e descrição no período.</p>
+            <div class="btn-row"><button class="btn" onclick="exportExpensesCSV()">Exportar CSV</button><button class="btn" onclick="exportExpensesPDF()">Exportar PDF</button></div>
+          </div>
+          <div class="report-card" id="rpt_div" data-submod-card="sub_rel_div">
+            <h4>Divergências por Loja</h4>
+            <p class="subtle">Saldo em caixa, status de revisão e divergências por loja.</p>
+            <div class="btn-row"><button class="btn" onclick="exportClientDivergencesCSV()">Exportar CSV</button><button class="btn" onclick="exportClientDivergencesPDF()">Exportar PDF</button></div>
+          </div>
+          <div class="report-card" id="rpt_azul" data-submod-card="sub_rel_azul">
+            <h4>Exportação Conta Azul</h4>
+            <p class="subtle">Lançamentos (entradas e saídas) no modelo de planilha Excel para importação no Conta Azul. Repasses não entram aqui — use o relatório de Repasses.</p>
+            <div class="btn-row"><button class="btn" onclick="exportContaAzulXLSX()">Exportar Excel (.xlsx)</button></div>
+          </div>
+          <div class="report-card" id="rpt_aud" data-submod-card="sub_rel_aud">
+            <h4>Auditoria Operacional</h4>
+            <p class="subtle">Log de ações: fechamentos, usuários e alterações do sistema.</p>
+            <div class="btn-row"><button class="btn" onclick="exportAuditCSV()">Exportar CSV</button><button class="btn" onclick="exportAuditPDF()">Exportar PDF</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         OPERADOR: FECHAMENTO DIÁRIO
+    ============================================================ -->
+    <section class="page hidden" id="closing">
+      <div class="panel-grid">
+
+        <!-- COLUNA ESQUERDA: Formulário -->
+        <div class="card">
+          <h3 class="section-title">Fechamento diário</h3>
+          <input id="closingDate" type="hidden"/>
+          <div class="form-grid">
+            <div class="field"><label>Loja</label><select id="closingStore" onchange="fillClosingResponsible5X();suggestInitialBalance();calc()"></select></div>
+            <div class="field"><label>Turno do fechamento</label><select id="closingShift" required onchange="suggestInitialBalance();calc()"><option>Manhã</option><option>Tarde</option><option>Noite</option><option selected>Integral</option><option>Outro</option></select></div>
+            <div class="field"><label>Responsável</label><select id="closingResponsible"><option value="">Selecione o responsável</option></select></div>
+          </div>
+
+          <!-- Conferência de abertura — inclui saldo inicial informado -->
+          <div class="closing-block">
+            <div class="closing-block-title">Conferência de abertura</div>
+            <div class="summary">
+              <div class="summary-line operator-hidden"><span>Último saldo fechado</span><strong id="previousFinalAfterTransferView">0,00 R$</strong></div>
+              <div class="summary-line operator-hidden"><span>Divergência de abertura</span><strong id="openingDivergenceView">0,00 R$</strong></div>
+              <div class="summary-line"><span>Origem do saldo anterior</span><strong id="openingOriginView">Caixa inicial</strong></div>
+            </div>
+            <div class="kpi-alert warning operator-hidden" id="openingDivergenceAlert" style="display:none;margin-top:10px"></div>
+            <div class="field" style="margin-top:12px">
+              <label>Saldo inicial informado <span class="subtle" id="initialBalanceHint" style="display:none;font-size:12px"></span></label>
+              <input id="initial" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*" value="0"
+                oninput="calc()" onblur="formatCurrencyInput(this)" onfocus="selectOnFocus(this)"/>
+            </div>
+          </div>
+
+          <!-- BLOCO: Movimento do caixa -->
+          <div class="closing-block">
+            <div class="closing-block-title">Movimento do caixa</div>
+
+            <div class="launch-box" id="entries">
+              <div class="launch-box-header">
+                <span>Entradas</span>
+                <button class="btn btn-sm" onclick="addEntry()">+ Adicionar entrada</button>
+              </div>
+              <div class="launch-row">
+                <div class="field"><label>Descrição</label><input class="entry-desc" value="Entrada em Dinheiro"/></div>
+                <div class="field"><label>Valor (R$)</label><input class="entry" data-money="br" type="text" inputmode="decimal" pattern="[0-9]*[,.]?[0-9]*" value="0" oninput="calc()"/></div>
+                <button class="btn btn-icon" onclick="removeLaunchRow(this)">×</button>
+              </div>
+            </div>
+
+            <div class="launch-box" id="expenses" style="margin-top:12px">
+              <div class="launch-box-header">
+                <span>Saídas</span>
+                <button class="btn btn-sm" onclick="addExpense()">+ Adicionar saída</button>
+              </div>
+              <div class="launch-row expense-row">
+                <div class="field"><label>Descrição da saída</label><input class="expense-desc" placeholder="Ex: ajuda de custo motoboy"/></div>
+                <div class="field"><label>Valor (R$)</label><input class="expense" data-money="br" type="text" inputmode="decimal" pattern="[0-9]*[,.]?[0-9]*" value="0" oninput="calc()"/></div>
+                <button class="btn btn-icon" onclick="removeLaunchRow(this)">×</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- BLOCO: Repasse -->
+          <div class="closing-block" style="margin-top:14px">
+            <div class="closing-block-title">Repasse</div>
+            <div class="summary">
+              <div class="summary-line">
+                <span>Repasse sugerido <span class="subtle">(saldo − fundo)</span></span>
+                <strong id="suggestedTransferView">0,00 R$</strong>
+              </div>
+            </div>
+            <div class="field" style="margin-top:10px">
+              <label>Repasse informado</label>
+              <input id="transfer" data-money="br" type="text" inputmode="decimal" pattern="[0-9.,]*" value="0"
+                oninput="calc()" onblur="formatCurrencyInput(this)" onfocus="selectOnFocus(this)"/>
+            </div>
+            <div class="btn-row" style="margin-top:10px;gap:8px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-sm" onclick="useSuggestedTransfer()" title="Preenche o repasse com o valor sugerido">+ Usar sugerido</button>
+              <button class="btn btn-primary" id="confirmTransferBtn" onclick="confirmTransfer()">Confirmar repasse</button>
+              <span id="transferConfirmedBadge" class="status success" style="display:none;padding:4px 10px;font-size:13px">✓ Repasse confirmado</span>
+            </div>
+          </div>
+
+          <!-- Observações -->
+          <div class="field full" style="margin-top:14px">
+            <label>Observações <span class="subtle">(obrigatório em divergência crítica)</span></label>
+            <textarea id="closingNotes" placeholder="Ex: entregue ao responsável, ficou no caixa, justificativa da diferença."></textarea>
+          </div>
+
+          <!-- Anexos -->
+          <div class="attachment-box">
+            <h4>Anexos <span class="subtle">(Opcional)</span></h4>
+            <div class="attachment-actions">
+              <label for="closingAttachments">Selecionar arquivo</label>
+              <input accept="image/*,.pdf" id="closingAttachments" multiple type="file" onchange="handleAttachments(this.files)"/>
+              <label for="closingCamera">Tirar foto</label>
+              <input accept="image/*" capture="environment" id="closingCamera" type="file" onchange="handleAttachments(this.files)"/>
+            </div>
+            <div class="attachment-list" id="attachmentList">Nenhum anexo selecionado.</div>
+          </div>
+
+          <div class="btn-row" style="margin-top:16px">
+            <button class="btn btn-brand" id="saveClosingBtn" onclick="handleSaveClosingClick(event)">✓ Realizar fechamento</button>
+          </div>
+        </div>
+
+        <!-- COLUNA DIREITA: Conferência 5X — oculta para operador -->
+        <div class="card operator-hidden" id="conferencia5X">
+          <h3 class="section-title">Conferência 5X</h3>
+
+          <!-- Bloco 1: Movimento calculado -->
+          <div class="conf-block">
+            <div class="conf-block-title">Movimento do caixa</div>
+            <div class="summary">
+              <div class="summary-line"><span>Total de entradas</span><strong id="totalEntries">0,00 R$</strong></div>
+              <div class="summary-line"><span>Total de saídas</span><strong id="totalExpenses">0,00 R$</strong></div>
+              <div class="summary-line summary-line-highlight"><span>Saldo em caixa antes do repasse</span><strong id="expectedCash">0,00 R$</strong></div>
+            </div>
+          </div>
+
+          <!-- Bloco 2: Saldo após repasse -->
+          <div class="conf-block">
+            <div class="conf-block-title">Repasse</div>
+            <div class="summary">
+              <div class="summary-line summary-line-highlight"><span>Saldo final após repasse</span><strong id="cashBalance">0,00 R$</strong></div>
+            </div>
+          </div>
+
+          <!-- Bloco 3: Fundo padrão e divergência -->
+          <div class="conf-block">
+            <div class="conf-block-title">Fundo padrão da loja</div>
+            <div class="summary">
+              <div class="summary-line"><span>Fundo padrão</span><strong id="standardFundView">0,00 R$</strong></div>
+              <div class="summary-line"><span>Divergência 5X (fundo)</span><strong id="fundDivergenceView">0,00 R$</strong></div>
+              <div class="summary-line"><span>Status</span><strong class="status info" id="closingStatusView">-</strong></div>
+            </div>
+          </div>
+
+          <!-- Bloco 4: Regras e leitura automática -->
+          <div class="box" style="margin-top:12px"><h4>Regras para este operador</h4><div id="operatorRules"></div></div>
+          <div class="box" style="margin-top:10px"><h4>Leitura automática 5X</h4><pre class="closing-insight" id="closingInsight">Preencha os valores para gerar a leitura.</pre></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         OPERADOR: MEU HISTÓRICO
+    ============================================================ -->
+    <section class="page hidden" id="operatorHistory">
+      <div class="card">
+        <h3 class="section-title">Meu histórico de fechamentos</h3>
+        <div class="filter-bar-5x">
+          <div class="field"><label>Data inicial</label><input id="opHistStart" type="date" onchange="renderOperatorViews()"/></div>
+          <div class="field"><label>Data final</label><input id="opHistEnd" type="date" onchange="renderOperatorViews()"/></div>
+        </div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Data</th><th>Loja</th><th>Entradas</th><th>Saídas</th><th>Repasse</th><th class="operator-hidden">Divergência</th><th>Tipo</th><th class="operator-hidden">Status</th><th>Retificação</th><th>Anexos</th></tr></thead>
+          <tbody id="operatorHistoryBody"></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         MANUAL 5X (aninhado dentro de Sistema — exclusivo Gestão 5X)
+    ============================================================ -->
 
     <!-- ============================================================
          OPERADOR: REGRAS DA LOJA
@@ -2233,6 +2234,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="src/utils.js"></script>
+<script src="src/searchableSelect.js"></script>
 <script src="src/supabaseClient.js"></script>
 <script src="src/auth.js"></script>
 <script src="src/permissions.js"></script>

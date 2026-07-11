@@ -57,6 +57,7 @@ async function init() {
 
   /* Popula selects estáticos */
   fillSelects();
+  if (window.enhanceAllCompanySelects) enhanceAllCompanySelects();
   renderAll();
   bindCurrencyInputs();
   if (window.bindClosingEvents) bindClosingEvents();

@@ -83,7 +83,6 @@ const NAV_ICONS = {
   fechamentos:      `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
   relatorios:       `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
   sistema:          `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
-  manualImplantacao:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
   adminDashboard:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>`,
   adminFechamento:  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
   adminOperacao:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
@@ -100,12 +99,20 @@ const MASTER_NAV = [
   { page: 'dashboard',        label: 'Dashboard'    },
   { page: 'cadastros',        label: 'Cadastros'    },
   { page: 'operacao',         label: 'Operação'     },
-  { page: 'fechamentos',      label: 'Fechamentos'  },
+  { page: 'fechamentos',      label: 'Fechamentos & Clientes' },
   { page: 'relatorios',       label: 'Relatórios'   },
   { page: 'sistema',          label: 'Sistema'      },
-  { page: 'manualImplantacao',label: 'Manual 5X'    },
-  { page: 'closing',          label: 'Fechamento'   },
-  { page: 'adminOperacao',    label: 'Op. Cliente'  },
+];
+
+/* Grupo de páginas irmãs acessadas a partir do item "Fechamentos & Clientes":
+   Fechamentos (visão global), Fechamento Manual (mesma tela do operador) e
+   Op. Cliente (Regras/Lojas por empresa — mesma tela do módulo Operação do Admin).
+   Cada uma continua sendo sua própria <section id="..."> porque é reaproveitada
+   por outros perfis (operator/admin); aqui só trocamos entre elas via showPage. */
+const MASTER_OPS_GROUP = [
+  { page: 'fechamentos',   label: 'Fechamentos' },
+  { page: 'closing',       label: 'Fechamento Manual' },
+  { page: 'adminOperacao', label: 'Op. Cliente' },
 ];
 
 /* Alias herdado — mantido para compatibilidade com state.modules antigos */
@@ -216,13 +223,22 @@ function firstAllowedSubTab(pageId) {
 /* ============================================================
    SIDEBAR DINÂMICA
 ============================================================ */
+/* Página cujo botão deve aparecer marcado como ativo na sidebar.
+   Guardada à parte porque renderSidebarByPermissions() reconstrói o
+   <nav> inteiro (nav.innerHTML = ...) toda vez que roda — inclusive
+   dentro de applyModuleAccess(), chamado a cada showPage() — então
+   qualquer classList.add('active') feito antes dela é perdido se não
+   for reaplicado depois da reconstrução. */
+let activeSidebarPage = null;
+
 function renderSidebarByPermissions() {
   const nav = document.querySelector('.nav');
   if (!nav) return;
 
   const navBtn = (page, label) => {
     const icon = NAV_ICONS[page] ? `<span class="nav-icon">${NAV_ICONS[page]}</span>` : '';
-    return `<button data-page="${page}" onclick="showPage('${page}',this)">${icon}<span class="nav-label">${label}</span></button>`;
+    const active = page === activeSidebarPage ? ' active' : '';
+    return `<button class="${active.trim()}" data-page="${page}" onclick="showPage('${page}',this)">${icon}<span class="nav-label">${label}</span></button>`;
   };
 
   if (role === 'master') {
@@ -288,7 +304,7 @@ const PAGE_TITLES = {
   dashboard:   ['Dashboard Gestão 5X', 'Visão executiva de todas as empresas.'],
   cadastros:   ['Cadastros', 'Empresas, lojas, usuários e implantação.'],
   operacao:    ['Operação', 'Regras, configurações e módulos por empresa.'],
-  fechamentos: ['Fechamentos', 'Movimentações, extrato e divergências.'],
+  fechamentos: ['Fechamentos & Clientes', 'Movimentações globais, fechamento manual e operação por cliente.'],
   relatorios:  ['Relatórios', 'Exportações gerenciais e operacionais.'],
   sistema:     ['Sistema', 'Configurações, backup e logs de auditoria.'],
   adminDashboard:     ['Dashboard da Empresa', 'Métricas e resumo operacional.'],
@@ -300,10 +316,26 @@ const PAGE_TITLES = {
   operatorHistory:     ['Meu Histórico', 'Seus fechamentos anteriores.'],
   operatorDocumentos:  ['Documentos', 'Envie fotos, comprovantes e arquivos para a pasta da sua loja.'],
   operatorRulesPage:   ['Regras da Loja', 'Regras operacionais para este caixa.'],
-  manualImplantacao:['Manual de Implantação', 'Referência técnica e operacional — exclusivo Gestão 5X.'],
 };
 
-function showPage(id, btn) {
+/* Insere/atualiza a faixa de troca entre Fechamentos / Fechamento Manual / Op. Cliente
+   no topo da página ativa — exclusivo do Master, só aparece quando uma das 3 páginas do
+   grupo está em exibição. */
+function renderMasterOpsGroupNav(activeId) {
+  document.querySelectorAll('.master-ops-group-nav').forEach((el) => el.remove());
+  if (role !== 'master' || !MASTER_OPS_GROUP.some((g) => g.page === activeId)) return;
+  const section = $(activeId);
+  if (!section) return;
+  const bar = document.createElement('div');
+  bar.className = 'inner-tabs master-ops-group-nav';
+  bar.innerHTML = MASTER_OPS_GROUP.map(({ page, label }) => {
+    const active = page === activeId ? ' active' : '';
+    return `<button class="inner-tab-btn${active}" onclick="showPage('${page}')">${label}</button>`;
+  }).join('');
+  section.insertBefore(bar, section.firstChild);
+}
+
+function showPage(id) {
   /* Proteção dupla — bloqueia mesmo chamada via console */
   if (role !== 'master') {
     if (!currentUser) { if (window.logout) logout(); return; }
@@ -314,19 +346,17 @@ function showPage(id, btn) {
         if (window.logout) logout();
         return;
       }
-      id = allowed; btn = null;
+      id = allowed;
     }
   }
 
   all('.page').forEach((p) => p.classList.add('hidden'));
   $(id)?.classList.remove('hidden');
+  renderMasterOpsGroupNav(id);
 
-  document.querySelectorAll('.nav button').forEach((b) => b.classList.remove('active'));
-  if (btn) {
-    btn.classList.add('active');
-  } else {
-    document.querySelector(`.nav button[data-page="${id}"]`)?.classList.add('active');
-  }
+  /* Páginas do grupo Fechamentos/Fechamento Manual/Op. Cliente marcam o
+     mesmo botão "Fechamentos & Clientes" como ativo na sidebar. */
+  activeSidebarPage = MASTER_OPS_GROUP.some((g) => g.page === id) ? 'fechamentos' : id;
 
   const [title, subtitle] = PAGE_TITLES[id] || [id, ''];
   text('pageTitle', title);
@@ -360,9 +390,10 @@ function showSubTab(pageId, tabId, btn) {
   }
   const page = $(pageId);
   if (!page) return;
-  page.querySelectorAll('.inner-tab-panel').forEach((p) => p.classList.add('hidden'));
+  /* :scope > evita afetar sub-abas aninhadas (ex.: Manual 5X dentro de Sistema) */
+  page.querySelectorAll(':scope > .inner-tab-panel').forEach((p) => p.classList.add('hidden'));
   $(tabId)?.classList.remove('hidden');
-  page.querySelectorAll('.inner-tab-btn').forEach((b) => b.classList.remove('active'));
+  page.querySelectorAll(':scope > .inner-tabs > .inner-tab-btn').forEach((b) => b.classList.remove('active'));
   btn?.classList.add('active');
 }
 
@@ -459,11 +490,11 @@ async function saveModules() {
 
 /* Exportação global */
 Object.assign(window, {
-  MODULE_TREE, MASTER_NAV, PAGE_ALIAS_GROUPS, PAGE_TITLES, NAV_ICONS,
+  MODULE_TREE, MASTER_NAV, MASTER_OPS_GROUP, PAGE_ALIAS_GROUPS, PAGE_TITLES, NAV_ICONS,
   defaultModuleConfig, syncModuleAliases, mergeModuleConfig, getModuleConfig,
   isPageAllowed, isSubTabAllowed, isCardAllowed,
   firstAllowedPage, firstAllowedSubTab,
-  renderSidebarByPermissions, applyModuleAccess,
+  renderSidebarByPermissions, applyModuleAccess, renderMasterOpsGroupNav,
   showPage, showSubTab, setupMenu,
   toggleSidebar, closeSidebar,
   onParentModuleChange, draftModules, saveModules,
