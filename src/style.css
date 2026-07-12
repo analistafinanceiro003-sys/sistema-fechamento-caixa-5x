@@ -132,6 +132,7 @@ button,input,select,textarea{font-family:var(--font)}
 .kpi-icon-blue{background:#eff6ff;color:#2563eb}
 .kpi-icon-violet{background:#f5f3ff;color:#7c3aed}
 .kpi-icon-amber{background:#fffbeb;color:#d97706}
+.kpi-icon-rose{background:#fff1f2;color:#e11d48}
 .kpi-trend{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;margin-top:8px;color:var(--muted)}
 .kpi-trend.up{color:var(--success)}
 .kpi-trend.down{color:var(--danger)}
@@ -223,7 +224,7 @@ tr:hover td{background:#fafbfc}
 .alert-item strong{flex:1}
 
 /* Dashboard — Movimento Diário (Entradas x Saídas), SVG puro sem lib de gráficos */
-#dashTrend{position:relative}
+#dashTrend, #adminDashTrend{position:relative}
 .chart-legend{display:flex;align-items:center;gap:18px;font-size:12px;font-weight:650;color:var(--muted);margin-bottom:6px}
 .legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 .legend-dot.entries{background:linear-gradient(180deg,#22d3a8,var(--success))}

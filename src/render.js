@@ -66,17 +66,18 @@ function _daysSince(dateBR) {
   return Math.max(0, Math.round(ms / 86400000));
 }
 
-/* Dados do último gráfico renderizado (Movimento Diário) — usado pelo hover
-   do tooltip para montar o detalhamento por loja sem precisar recalcular. */
-let _dashDailyChartData = [];
-let _dashChartColW = 0;
+/* Dados do último gráfico renderizado por container (Movimento Diário pode
+   aparecer tanto no dashboard do Master quanto no do Admin) — chaveado pelo
+   id do container para os dois não pisarem um no outro no mesmo renderAll(). */
+let _dashChartDataByContainer = {};
 
 /* Gráfico "Movimento Diário — Entradas x Saídas": SVG puro (sem biblioteca),
    barras pareadas por dia dos últimos N dias. Por padrão as barras ficam em
    tom suave; passar o mouse sobre a coluna do dia acende as barras daquele
    dia (gradiente cheio), traça uma linha-guia vertical e mostra um tooltip
-   com o detalhamento por loja daquele dia. */
-function _dailyEntriesExpensesChartHTML(rows, days = 14) {
+   com o detalhamento por loja daquele dia. Reutilizado tanto no dashboard do
+   Master quanto no do Admin (containerId identifica onde ele está). */
+function _dailyEntriesExpensesChartHTML(rows, containerId, days = 14) {
   const buckets = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
@@ -98,12 +99,10 @@ function _dailyEntriesExpensesChartHTML(rows, days = 14) {
     s.entries += entries;
     s.expenses += expenses;
   });
-  _dashDailyChartData = buckets;
-
   const maxVal = Math.max(1, ...buckets.map((b) => Math.max(b.entries, b.expenses)));
   const W = 900, H = 230, padT = 12, padB = 30, plotH = H - padT - padB;
   const colW = W / buckets.length;
-  _dashChartColW = colW;
+  _dashChartDataByContainer[containerId] = { buckets, colW };
   const barGap = Math.max(2, colW * 0.08);
   const barW = Math.max(3, (colW - barGap * 3) / 2);
 
@@ -121,7 +120,7 @@ function _dailyEntriesExpensesChartHTML(rows, days = 14) {
       <rect x="${xEntries.toFixed(1)}" y="${(padT + plotH - hEntries).toFixed(1)}" width="${barW.toFixed(1)}" height="${hEntries.toFixed(1)}" rx="3" class="chart-bar chart-bar-entries" data-idx="${i}"/>
       <rect x="${xExpenses.toFixed(1)}" y="${(padT + plotH - hExpenses).toFixed(1)}" width="${barW.toFixed(1)}" height="${hExpenses.toFixed(1)}" rx="3" class="chart-bar chart-bar-expenses" data-idx="${i}"/>
       ${showLabel ? `<text x="${(x0 + colW / 2).toFixed(1)}" y="${H - 8}" class="chart-x-label" text-anchor="middle" data-idx="${i}">${esc(b.label)}</text>` : ''}
-      <rect x="${x0.toFixed(1)}" y="0" width="${colW.toFixed(1)}" height="${H}" class="chart-hit" data-idx="${i}" onmousemove="_showDashChartTooltip(${i}, event)" onmouseleave="_hideDashChartTooltip()"/>
+      <rect x="${x0.toFixed(1)}" y="0" width="${colW.toFixed(1)}" height="${H}" class="chart-hit" data-idx="${i}" onmousemove="_showDashChartTooltip('${containerId}', ${i}, event)" onmouseleave="_hideDashChartTooltip('${containerId}')"/>
     `;
   }).join('');
 
@@ -141,16 +140,17 @@ function _dailyEntriesExpensesChartHTML(rows, days = 14) {
           <stop offset="100%" stop-color="#dc2626"/>
         </linearGradient>
       </defs>
-      <line id="chartGuideLine" class="chart-guide-line" x1="0" y1="0" x2="0" y2="${H}" style="display:none"/>
+      <line id="${containerId}_guide" class="chart-guide-line" x1="0" y1="0" x2="0" y2="${H}" style="display:none"/>
       ${svgBody}
     </svg>
-    <div id="dashChartTooltip" class="chart-tooltip"></div>`;
+    <div id="${containerId}_tooltip" class="chart-tooltip"></div>`;
 }
 
-function _showDashChartTooltip(idx, evt) {
-  const b = _dashDailyChartData[idx];
-  const container = document.getElementById('dashTrend');
-  const tip = document.getElementById('dashChartTooltip');
+function _showDashChartTooltip(containerId, idx, evt) {
+  const chartData = _dashChartDataByContainer[containerId];
+  const b = chartData?.buckets[idx];
+  const container = document.getElementById(containerId);
+  const tip = document.getElementById(containerId + '_tooltip');
   if (!b || !container || !tip) return;
 
   container.querySelectorAll('.chart-bar.active').forEach((el) => el.classList.remove('active'));
@@ -158,9 +158,9 @@ function _showDashChartTooltip(idx, evt) {
   container.querySelectorAll('.chart-x-label.active').forEach((el) => el.classList.remove('active'));
   container.querySelectorAll(`.chart-x-label[data-idx="${idx}"]`).forEach((el) => el.classList.add('active'));
 
-  const guide = container.querySelector('#chartGuideLine');
+  const guide = container.querySelector(`#${containerId}_guide`);
   if (guide) {
-    const cx = ((idx + 0.5) * _dashChartColW).toFixed(1);
+    const cx = ((idx + 0.5) * chartData.colW).toFixed(1);
     guide.setAttribute('x1', cx);
     guide.setAttribute('x2', cx);
     guide.style.display = 'block';
@@ -198,14 +198,14 @@ function _showDashChartTooltip(idx, evt) {
   tip.style.top  = top + 'px';
 }
 
-function _hideDashChartTooltip() {
-  const container = document.getElementById('dashTrend');
+function _hideDashChartTooltip(containerId) {
+  const container = document.getElementById(containerId);
   if (!container) return;
   container.querySelectorAll('.chart-bar.active').forEach((el) => el.classList.remove('active'));
   container.querySelectorAll('.chart-x-label.active').forEach((el) => el.classList.remove('active'));
-  const guide = container.querySelector('#chartGuideLine');
+  const guide = container.querySelector(`#${containerId}_guide`);
   if (guide) guide.style.display = 'none';
-  const tip = document.getElementById('dashChartTooltip');
+  const tip = document.getElementById(containerId + '_tooltip');
   if (tip) tip.style.display = 'none';
 }
 
@@ -260,57 +260,6 @@ function _trendBadgeHTML(series, invertColors = false) {
   return `<div class="kpi-trend ${dir}"><span class="arrow">${arrow}</span> ${Math.abs(pct)}% <span class="kpi-trend-note">vs. 7 dias antes</span></div>`;
 }
 
-/* Encurta um texto para caber numa coluna do gráfico, evitando que nomes
-   longos de loja se sobreponham ou fiquem "apertados". maxChars é estimado
-   pela largura disponível da coluna (colW em unidades do viewBox). */
-function _truncateForChart(text, colW) {
-  const maxChars = Math.max(4, Math.floor(colW / 7));
-  if (text.length <= maxChars) return text;
-  return text.slice(0, maxChars - 1) + '…';
-}
-
-/* Dashboard do Admin (cliente) — gráfico simples de Entradas x Saídas por
-   loja (total do período, sem quebra diária/tooltip rico — só para o cliente
-   comparar as lojas rapidamente). Usa <title> nativo do SVG para o valor
-   exato aparecer ao passar o mouse, sem JS adicional. */
-function _storeEntriesExpensesChartHTML(rows, stores) {
-  if (!stores.length) return '<p class="subtle">Nenhuma loja cadastrada.</p>';
-  const data = stores.map((s) => {
-    const cls = rows.filter((c) => c.storeId === s.id);
-    return {
-      name: s.name,
-      entries: cls.reduce((a, c) => a + Number(c.entries || 0), 0),
-      expenses: cls.reduce((a, c) => a + Number(c.expenses || 0), 0),
-    };
-  });
-
-  const maxVal = Math.max(1, ...data.map((d) => Math.max(d.entries, d.expenses)));
-  const W = 900, H = 210, padT = 10, padB = 34, plotH = H - padT - padB;
-  const colW = W / data.length;
-  const barGap = Math.max(3, colW * 0.1);
-  const barW = Math.max(4, (colW - barGap * 3) / 2);
-
-  const bars = data.map((d, i) => {
-    const x0 = i * colW;
-    const hE = Math.max(d.entries ? (d.entries / maxVal) * plotH : 0, d.entries ? 2 : 0);
-    const hS = Math.max(d.expenses ? (d.expenses / maxVal) * plotH : 0, d.expenses ? 2 : 0);
-    const xE = x0 + barGap, xS = xE + barW + barGap;
-    const label = _truncateForChart(d.name, colW);
-    return `
-      <rect x="${xE.toFixed(1)}" y="${(padT + plotH - hE).toFixed(1)}" width="${barW.toFixed(1)}" height="${hE.toFixed(1)}" rx="3" fill="#16a34a"><title>${esc(d.name)} — Entradas: ${money(d.entries)}</title></rect>
-      <rect x="${xS.toFixed(1)}" y="${(padT + plotH - hS).toFixed(1)}" width="${barW.toFixed(1)}" height="${hS.toFixed(1)}" rx="3" fill="#dc2626"><title>${esc(d.name)} — Saídas: ${money(d.expenses)}</title></rect>
-      <text x="${(x0 + colW / 2).toFixed(1)}" y="${H - 12}" text-anchor="middle" class="chart-x-label">${esc(label)}<title>${esc(d.name)}</title></text>
-    `;
-  }).join('');
-
-  return `
-    <div class="chart-legend" style="margin-bottom:6px">
-      <span class="legend-dot entries"></span> Entradas
-      <span class="legend-dot expenses"></span> Saídas
-    </div>
-    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="daily-chart" style="height:200px">${bars}</svg>`;
-}
-
 /* Quantas etapas de implantação (de IMPLANT_STEP_LIST) estão "Concluído" para a empresa */
 function implantProgress(companyId) {
   const steps = state.implantSteps?.[companyId] || {};
@@ -351,7 +300,7 @@ function renderMasterDashboard() {
 
   /* Movimento diário — entradas x saídas dos últimos 14 dias, com tooltip
      por loja ao passar o mouse (ver _dailyEntriesExpensesChartHTML). */
-  html('dashTrend', _dailyEntriesExpensesChartHTML(activeRows));
+  html('dashTrend', _dailyEntriesExpensesChartHTML(activeRows, 'dashTrend'));
 
   /* Alertas críticos — divergências pendentes de revisão, mais urgentes (mais dias) primeiro.
      Usa state.divergenceReviews (não c.reviewStatus, que fica travado em "Pendente de revisão"
@@ -1136,8 +1085,9 @@ function renderAdminViews() {
   text('aSaldoCentral', money(saldoCentral));
   text('aSaldoCentralHint', `${pendCount} repasse(s) pendente(s)`);
 
-  /* Entradas x Saídas por loja — gráfico simples, sem quebra diária */
-  html('adminStoreChart', _storeEntriesExpensesChartHTML(rows, stores));
+  /* Movimento diário — mesmo gráfico do dashboard do Master, escopado à
+     própria empresa do Admin. */
+  html('adminDashTrend', _dailyEntriesExpensesChartHTML(rows, 'adminDashTrend'));
 
   /* Dashboard por loja */
   html('adminStoreDashboard', stores.map((s) => {
