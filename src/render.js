@@ -1089,22 +1089,6 @@ function renderAdminViews() {
      própria empresa do Admin. */
   html('adminDashTrend', _dailyEntriesExpensesChartHTML(rows, 'adminDashTrend'));
 
-  /* Dashboard por loja */
-  html('adminStoreDashboard', stores.map((s) => {
-    const cls = rows.filter((c) => c.storeId === s.id);
-    const lastStatus = cls.slice(-1)[0]?.status || '-';
-    return `<div class="store-card">
-      <h4>${esc(s.name)}</h4>
-      <div class="store-kpis">
-        <div class="store-kpi"><span>Entradas</span><strong>${money(cls.reduce((a,c)=>a+Number(c.entries||0),0))}</strong></div>
-        <div class="store-kpi"><span>Saídas</span><strong>${money(cls.reduce((a,c)=>a+Number(c.expenses||0),0))}</strong></div>
-        <div class="store-kpi"><span>Repasse</span><strong>${money(cls.reduce((a,c)=>a+Number(c.transfer||0),0))}</strong></div>
-        <div class="store-kpi"><span>Divergência</span><strong>${money(cls.reduce((a,c)=>a+(pendingReviewClosingIds.has(c.id)?Number(c.diff||0):0),0))}</strong></div>
-      </div>
-      <div style="margin-top:8px">${tag(lastStatus)}</div>
-    </div>`;
-  }).join('') || '<p class="subtle">Nenhuma loja cadastrada.</p>');
-
   /* Lojas */
   html('adminStoresBody', stores.map((s) =>
     `<tr><td>${esc(s.name)}</td><td>${esc(s.code)}</td><td>${esc(s.cashType)}</td><td>${money(s.standardFund)}</td><td>${tag(s.status)}</td></tr>`
