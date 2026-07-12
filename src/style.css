@@ -123,6 +123,22 @@ button,input,select,textarea{font-family:var(--font)}
 .metric-label{color:var(--muted);font-size:12px;font-weight:700}
 .metric-value{font-size:26px;font-weight:650;margin-top:6px}
 .metric-hint{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* KPI cards do Dashboard — ícone + minigráfico + comparação */
+.kpi-card{display:flex;flex-direction:column}
+.kpi-icon{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:12px;flex-shrink:0}
+.kpi-icon svg{width:22px;height:22px}
+.kpi-icon-teal{background:var(--soft);color:var(--brand2)}
+.kpi-icon-blue{background:#eff6ff;color:#2563eb}
+.kpi-icon-violet{background:#f5f3ff;color:#7c3aed}
+.kpi-icon-amber{background:#fffbeb;color:#d97706}
+.kpi-trend{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;margin-top:8px;color:var(--muted)}
+.kpi-trend.up{color:var(--success)}
+.kpi-trend.down{color:var(--danger)}
+.kpi-trend .arrow{font-size:12px}
+.kpi-trend .kpi-trend-note{font-weight:500;color:var(--muted);font-size:11px}
+.kpi-spark{margin-top:8px;height:32px}
+.kpi-spark svg{width:100%;height:100%;display:block}
 .section-title{font-size:17px;margin-bottom:12px;letter-spacing:-.2px;font-weight:650}
 .subtle{color:var(--muted);font-size:14px;line-height:1.5}
 .panel-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}
@@ -212,21 +228,38 @@ tr:hover td{background:#fafbfc}
 .legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 .legend-dot.entries{background:linear-gradient(180deg,#22d3a8,var(--success))}
 .legend-dot.expenses{background:linear-gradient(180deg,#f87171,var(--danger))}
-.daily-chart{width:100%;height:220px;display:block;overflow:visible}
-.chart-bar{transition:opacity .12s,filter .12s}
-.chart-bar-entries{fill:url(#gradEntries)}
-.chart-bar-expenses{fill:url(#gradExpenses)}
-.chart-bar.active{filter:brightness(1.08) drop-shadow(0 2px 4px rgba(0,0,0,.15))}
+.daily-chart{width:100%;height:230px;display:block;overflow:visible}
+.chart-bar{transition:opacity .15s,filter .15s}
+.chart-bar-entries{fill:#cdf1e6}
+.chart-bar-expenses{fill:#fcdcdc}
+.chart-bar.active.chart-bar-entries{fill:url(#gradEntries)}
+.chart-bar.active.chart-bar-expenses{fill:url(#gradExpenses)}
+.chart-bar.active{filter:drop-shadow(0 6px 10px rgba(15,23,42,.16))}
 .chart-hit{fill:transparent;cursor:pointer}
 .chart-x-label{font-size:9px;fill:var(--muted);font-family:var(--font)}
-.chart-tooltip{display:none;position:absolute;z-index:20;background:#0d1720;color:#fff;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.5;pointer-events:none;box-shadow:0 12px 28px rgba(0,0,0,.22);min-width:200px;max-width:260px}
-.chart-tip-header{font-weight:700;font-size:13px;margin-bottom:6px}
-.chart-tip-totals{display:flex;justify-content:space-between;gap:12px;font-size:11px;font-weight:650;border-bottom:1px solid rgba(255,255,255,.15);padding-bottom:8px;margin-bottom:6px}
-.chart-tip-stores{max-height:160px;overflow-y:auto;display:grid;gap:5px}
-.chart-tip-row{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#e2e8f0}
-.chart-tip-values{white-space:nowrap}
-.chart-tooltip .c-entries{color:#4ade80}
-.chart-tooltip .c-expenses{color:#f87171}
+.chart-x-label.active{fill:var(--ink);font-weight:700}
+.chart-guide-line{stroke:#94a3b8;stroke-width:1;stroke-dasharray:4 3;pointer-events:none}
+
+/* Tooltip do gráfico — card claro, com indicadores por cor */
+.chart-tooltip{display:none;position:absolute;z-index:20;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:12px;line-height:1.5;pointer-events:none;box-shadow:0 16px 40px rgba(15,23,42,.18);min-width:220px;max-width:280px}
+.chart-tip-header{font-weight:700;font-size:14px;margin-bottom:8px;color:var(--ink)}
+.chart-tip-totals{display:grid;gap:5px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:8px}
+.chart-tip-metric{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted)}
+.chart-tip-metric .tip-label{display:flex;align-items:center}
+.chart-tip-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px}
+.chart-tip-dot.entries{background:var(--success)}
+.chart-tip-dot.expenses{background:var(--danger)}
+.chart-tip-metric b{color:var(--ink);font-size:13px;font-weight:700}
+.chart-tip-net{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.chart-tip-net b{font-weight:700}
+.chart-tip-net b.positive{color:var(--success)}
+.chart-tip-net b.negative{color:var(--danger)}
+.chart-tip-stores{max-height:150px;overflow-y:auto;display:grid;gap:6px;margin-top:2px}
+.chart-tip-row{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted)}
+.chart-tip-row strong{color:var(--ink);font-weight:600}
+.chart-tip-values{white-space:nowrap;font-weight:700}
+.chart-tip-values .c-entries{color:var(--success)}
+.chart-tip-values .c-expenses{color:var(--danger)}
 
 /* ============================================================
    FECHAMENTO 5X — blocos de conferência

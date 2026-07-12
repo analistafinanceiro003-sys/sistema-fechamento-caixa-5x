@@ -1279,12 +1279,14 @@ function openOperatorRectifyModal(closingId) {
   const today = todayISO();
 
   if (deadlineDays === 0) {
-    const cDate = new Date(closingDate); const tDate = new Date(today);
+    /* dateFromISO() constrói à meia-noite local — new Date('yyyy-mm-dd') direto
+       interpreta como UTC e desalinha em fusos negativos (ex: Brasil). */
+    const cDate = dateFromISO(closingDate); const tDate = dateFromISO(today);
     if (cDate.getFullYear() !== tDate.getFullYear() || cDate.getMonth() !== tDate.getMonth())
       return alert('Retificação permitida apenas dentro do mês atual.');
   } else {
-    const limit = new Date(today); limit.setDate(limit.getDate() - deadlineDays);
-    if (closingDate < limit.toISOString().slice(0, 10))
+    const limit = dateFromISO(today); limit.setDate(limit.getDate() - deadlineDays);
+    if (closingDate < dateToISO(limit))
       return alert(`Retificação permitida apenas nos últimos ${deadlineDays} dias.`);
   }
 

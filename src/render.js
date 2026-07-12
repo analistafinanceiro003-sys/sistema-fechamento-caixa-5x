@@ -62,24 +62,26 @@ function renderMetrics() {
 function _daysSince(dateBR) {
   const iso = parseBR(dateBR);
   if (!iso) return 0;
-  const ms = new Date(`${todayISO()}T00:00:00`) - new Date(`${iso}T00:00:00`);
+  const ms = dateFromISO(todayISO()) - dateFromISO(iso);
   return Math.max(0, Math.round(ms / 86400000));
 }
 
 /* Dados do último gráfico renderizado (Movimento Diário) — usado pelo hover
    do tooltip para montar o detalhamento por loja sem precisar recalcular. */
 let _dashDailyChartData = [];
+let _dashChartColW = 0;
 
 /* Gráfico "Movimento Diário — Entradas x Saídas": SVG puro (sem biblioteca),
-   barras pareadas por dia dos últimos N dias. Passar o mouse sobre a coluna
-   de um dia mostra um tooltip com o detalhamento por loja daquele dia. */
+   barras pareadas por dia dos últimos N dias. Por padrão as barras ficam em
+   tom suave; passar o mouse sobre a coluna do dia acende as barras daquele
+   dia (gradiente cheio), traça uma linha-guia vertical e mostra um tooltip
+   com o detalhamento por loja daquele dia. */
 function _dailyEntriesExpensesChartHTML(rows, days = 14) {
   const buckets = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
-    const iso = d.toISOString().slice(0, 10);
     buckets.push({
-      iso, label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+      iso: dateToISO(d), label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
       entries: 0, expenses: 0, byStore: new Map(),
     });
   }
@@ -99,8 +101,9 @@ function _dailyEntriesExpensesChartHTML(rows, days = 14) {
   _dashDailyChartData = buckets;
 
   const maxVal = Math.max(1, ...buckets.map((b) => Math.max(b.entries, b.expenses)));
-  const W = 900, H = 220, padT = 12, padB = 24, plotH = H - padT - padB;
+  const W = 900, H = 230, padT = 12, padB = 24, plotH = H - padT - padB;
   const colW = W / buckets.length;
+  _dashChartColW = colW;
   const barGap = Math.max(2, colW * 0.08);
   const barW = Math.max(3, (colW - barGap * 3) / 2);
 
@@ -114,7 +117,7 @@ function _dailyEntriesExpensesChartHTML(rows, days = 14) {
     return `
       <rect x="${xEntries.toFixed(1)}" y="${(padT + plotH - hEntries).toFixed(1)}" width="${barW.toFixed(1)}" height="${hEntries.toFixed(1)}" rx="3" class="chart-bar chart-bar-entries" data-idx="${i}"/>
       <rect x="${xExpenses.toFixed(1)}" y="${(padT + plotH - hExpenses).toFixed(1)}" width="${barW.toFixed(1)}" height="${hExpenses.toFixed(1)}" rx="3" class="chart-bar chart-bar-expenses" data-idx="${i}"/>
-      ${showLabel ? `<text x="${(x0 + colW / 2).toFixed(1)}" y="${H - 6}" class="chart-x-label" text-anchor="middle">${esc(b.label)}</text>` : ''}
+      ${showLabel ? `<text x="${(x0 + colW / 2).toFixed(1)}" y="${H - 6}" class="chart-x-label" text-anchor="middle" data-idx="${i}">${esc(b.label)}</text>` : ''}
       <rect x="${x0.toFixed(1)}" y="0" width="${colW.toFixed(1)}" height="${H}" class="chart-hit" data-idx="${i}" onmousemove="_showDashChartTooltip(${i}, event)" onmouseleave="_hideDashChartTooltip()"/>
     `;
   }).join('');
@@ -135,6 +138,7 @@ function _dailyEntriesExpensesChartHTML(rows, days = 14) {
           <stop offset="100%" stop-color="#dc2626"/>
         </linearGradient>
       </defs>
+      <line id="chartGuideLine" class="chart-guide-line" x1="0" y1="0" x2="0" y2="${H}" style="display:none"/>
       ${svgBody}
     </svg>
     <div id="dashChartTooltip" class="chart-tooltip"></div>`;
@@ -148,21 +152,33 @@ function _showDashChartTooltip(idx, evt) {
 
   container.querySelectorAll('.chart-bar.active').forEach((el) => el.classList.remove('active'));
   container.querySelectorAll(`.chart-bar[data-idx="${idx}"]`).forEach((el) => el.classList.add('active'));
+  container.querySelectorAll('.chart-x-label.active').forEach((el) => el.classList.remove('active'));
+  container.querySelectorAll(`.chart-x-label[data-idx="${idx}"]`).forEach((el) => el.classList.add('active'));
 
+  const guide = container.querySelector('#chartGuideLine');
+  if (guide) {
+    const cx = ((idx + 0.5) * _dashChartColW).toFixed(1);
+    guide.setAttribute('x1', cx);
+    guide.setAttribute('x2', cx);
+    guide.style.display = 'block';
+  }
+
+  const net = b.entries - b.expenses;
   const storeRows = [...b.byStore.values()]
     .filter((s) => s.entries || s.expenses)
     .sort((a, c) => (c.entries + c.expenses) - (a.entries + a.expenses))
     .map((s) => `<div class="chart-tip-row">
-        <span>${esc(companyName(s.companyId))} / ${esc(storeName(s.storeId))}</span>
-        <span class="chart-tip-values"><b class="c-entries">+${money(s.entries)}</b> <b class="c-expenses">-${money(s.expenses)}</b></span>
+        <span><strong>${esc(storeName(s.storeId))}</strong> · ${esc(companyName(s.companyId))}</span>
+        <span class="chart-tip-values"><span class="c-entries">+${money(s.entries)}</span> <span class="c-expenses">-${money(s.expenses)}</span></span>
       </div>`)
     .join('') || '<p class="subtle" style="margin:2px 0 0">Sem fechamentos neste dia.</p>';
 
   tip.innerHTML = `
     <div class="chart-tip-header">${esc(b.label)}</div>
     <div class="chart-tip-totals">
-      <span class="c-entries">Entradas: ${money(b.entries)}</span>
-      <span class="c-expenses">Saídas: ${money(b.expenses)}</span>
+      <div class="chart-tip-metric"><span class="tip-label"><span class="chart-tip-dot entries"></span>Entradas</span><b>${money(b.entries)}</b></div>
+      <div class="chart-tip-metric"><span class="tip-label"><span class="chart-tip-dot expenses"></span>Saídas</span><b>${money(b.expenses)}</b></div>
+      <div class="chart-tip-net"><span>Saldo do dia</span><b class="${net >= 0 ? 'positive' : 'negative'}">${net >= 0 ? '+' : ''}${money(net)}</b></div>
     </div>
     <div class="chart-tip-stores">${storeRows}</div>`;
   tip.style.display = 'block';
@@ -183,10 +199,104 @@ function _hideDashChartTooltip() {
   const container = document.getElementById('dashTrend');
   if (!container) return;
   container.querySelectorAll('.chart-bar.active').forEach((el) => el.classList.remove('active'));
+  container.querySelectorAll('.chart-x-label.active').forEach((el) => el.classList.remove('active'));
+  const guide = container.querySelector('#chartGuideLine');
+  if (guide) guide.style.display = 'none';
   const tip = document.getElementById('dashChartTooltip');
   if (tip) tip.style.display = 'none';
 }
 
+/* Minigráfico de linha (sparkline) para os cards de KPI do dashboard —
+   mesma filosofia do gráfico principal: SVG puro, sem biblioteca. */
+function _sparklineSVG(values, colorVar) {
+  if (!values.length) return '';
+  const max = Math.max(0, ...values);
+  const min = Math.min(0, ...values);
+  const range = (max - min) || 1;
+  const W = 100, H = 32;
+  const stepX = values.length > 1 ? W / (values.length - 1) : 0;
+  const pts = values.map((v, i) => `${(i * stepX).toFixed(1)},${(H - ((v - min) / range) * H).toFixed(1)}`);
+  const areaPts = `0,${H} ${pts.join(' ')} ${W},${H}`;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <polygon points="${areaPts}" fill="${colorVar}" opacity="0.14"/>
+    <polyline points="${pts.join(' ')}" fill="none" stroke="${colorVar}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+/* Soma diária de uma métrica (valueFn) nos últimos N dias — base para
+   sparkline + comparação "vs período anterior" dos cards de KPI. */
+function _dailySeries(rows, valueFn, days = 14) {
+  const buckets = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    buckets.push({ iso: dateToISO(d), value: 0 });
+  }
+  rows.forEach((c) => {
+    const iso = parseBR(c.date);
+    const b = buckets.find((x) => x.iso === iso);
+    if (b) b.value += valueFn(c);
+  });
+  return buckets.map((b) => b.value);
+}
+
+/* Compara a 2ª metade da série (mais recente) com a 1ª (período anterior) —
+   invertColors troca o verde/vermelho quando "menos" é o resultado bom
+   (ex: divergência). */
+function _trendBadgeHTML(series, invertColors = false) {
+  const half = Math.floor(series.length / 2) || 1;
+  const prev = series.slice(0, half).reduce((a, v) => a + v, 0);
+  const curr = series.slice(half).reduce((a, v) => a + v, 0);
+  if (!prev && !curr) return '<div class="kpi-trend"><span class="kpi-trend-note">Sem movimento nos últimos 14 dias</span></div>';
+  let pct;
+  if (!prev) pct = curr > 0 ? 100 : 0;
+  else pct = Math.round(((curr - prev) / Math.abs(prev)) * 100);
+  const isUp = curr >= prev;
+  const good = invertColors ? !isUp : isUp;
+  const dir = pct === 0 ? '' : (good ? 'up' : 'down');
+  const arrow = pct === 0 ? '·' : (isUp ? '↑' : '↓');
+  return `<div class="kpi-trend ${dir}"><span class="arrow">${arrow}</span> ${Math.abs(pct)}% <span class="kpi-trend-note">vs. 7 dias antes</span></div>`;
+}
+
+/* Dashboard do Admin (cliente) — gráfico simples de Entradas x Saídas por
+   loja (total do período, sem quebra diária/tooltip rico — só para o cliente
+   comparar as lojas rapidamente). Usa <title> nativo do SVG para o valor
+   exato aparecer ao passar o mouse, sem JS adicional. */
+function _storeEntriesExpensesChartHTML(rows, stores) {
+  if (!stores.length) return '<p class="subtle">Nenhuma loja cadastrada.</p>';
+  const data = stores.map((s) => {
+    const cls = rows.filter((c) => c.storeId === s.id);
+    return {
+      name: s.name,
+      entries: cls.reduce((a, c) => a + Number(c.entries || 0), 0),
+      expenses: cls.reduce((a, c) => a + Number(c.expenses || 0), 0),
+    };
+  });
+
+  const maxVal = Math.max(1, ...data.map((d) => Math.max(d.entries, d.expenses)));
+  const W = 900, H = 200, padT = 10, padB = 26, plotH = H - padT - padB;
+  const colW = W / data.length;
+  const barGap = Math.max(3, colW * 0.1);
+  const barW = Math.max(4, (colW - barGap * 3) / 2);
+
+  const bars = data.map((d, i) => {
+    const x0 = i * colW;
+    const hE = Math.max(d.entries ? (d.entries / maxVal) * plotH : 0, d.entries ? 2 : 0);
+    const hS = Math.max(d.expenses ? (d.expenses / maxVal) * plotH : 0, d.expenses ? 2 : 0);
+    const xE = x0 + barGap, xS = xE + barW + barGap;
+    return `
+      <rect x="${xE.toFixed(1)}" y="${(padT + plotH - hE).toFixed(1)}" width="${barW.toFixed(1)}" height="${hE.toFixed(1)}" rx="3" fill="#16a34a"><title>${esc(d.name)} — Entradas: ${money(d.entries)}</title></rect>
+      <rect x="${xS.toFixed(1)}" y="${(padT + plotH - hS).toFixed(1)}" width="${barW.toFixed(1)}" height="${hS.toFixed(1)}" rx="3" fill="#dc2626"><title>${esc(d.name)} — Saídas: ${money(d.expenses)}</title></rect>
+      <text x="${(x0 + colW / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle" class="chart-x-label">${esc(d.name)}</text>
+    `;
+  }).join('');
+
+  return `
+    <div class="chart-legend" style="margin-bottom:6px">
+      <span class="legend-dot entries"></span> Entradas
+      <span class="legend-dot expenses"></span> Saídas
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="daily-chart" style="height:200px">${bars}</svg>`;
+}
 
 /* Quantas etapas de implantação (de IMPLANT_STEP_LIST) estão "Concluído" para a empresa */
 function implantProgress(companyId) {
@@ -214,6 +324,17 @@ function renderMasterDashboard() {
   text('mStores', dashCompanyId ? state.stores.filter((s) => s.companyId === dashCompanyId).length : state.stores.length);
   text('mClosings', activeRows.length);
   text('mDiff', money(activeRows.reduce((a, c) => a + (pendingReviewClosingIds.has(c.id) ? Math.abs(Number(c.diff || 0)) : 0), 0)));
+
+  /* Sparkline + comparação "vs. 7 dias antes" dos cards de Fechamentos e
+     Divergência — usa os últimos 14 dias (mesma janela do gráfico principal),
+     independente do valor total (histórico completo) mostrado no card. */
+  const closingsSeries = _dailySeries(activeRows, () => 1);
+  html('mClosingsSpark', _sparklineSVG(closingsSeries, '#7c3aed'));
+  html('mClosingsTrend', _trendBadgeHTML(closingsSeries));
+
+  const diffSeries = _dailySeries(activeRows, (c) => pendingReviewClosingIds.has(c.id) ? Math.abs(Number(c.diff || 0)) : 0);
+  html('mDiffSpark', _sparklineSVG(diffSeries, '#dc2626'));
+  html('mDiffTrend', _trendBadgeHTML(diffSeries, true));
 
   /* Movimento diário — entradas x saídas dos últimos 14 dias, com tooltip
      por loja ao passar o mouse (ver _dailyEntriesExpensesChartHTML). */
@@ -1001,6 +1122,9 @@ function renderAdminViews() {
     !receipts.find((r) => r.closingId === c.id)).length;
   text('aSaldoCentral', money(saldoCentral));
   text('aSaldoCentralHint', `${pendCount} repasse(s) pendente(s)`);
+
+  /* Entradas x Saídas por loja — gráfico simples, sem quebra diária */
+  html('adminStoreChart', _storeEntriesExpensesChartHTML(rows, stores));
 
   /* Dashboard por loja */
   html('adminStoreDashboard', stores.map((s) => {

@@ -101,7 +101,17 @@ function bindCurrencyInputs(root = document) {
    FUNÇÕES DE DATA
    Interface: dd/mm/aaaa  |  Banco/cálculo: yyyy-mm-dd
 ============================================================ */
-const todayISO = () => new Date().toISOString().slice(0, 10);
+/* Constrói um Date à meia-noite LOCAL a partir de "yyyy-mm-dd". Usar
+   `new Date('yyyy-mm-dd')` diretamente interpreta a string como UTC e
+   desalinha em fusos negativos (ex: Brasil, GMT-3) — à noite, o dia UTC já
+   virou o seguinte. */
+const dateFromISO = (iso) => {
+  const [y, m, d] = String(iso || '').split('-').map(Number);
+  return (y && m && d) ? new Date(y, m - 1, d) : new Date(NaN);
+};
+/* Date → "yyyy-mm-dd" pelo calendário LOCAL (não toISOString(), que é UTC). */
+const dateToISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const todayISO = () => dateToISO(new Date());
 const todayBR  = () => new Date().toLocaleDateString('pt-BR');
 
 /* dd/mm/aaaa ou yyyy-mm-dd → yyyy-mm-dd */
@@ -252,7 +262,7 @@ Object.assign(window, {
   $, all, val, setVal, html, text, clear, num,
   money, formatCurrencyBR, parseCurrencyBR, normalizeMoney,
   formatCurrencyInput, selectOnFocus, bindCurrencyInputs,
-  todayISO, todayBR, parseBR, toBRFromISO,
+  todayISO, todayBR, parseBR, toBRFromISO, dateFromISO, dateToISO,
   formatDateBR, parseDateBR, toISODate,
   validateDateRange, readDateRange,
   uid, esc, emptyRow, tag, flash, toast, downloadFile,

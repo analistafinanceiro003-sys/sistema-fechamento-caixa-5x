@@ -132,10 +132,32 @@
         <div class="field"><label>Empresa</label><select id="dashCompanyFilter" onchange="renderMasterDashboard()"></select></div>
       </div>
       <div class="grid cards">
-        <div class="card clickable-card" onclick="showPage('cadastros',document.querySelector('.nav button[data-page=cadastros]'));showSubTab('cadastros','cad-empresas',document.querySelector('[data-subtab=cad-empresas]'))"><div class="metric-label">Empresas ativas</div><div class="metric-value" id="mCompanies">0</div><div class="metric-hint">Clientes em operação</div></div>
-        <div class="card clickable-card" onclick="showPage('cadastros',document.querySelector('.nav button[data-page=cadastros]'));showSubTab('cadastros','cad-lojas',document.querySelector('[data-subtab=cad-lojas]'))"><div class="metric-label">Lojas / caixas</div><div class="metric-value" id="mStores">0</div><div class="metric-hint">Pontos de fechamento</div></div>
-        <div class="card clickable-card" onclick="showPage('fechamentos',document.querySelector('.nav button[data-page=fechamentos]'))"><div class="metric-label">Fechamentos</div><div class="metric-value" id="mClosings">0</div><div class="metric-hint">Registros salvos</div></div>
-        <div class="card clickable-card" onclick="showPage('fechamentos',document.querySelector('.nav button[data-page=fechamentos]'));showSubTab('fechamentos','fech-divergencias',document.querySelector('[data-subtab=fech-divergencias]'))"><div class="metric-label">Divergência total</div><div class="metric-value" id="mDiff">0,00 R$</div><div class="metric-hint">Soma absoluta</div></div>
+        <div class="card kpi-card clickable-card" onclick="showPage('cadastros',document.querySelector('.nav button[data-page=cadastros]'));showSubTab('cadastros','cad-empresas',document.querySelector('[data-subtab=cad-empresas]'))">
+          <div class="kpi-icon kpi-icon-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V7a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v14"/><path d="M15 21V11a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v10"/><path d="M9 9h.01M9 13h.01M9 17h.01M4 21h16"/></svg></div>
+          <div class="metric-label">Empresas ativas</div>
+          <div class="metric-value" id="mCompanies">0</div>
+          <div class="metric-hint">Clientes em operação</div>
+        </div>
+        <div class="card kpi-card clickable-card" onclick="showPage('cadastros',document.querySelector('.nav button[data-page=cadastros]'));showSubTab('cadastros','cad-lojas',document.querySelector('[data-subtab=cad-lojas]'))">
+          <div class="kpi-icon kpi-icon-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1.5-5h15L21 9"/><path d="M3 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 9v11h14V9"/><path d="M9 20v-6h6v6"/></svg></div>
+          <div class="metric-label">Lojas / caixas</div>
+          <div class="metric-value" id="mStores">0</div>
+          <div class="metric-hint">Pontos de fechamento</div>
+        </div>
+        <div class="card kpi-card clickable-card" onclick="showPage('fechamentos',document.querySelector('.nav button[data-page=fechamentos]'))">
+          <div class="kpi-icon kpi-icon-violet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 13l2.2 2.2L15.5 11"/></svg></div>
+          <div class="metric-label">Fechamentos</div>
+          <div class="metric-value" id="mClosings">0</div>
+          <div class="kpi-trend" id="mClosingsTrend"></div>
+          <div class="kpi-spark" id="mClosingsSpark"></div>
+        </div>
+        <div class="card kpi-card clickable-card" onclick="showPage('fechamentos',document.querySelector('.nav button[data-page=fechamentos]'));showSubTab('fechamentos','fech-divergencias',document.querySelector('[data-subtab=fech-divergencias]'))">
+          <div class="kpi-icon kpi-icon-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9.5 17H2.5z"/><path d="M12 10v4"/><path d="M12 17.5h.01"/></svg></div>
+          <div class="metric-label">Divergência total</div>
+          <div class="metric-value" id="mDiff">0,00 R$</div>
+          <div class="kpi-trend" id="mDiffTrend"></div>
+          <div class="kpi-spark" id="mDiffSpark"></div>
+        </div>
       </div>
 
       <div class="card" style="margin-top:16px">
@@ -1027,6 +1049,16 @@
             </table>
           </div>
         </div>
+
+        <div class="card" style="margin-top:14px">
+          <h3 class="section-title">Dashboard do Master — o que observar</h3>
+          <p class="subtle" style="margin-bottom:10px">Além dos KPIs e do gráfico de Movimento Diário, o Dashboard tem três ferramentas de acompanhamento rápido:</p>
+          <ul style="font-size:13px;color:#374151;line-height:1.9;padding-left:18px">
+            <li><strong>Alertas críticos</strong> — divergências ainda pendentes de revisão, mais urgentes primeiro. Some da lista assim que a divergência é revisada/justificada/resolvida ou a diferença de repasse é aceita.</li>
+            <li><strong>Lojas sem fechamento recente</strong> — lojas ativas sem nenhum fechamento novo há 2 dias ou mais (inclui lojas que nunca fecharam). Sinaliza operação esquecida ou parada.</li>
+            <li><strong>Totais por Loja</strong> — soma de entradas, saídas, repasse informado e nº de fechamentos por loja, com filtro de período próprio, para validar rapidamente os números.</li>
+          </ul>
+        </div>
       </div>
 
       <!-- ── ABA 2: PERFIS ── -->
@@ -1626,6 +1658,11 @@
                   <td>Divergências</td>
                   <td>Toda divergência acima da tolerância aparece aqui. Revisar e comentar cada uma.</td>
                 </tr>
+                <tr>
+                  <td><strong>Movimento por loja</strong></td>
+                  <td>Dashboard</td>
+                  <td>Gráfico "Entradas x Saídas por Loja" — comparação rápida entre as lojas. Útil para notar uma loja com movimento muito abaixo do normal.</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -1865,6 +1902,10 @@
       </div>
       <div class="kpi-alert warning" id="adminRectificationAlert" style="display:none;margin-bottom:12px"></div>
       <div class="card">
+        <h3 class="section-title">Entradas x Saídas por Loja</h3>
+        <div id="adminStoreChart"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
         <h3 class="section-title">Dashboard por loja</h3>
         <div class="store-dashboard-grid" id="adminStoreDashboard"></div>
       </div>
