@@ -47,9 +47,11 @@ const MODULE_TREE = {
       key: 'adminMovimentacoes', label: 'Movimentações', page: 'adminMovimentacoes',
       defaultEnabled: true,
       submodules: [
-        { key: 'sub_mov_extrato',   label: 'Extrato de Movimentações', subTab: 'amov-extrato',      defaultEnabled: true },
+        { key: 'sub_mov_resumo',    label: 'Resumo por Fechamento',    subTab: 'amov-resumo',       defaultEnabled: true },
         { key: 'sub_mov_repasses',  label: 'Repasses Recebidos',       subTab: 'amov-repasses',     defaultEnabled: true },
         { key: 'sub_mov_div',       label: 'Divergências',             subTab: 'amov-divergencias', defaultEnabled: true },
+        { key: 'sub_mov_retif',     label: 'Retificações',             subTab: 'amov-retificacoes', defaultEnabled: true },
+        { key: 'sub_mov_extrato',   label: 'Extrato de Movimentações', subTab: 'amov-extrato',      defaultEnabled: true },
         { key: 'sub_mov_docs',      label: 'Documentos',               subTab: 'amov-documentos',   defaultEnabled: true },
       ],
     },
