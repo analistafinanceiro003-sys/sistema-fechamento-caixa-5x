@@ -101,7 +101,7 @@ function _dailyEntriesExpensesChartHTML(rows, days = 14) {
   _dashDailyChartData = buckets;
 
   const maxVal = Math.max(1, ...buckets.map((b) => Math.max(b.entries, b.expenses)));
-  const W = 900, H = 230, padT = 12, padB = 24, plotH = H - padT - padB;
+  const W = 900, H = 230, padT = 12, padB = 30, plotH = H - padT - padB;
   const colW = W / buckets.length;
   _dashChartColW = colW;
   const barGap = Math.max(2, colW * 0.08);
@@ -113,11 +113,14 @@ function _dailyEntriesExpensesChartHTML(rows, days = 14) {
     const hExpenses = Math.max(b.expenses ? (b.expenses / maxVal) * plotH : 0, b.expenses ? 2 : 0);
     const xEntries = x0 + barGap;
     const xExpenses = xEntries + barW + barGap;
-    const showLabel = days <= 10 || i % 2 === 0 || i === buckets.length - 1;
+    /* Conta a partir do fim (hoje) para nunca cair dois rótulos vizinhos —
+       sem isso, "hoje" (sempre mostrado) podia colar no dia anterior. */
+    const fromEnd = buckets.length - 1 - i;
+    const showLabel = days <= 8 || fromEnd % 2 === 0;
     return `
       <rect x="${xEntries.toFixed(1)}" y="${(padT + plotH - hEntries).toFixed(1)}" width="${barW.toFixed(1)}" height="${hEntries.toFixed(1)}" rx="3" class="chart-bar chart-bar-entries" data-idx="${i}"/>
       <rect x="${xExpenses.toFixed(1)}" y="${(padT + plotH - hExpenses).toFixed(1)}" width="${barW.toFixed(1)}" height="${hExpenses.toFixed(1)}" rx="3" class="chart-bar chart-bar-expenses" data-idx="${i}"/>
-      ${showLabel ? `<text x="${(x0 + colW / 2).toFixed(1)}" y="${H - 6}" class="chart-x-label" text-anchor="middle" data-idx="${i}">${esc(b.label)}</text>` : ''}
+      ${showLabel ? `<text x="${(x0 + colW / 2).toFixed(1)}" y="${H - 8}" class="chart-x-label" text-anchor="middle" data-idx="${i}">${esc(b.label)}</text>` : ''}
       <rect x="${x0.toFixed(1)}" y="0" width="${colW.toFixed(1)}" height="${H}" class="chart-hit" data-idx="${i}" onmousemove="_showDashChartTooltip(${i}, event)" onmouseleave="_hideDashChartTooltip()"/>
     `;
   }).join('');
@@ -257,6 +260,15 @@ function _trendBadgeHTML(series, invertColors = false) {
   return `<div class="kpi-trend ${dir}"><span class="arrow">${arrow}</span> ${Math.abs(pct)}% <span class="kpi-trend-note">vs. 7 dias antes</span></div>`;
 }
 
+/* Encurta um texto para caber numa coluna do gráfico, evitando que nomes
+   longos de loja se sobreponham ou fiquem "apertados". maxChars é estimado
+   pela largura disponível da coluna (colW em unidades do viewBox). */
+function _truncateForChart(text, colW) {
+  const maxChars = Math.max(4, Math.floor(colW / 7));
+  if (text.length <= maxChars) return text;
+  return text.slice(0, maxChars - 1) + '…';
+}
+
 /* Dashboard do Admin (cliente) — gráfico simples de Entradas x Saídas por
    loja (total do período, sem quebra diária/tooltip rico — só para o cliente
    comparar as lojas rapidamente). Usa <title> nativo do SVG para o valor
@@ -273,7 +285,7 @@ function _storeEntriesExpensesChartHTML(rows, stores) {
   });
 
   const maxVal = Math.max(1, ...data.map((d) => Math.max(d.entries, d.expenses)));
-  const W = 900, H = 200, padT = 10, padB = 26, plotH = H - padT - padB;
+  const W = 900, H = 210, padT = 10, padB = 34, plotH = H - padT - padB;
   const colW = W / data.length;
   const barGap = Math.max(3, colW * 0.1);
   const barW = Math.max(4, (colW - barGap * 3) / 2);
@@ -283,10 +295,11 @@ function _storeEntriesExpensesChartHTML(rows, stores) {
     const hE = Math.max(d.entries ? (d.entries / maxVal) * plotH : 0, d.entries ? 2 : 0);
     const hS = Math.max(d.expenses ? (d.expenses / maxVal) * plotH : 0, d.expenses ? 2 : 0);
     const xE = x0 + barGap, xS = xE + barW + barGap;
+    const label = _truncateForChart(d.name, colW);
     return `
       <rect x="${xE.toFixed(1)}" y="${(padT + plotH - hE).toFixed(1)}" width="${barW.toFixed(1)}" height="${hE.toFixed(1)}" rx="3" fill="#16a34a"><title>${esc(d.name)} — Entradas: ${money(d.entries)}</title></rect>
       <rect x="${xS.toFixed(1)}" y="${(padT + plotH - hS).toFixed(1)}" width="${barW.toFixed(1)}" height="${hS.toFixed(1)}" rx="3" fill="#dc2626"><title>${esc(d.name)} — Saídas: ${money(d.expenses)}</title></rect>
-      <text x="${(x0 + colW / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle" class="chart-x-label">${esc(d.name)}</text>
+      <text x="${(x0 + colW / 2).toFixed(1)}" y="${H - 12}" text-anchor="middle" class="chart-x-label">${esc(label)}<title>${esc(d.name)}</title></text>
     `;
   }).join('');
 
