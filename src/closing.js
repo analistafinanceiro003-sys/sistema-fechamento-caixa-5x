@@ -735,20 +735,32 @@ async function saveClosing() {
     `${companyName(store.companyId)} / ${store.name} — ${toBRFromISO(dateISO)}`
   );
 
-  /* Limpar formulário */
+  /* Limpar formulário — remove todas as linhas de entrada/saída (descrição,
+     categoria, cliente/fornecedor e valor) e volta para uma única linha em
+     branco, em vez de só zerar o valor, para o próximo fechamento não herdar
+     dados digitados no fechamento anterior. */
   closingAttachments = [];
   clearAttachmentsUI();
   ['initial','transfer','closingNotes'].forEach((id) =>
     setVal(id, id === 'closingNotes' ? '' : formatCurrencyBR(0))
   );
-  all('.entry').forEach((e)      => { e.value = formatCurrencyBR(0); });
-  all('.expense').forEach((e)    => { e.value = formatCurrencyBR(0); });
+  all('#entries .launch-row').forEach((row) => row.remove());
+  all('#expenses .launch-row').forEach((row) => row.remove());
+  addEntry();
+  addExpense();
   const hint = $('initialBalanceHint');
   if (hint) hint.style.display = 'none';
   const badge = $('transferConfirmedBadge');
   if (badge) badge.style.display = 'none';
   const cBtn = $('confirmTransferBtn');
   if (cBtn) cBtn.textContent = 'Confirmar repasse';
+
+  /* Lançamento retroativo: sempre volta a data para hoje depois de salvar —
+     evita que a data escolhida neste fechamento fique "presa" no campo e o
+     usuário esqueça de trocá-la no próximo lançamento. Continua editável
+     (só aparece quando canBackdateClosing() libera). */
+  const dateInputReset = $('closingDate');
+  if (dateInputReset) dateInputReset.value = todayISO();
 
   save();
   renderAll();
