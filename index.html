@@ -573,6 +573,7 @@
             <div class="field"><label>Data inicial</label><input id="masterExtractStart" type="date" onchange="renderFechamentos()"/></div>
             <div class="field"><label>Data final</label><input id="masterExtractEnd" type="date" onchange="renderFechamentos()"/></div>
           </div>
+          <div id="masterExtractTotals" style="margin:12px 0"></div>
           <div class="table-wrap">
             <table><thead><tr>
               <th class="th-sort" onclick="sortExtrato('empresa','master')">Empresa<span id="ex-m-empresa"></span></th>
@@ -2071,6 +2072,7 @@
             <div class="field"><label>Data inicial</label><input id="adminExtratStart" type="date" onchange="renderAdminViews()"/></div>
             <div class="field"><label>Data final</label><input id="adminExtratEnd" type="date" onchange="renderAdminViews()"/></div>
           </div>
+          <div id="adminExtractTotals" style="margin:12px 0"></div>
           <div class="table-wrap"><table><thead><tr>
             <th class="th-sort" onclick="sortExtrato('date','admin')">Data<span id="ex-a-date"></span></th>
             <th class="th-sort" onclick="sortExtrato('store','admin')">Loja<span id="ex-a-store"></span></th>

@@ -686,6 +686,26 @@ function _updateExtratSortUI(view) {
   });
 }
 
+function _extractTotalsHTML(rows) {
+  const entradas = rows.filter((r) => r.Tipo === 'Entrada');
+  const saidas   = rows.filter((r) => r.Tipo === 'Saída');
+  const totalEntradas = entradas.reduce((a, r) => a + Number(r.Valor || 0), 0);
+  const totalSaidas   = saidas.reduce((a, r) => a + Math.abs(Number(r.Valor || 0)), 0);
+  return `
+    <div class="exec-stats" style="flex-wrap:wrap;gap:10px">
+      <div class="exec-stat" style="min-width:170px">
+        <span>Total de Entradas</span>
+        <strong style="color:var(--success)">${money(totalEntradas)}</strong>
+        <span class="subtle" style="font-size:11px">${entradas.length} lançamento(s)</span>
+      </div>
+      <div class="exec-stat" style="min-width:170px">
+        <span>Total de Saídas</span>
+        <strong style="color:var(--danger)">${money(totalSaidas)}</strong>
+        <span class="subtle" style="font-size:11px">${saidas.length} lançamento(s)</span>
+      </div>
+    </div>`;
+}
+
 /* --- Ordenação dos Repasses --- */
 const _repasseSort = { master: { col: 'date', dir: -1 }, admin: { col: 'date', dir: -1 } };
 
@@ -851,6 +871,7 @@ function renderFechamentos() {
   const type = val('masterExtractType');
   let extractRows = allMovementRows(extractFilteredClosings());
   if (type) extractRows = extractRows.filter((r) => r.Tipo === type);
+  html('masterExtractTotals', _extractTotalsHTML(extractRows));
   extractRows = _sortExtrat(extractRows, _extratSort.master);
   html('masterMovementsExtractBody', extractRows.map((r) => {
     const obsBtn = r.notes ? `<button class="btn-obs-extrat" data-notes="${esc(r.notes)}" onclick="showObsModal(this)" title="Ver observação">💬</button>` : '';
@@ -1209,6 +1230,7 @@ function renderAdminViews() {
     (!extratEnd   || parseBR(c.date) <= extratEnd)
   );
   let adminExtratRows = allMovementRows(adminMovRows);
+  html('adminExtractTotals', _extractTotalsHTML(adminExtratRows));
   adminExtratRows = _sortExtrat(adminExtratRows, _extratSort.admin);
   html('adminMovementsDetailBody2', adminExtratRows.map((r) => {
     const obsBtn = r.notes ? `<button class="btn-obs-extrat" data-notes="${esc(r.notes)}" onclick="showObsModal(this)" title="Ver observação">💬</button>` : '';
