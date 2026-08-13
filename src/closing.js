@@ -496,6 +496,32 @@ async function saveOpeningAdjustment() {
   alert('Saldo inicial autorizado registrado.');
 }
 
+/* Exclui uma autorização de saldo inicial. Master pode excluir qualquer uma;
+   Admin só as da própria empresa. Não desfaz fechamentos já lançados com base
+   nela — só remove a autorização (evita que volte a ser usada como referência
+   de abertura em novos fechamentos). */
+async function deleteOpeningAdjustment(id) {
+  const adj = (state.cashOpeningAdjustments || []).find((a) => a.id === id);
+  if (!adj) return;
+  if (role === 'operator')                                            return alert('Operador não pode excluir autorizações de saldo.');
+  if (role === 'admin' && adj.companyId !== currentUser?.companyId)  return alert('Esta autorização não pertence ao seu acesso.');
+  if (!confirm(
+    `Excluir a autorização de saldo de ${money(adj.amount)} para ${storeName(adj.storeId)} ` +
+    `(${toBRFromISO(parseBR(adj.startDate))} / ${adj.shift || 'Integral'})?\n\nEsta ação não pode ser desfeita.`
+  )) return;
+
+  if (sb && !USE_LOCAL_FALLBACK && currentUser?.authId) {
+    try { await deleteCashOpeningAdjustment(id); }
+    catch (e) { return alert(`Erro ao excluir: ${e.message}`); }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase obrigatório em produção para excluir ajuste.');
+  }
+
+  state.cashOpeningAdjustments = state.cashOpeningAdjustments.filter((a) => a.id !== id);
+  addAudit('Autorização de saldo excluída', `${companyName(adj.companyId)} / ${storeName(adj.storeId)} - ${money(adj.amount)}`);
+  save(); renderAll();
+}
+
 /* ================================================================
    REVISÃO DE DIVERGÊNCIAS (admin)
 ================================================================ */
@@ -615,13 +641,17 @@ async function saveClosing() {
   for (const row of entryRows) {
     const v = parseCurrencyBR(row.querySelector('.entry')?.value || '0');
     const d = row.querySelector('.entry-desc')?.value?.trim();
+    const client = row.querySelector('.entry-client')?.value?.trim();
     if (v > 0 && !d) return alert('Toda entrada com valor precisa de descrição.');
+    if (v > 0 && !client) return alert('Toda entrada com valor precisa de Cliente selecionado.');
     if (v < 0)       return alert('Valor de entrada não pode ser negativo.');
   }
   for (const row of expenseRows) {
     const v = parseCurrencyBR(row.querySelector('.expense')?.value || '0');
     const d = row.querySelector('.expense-desc')?.value?.trim();
+    const supplier = row.querySelector('.expense-supplier')?.value?.trim();
     if (v > 0 && !d) return alert('Toda saída com valor precisa de descrição.');
+    if (v > 0 && !supplier) return alert('Toda saída com valor precisa de Fornecedor selecionado.');
     if (v < 0)       return alert('Valor de saída não pode ser negativo.');
   }
 
@@ -1508,7 +1538,7 @@ Object.assign(window, {
   suggestInitialBalance, calc,
   addEntry, addExpense, removeLaunchRow,
   ensureExpenseCategories, ensureEntryCategories,
-  confirmTransfer, handleSaveClosingClick, saveClosing, saveOpeningAdjustment, reviewDivergence, createDivergenceReviews,
+  confirmTransfer, handleSaveClosingClick, saveClosing, saveOpeningAdjustment, deleteOpeningAdjustment, reviewDivergence, createDivergenceReviews,
   recalculateClosingStatuses, handleRecalculateStatuses,
   handleAttachments, renderAttachments, clearAttachmentsUI,
   confirmDeleteClosing, openRectifyModal, closeRectifyModal, saveRectification,
@@ -1519,5 +1549,4 @@ Object.assign(window, {
   previewBulkReassign, applyBulkReassignStore,
   previewBulkWaive, applyBulkWaiveDifferences,
 });
-
 

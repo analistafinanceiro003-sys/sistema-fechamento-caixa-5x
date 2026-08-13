@@ -279,7 +279,7 @@ const CONTA_AZUL_HEADERS = [
   'Valor','Categoria','Descrição','Cliente/Fornecedor','CNPJ/CPF Cliente/Fornecedor',
   'Centro de Custo','Observações',
 ];
-function contaAzulRow(r, obsPrefix) {
+function contaAzulRow(r, obsPrefix, includeCostCenter = true) {
   return {
     'Data de Competência': r.Data,
     'Data de Vencimento': r.Data,
@@ -291,7 +291,7 @@ function contaAzulRow(r, obsPrefix) {
     'Descrição': r['Descrição'],
     'Cliente/Fornecedor': r.Fornecedor || '',
     'CNPJ/CPF Cliente/Fornecedor': '',
-    'Centro de Custo': r.Loja,
+    'Centro de Custo': includeCostCenter ? r.Loja : '',
     'Observações': `${obsPrefix} - ${r.Empresa} - ID ${r['ID Fechamento'] || ''}`,
   };
 }
@@ -342,10 +342,16 @@ const CONTA_AZUL_ORIENTACOES = [
   '* Verificar se não ficou espaços entre os dados informados, principalmente quando as informações são coladas;',
   '* As células não podem conter fórmulas;',
 ];
+function shouldFillContaAzulCostCenter() {
+  const visibleOption = all('[data-conta-azul-cost-center]')
+    .find((el) => el.offsetParent !== null);
+  return visibleOption ? visibleOption.checked : true;
+}
 function exportContaAzulXLSX() {
+  const includeCostCenter = shouldFillContaAzulCostCenter();
   const rows = allMovementRows(reportFilteredClosings())
     .filter((r) => r.Tipo === 'Entrada' || r.Tipo === 'Saída')
-    .map((r) => contaAzulRow(r, 'Importado Central de Caixa 5X'));
+    .map((r) => contaAzulRow(r, 'Importado Central de Caixa 5X', includeCostCenter));
 
   if (typeof XLSX === 'undefined') {
     exportGenericCSV('modelo_conta_azul_5x.csv', CONTA_AZUL_HEADERS, rows);

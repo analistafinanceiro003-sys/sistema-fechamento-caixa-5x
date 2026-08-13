@@ -1333,6 +1333,10 @@ async function createCashOpeningAdjustment(adjustment) {
   }));
 }
 
+async function deleteCashOpeningAdjustment(id) {
+  return supabaseWrite('cash_opening_adjustments', 'delete', {}, { id });
+}
+
 async function getCashOpeningAdjustment({ storeId, date, shift }) {
   if (!sb || !hasSupabaseSession()) return findOpeningAdjustment(storeId, parseBR(date), shift);
   const { data, error } = await sb.from('cash_opening_adjustments').select('*')
@@ -1763,6 +1767,22 @@ function loadUserToEdit() {
   setVal('editUserStore', u.storeId || '');
 }
 
+function openUserEditModal(id) {
+  const u = state.users.find((x) => x.id === id);
+  if (!u) return alert('Usuário não encontrado.');
+  setVal('userManageCompany', u.companyId);
+  fillUserManageSelect();
+  setVal('userManageSelect', u.id);
+  loadUserToEdit();
+  const modal = $('userEditModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeUserEditModal() {
+  const modal = $('userEditModal');
+  if (modal) modal.style.display = 'none';
+}
+
 async function saveUserEdit() {
   const u = state.users.find((x) => x.id === val('userManageSelect'));
   if (!u) return alert('Selecione um usuário.');
@@ -1785,6 +1805,7 @@ async function saveUserEdit() {
   addAudit('Edição de usuário', u.login);
   save();
   renderAll();
+  closeUserEditModal();
   toast('Usuário atualizado.');
 }
 
@@ -1849,6 +1870,7 @@ async function removeUserById(id) {
   state.users = state.users.filter((user) => user.id !== id);
   state.analystCompanies = (state.analystCompanies || []).filter((ac) => ac.profileId !== id);
   setVal('userManageSelect', '');
+  closeUserEditModal();
   save();
   renderAll();
   fillUserManageSelect();
@@ -3054,13 +3076,13 @@ Object.assign(window, {
   getOperationConfig, saveOperationConfigToSupabase, saveSelectOptionsToSupabase,
   getClosingsByScope, createClosing, updateClosing, softDeleteClosing, getPreviousClosing, checkDuplicateClosing,
   createClosingEntries, createClosingExpenses, createClosingAttachments, getClosingEntries, getClosingExpenses,
-  createCashOpeningAdjustment, getCashOpeningAdjustment,
+  createCashOpeningAdjustment, getCashOpeningAdjustment, deleteCashOpeningAdjustment,
   createDivergenceReview, getPendingDivergenceReviews, updateDivergenceReview,
   logAudit,
   companyName, storeName, visibleCompanies, visibleStores, cfg,
   saveClientSetup, clearClientSetup, toggleCompany, activateCompanyFromImplant, deleteCompany,
   createStore, updateStoreFund, deleteStore,
-  createUserFromMaster, loadUserToEdit, saveUserEdit,
+  createUserFromMaster, loadUserToEdit, openUserEditModal, closeUserEditModal, saveUserEdit,
   resetSelectedUserPassword, resetUserPasswordViaEdgeFunction, removeUserById,
   deleteSelectedUser, deleteUser,
   renderCompanyChecklist, getCheckedCompanyIds, analystCompanyNames, renderAnalysts,

@@ -565,12 +565,7 @@ function renderUsersByCompany() {
       <td>${u.role === 'admin' ? 'Administrador Cliente' : 'Operador'}</td>
       <td>${tag(u.status || 'Ativo')}</td>
       <td>
-        <button class="btn btn-sm" onclick="
-          document.getElementById('userManageCompany').value='${u.companyId}';
-          fillUserManageSelect();
-          document.getElementById('userManageSelect').value='${u.id}';
-          loadUserToEdit()
-        ">Editar</button>
+        <button class="btn btn-sm" onclick="openUserEditModal('${esc(u.id)}')">Editar</button>
       </td>
     </tr>`
   ).join('') || emptyRow(7));
@@ -1114,8 +1109,9 @@ function renderAdminViews() {
   if ($('openingAdjustmentDate') && !val('openingAdjustmentDate')) setVal('openingAdjustmentDate', todayISO());
   html('openingAdjustmentsBody', (state.cashOpeningAdjustments || [])
     .filter((a) => role === 'master' || a.companyId === currentUser?.companyId)
-    .map((a) => `<tr><td>${esc(storeName(a.storeId))}</td><td>${esc(toBRFromISO(parseBR(a.startDate)))}</td><td>${esc(a.shift || 'Integral')}</td><td>${money(a.amount)}</td><td>${esc(a.reason)}</td><td>${esc(a.authorizedBy || '-')}</td></tr>`)
-    .join('') || emptyRow(6));
+    .map((a) => `<tr><td>${esc(storeName(a.storeId))}</td><td>${esc(toBRFromISO(parseBR(a.startDate)))}</td><td>${esc(a.shift || 'Integral')}</td><td>${money(a.amount)}</td><td>${esc(a.reason)}</td><td>${esc(a.authorizedBy || '-')}</td>
+      <td><button class="btn btn-icon btn-danger" onclick="deleteOpeningAdjustment('${esc(a.id)}')" title="Excluir autorização">×</button></td></tr>`)
+    .join('') || emptyRow(7));
 
   /* Histórico de fechamentos (afech-historico) — resumo por fechamento */
   setOptions('adminMovementStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');

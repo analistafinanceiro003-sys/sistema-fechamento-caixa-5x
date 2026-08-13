@@ -213,8 +213,7 @@
         <button class="inner-tab-btn active" onclick="showSubTab('cadastros','cad-setup',this)">Cadastro Guiado</button>
         <button class="inner-tab-btn" data-subtab="cad-empresas" onclick="showSubTab('cadastros','cad-empresas',this)">Empresas</button>
         <button class="inner-tab-btn" data-subtab="cad-lojas" onclick="showSubTab('cadastros','cad-lojas',this)">Lojas e Caixas</button>
-        <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-usuarios-cadastro',this)">Cadastrar Usuário</button>
-        <button class="inner-tab-btn" onclick="showSubTab('cadastros','cad-usuarios-lista',this)">Usuários e Acessos</button>
+        <button class="inner-tab-btn" data-subtab="cad-usuarios" onclick="showSubTab('cadastros','cad-usuarios',this)">Usuários e Acessos</button>
         <button class="inner-tab-btn" data-subtab="cad-implantacao" onclick="showSubTab('cadastros','cad-implantacao',this)">Implantação</button>
       </div>
 
@@ -274,30 +273,31 @@
 
       <!-- Lojas -->
       <div class="inner-tab-panel hidden" id="cad-lojas">
-        <div class="panel-grid">
-          <div class="card">
-            <h3 class="section-title">Cadastrar loja / caixa</h3>
-            <div class="form-grid">
-              <div class="field"><label>Empresa</label><select id="storeCompany"></select></div>
-              <div class="field"><label>Nome da loja</label><input id="storeName"/></div>
-              <div class="field"><label>Código</label><input id="storeCode"/></div>
-              <div class="field"><label>Tipo de caixa</label><select id="storeCashType"><option>Caixa diário</option><option>Caixa por turno</option><option>Caixa central</option><option>Caixa delivery</option></select></div>
-              <div class="field"><label>Fundo padrão</label><input id="storeStandardFund" type="number" step="0.01" value="100"/></div>
-              <div class="field"><label>Status</label><select id="storeStatus"><option>Ativa</option><option>Implantação</option><option>Inativa</option></select></div>
-            </div>
-            <div class="btn-row"><button class="btn btn-primary" onclick="createStore()">Salvar loja</button></div>
+        <div class="card">
+          <h3 class="section-title">Cadastrar loja / caixa</h3>
+          <div class="form-grid">
+            <div class="field"><label>Empresa</label><select id="storeCompany"></select></div>
+            <div class="field"><label>Nome da loja</label><input id="storeName"/></div>
+            <div class="field"><label>Código</label><input id="storeCode"/></div>
+            <div class="field"><label>Tipo de caixa</label><select id="storeCashType"><option>Caixa diário</option><option>Caixa por turno</option><option>Caixa central</option><option>Caixa delivery</option></select></div>
+            <div class="field"><label>Fundo padrão</label><input id="storeStandardFund" type="number" step="0.01" value="100"/></div>
+            <div class="field"><label>Status</label><select id="storeStatus"><option>Ativa</option><option>Implantação</option><option>Inativa</option></select></div>
           </div>
-          <div class="card">
-            <h3 class="section-title">Lojas cadastradas</h3>
-            <div class="table-wrap">
-              <table><thead><tr><th>Empresa</th><th>Loja</th><th>Código</th><th>Tipo</th><th>Fundo padrão</th><th>Status</th><th>Ações</th></tr></thead>
-              <tbody id="storesBody"></tbody></table>
-            </div>
-            <div class="filter-bar-5x" style="margin-top:10px">
-              <div class="field"><label>Filtrar por nome</label><input id="storeFilter" placeholder="Nome da loja..." oninput="renderCadastros()"/></div>
-            </div>
+          <div class="btn-row"><button class="btn btn-primary" onclick="createStore()">Salvar loja</button></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h3 class="section-title">Lojas cadastradas</h3>
+          <div class="table-wrap">
+            <table><thead><tr><th>Empresa</th><th>Loja</th><th>Código</th><th>Tipo</th><th>Fundo padrão</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="storesBody"></tbody></table>
           </div>
-          <!-- Modal edição de loja -->
+          <div class="filter-bar-5x" style="margin-top:10px">
+            <div class="field"><label>Filtrar por nome</label><input id="storeFilter" placeholder="Nome da loja..." oninput="renderCadastros()"/></div>
+          </div>
+        </div>
+
+        <!-- Modal edição de loja -->
           <div id="editStoreModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:none;align-items:center;justify-content:center">
             <div class="card" style="width:min(500px,96vw);max-height:90vh;overflow-y:auto;padding:24px">
               <h3 class="section-title">Editar loja</h3>
@@ -316,11 +316,10 @@
               </div>
             </div>
           </div>
-        </div>
       </div>
 
-      <!-- Cadastrar Usuário -->
-      <div class="inner-tab-panel hidden" id="cad-usuarios-cadastro">
+      <!-- Usuários e Acessos -->
+      <div class="inner-tab-panel hidden" id="cad-usuarios">
         <div class="panel-grid">
           <div class="card">
             <h3 class="section-title">Criar usuário</h3>
@@ -334,8 +333,12 @@
             </div>
             <div class="btn-row"><button class="btn btn-primary" onclick="createUserFromMaster()">Criar usuário</button></div>
           </div>
-          <div class="card">
+          <div id="userEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+          <div class="card" style="width:min(720px,96vw);max-height:90vh;overflow-y:auto;padding:24px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
             <h3 class="section-title">Editar / Resetar / Excluir usuário</h3>
+              <button class="btn btn-icon" onclick="closeUserEditModal()" title="Fechar">×</button>
+            </div>
             <div class="form-grid">
               <div class="field"><label>Empresa</label><select id="userManageCompany" onchange="fillUserManageSelect();renderUsersByCompany()"></select></div>
               <div class="field"><label>Usuário</label><select id="userManageSelect" onchange="loadUserToEdit()"></select></div>
@@ -354,12 +357,10 @@
               <button class="btn btn-danger" onclick="deleteSelectedUser()">Excluir usuário</button>
             </div>
           </div>
+          </div>
         </div>
-      </div>
 
-      <!-- Usuários e Acessos (visualização) -->
-      <div class="inner-tab-panel hidden" id="cad-usuarios-lista">
-        <div class="card">
+        <div class="card" style="margin-top:16px">
           <h3 class="section-title">Usuários cadastrados</h3>
           <div class="field" style="margin-bottom:14px"><label>Filtrar empresa</label><select id="usersCompanyFilter" onchange="renderUsersByCompany()"></select></div>
           <div class="table-wrap">
@@ -703,6 +704,10 @@
         <div class="report-card" style="max-width:480px">
           <h4>Exportação modelo Conta Azul</h4>
           <p class="subtle">Gera os lançamentos (entradas e saídas) no modelo de planilha Excel para importação no Conta Azul. Repasses não entram aqui — use o relatório de Repasses.</p>
+          <label style="display:flex;align-items:flex-start;gap:8px;margin:10px 0 12px;font-size:13px;color:#374151;line-height:1.5">
+            <input type="checkbox" data-conta-azul-cost-center checked style="width:16px;height:16px;margin-top:2px"/>
+            <span>Preencher <strong>Centro de Custo</strong> com o nome da loja. Se desmarcar, a coluna será exportada vazia.</span>
+          </label>
           <div class="btn-row"><button class="btn btn-primary" onclick="exportContaAzulXLSX()">Exportar Excel (.xlsx)</button></div>
         </div>
       </div>
@@ -1215,13 +1220,13 @@
                 </tr>
                 <tr>
                   <td><strong>Entradas</strong></td>
-                  <td>Todo dinheiro que entrou no caixa durante o turno. Cada entrada tem descrição e valor.</td>
-                  <td>Inclua cada tipo de entrada separadamente: "Vendas dinheiro", "Recebimento de troco", etc.</td>
+                  <td>Todo dinheiro que entrou no caixa durante o turno. Cada linha com valor precisa ter <strong>Descrição</strong>, <strong>Categoria</strong>, <strong>Cliente</strong> e <strong>Valor (R$)</strong>.</td>
+                  <td>Use a Descrição para explicar a origem do dinheiro, por exemplo: "Venda em dinheiro balcão" ou "Recebimento cliente João".</td>
                 </tr>
                 <tr>
                   <td><strong>Saídas</strong></td>
                   <td>Todo dinheiro retirado do caixa durante o turno de forma autorizada (pagamentos, ajuda de custo, etc.).</td>
-                  <td>Saídas reduzem o saldo disponível. Sempre informe a categoria e a descrição real.</td>
+                  <td>Saídas reduzem o saldo disponível. Cada linha com valor precisa ter <strong>Descrição da saída</strong>, <strong>Categoria</strong>, <strong>Fornecedor</strong> e <strong>Valor (R$)</strong>.</td>
                 </tr>
                 <tr>
                   <td><strong>Repasse</strong></td>
@@ -1275,7 +1280,7 @@
           <h3 class="section-title">Entradas</h3>
           <p style="line-height:1.7;color:#374151;margin-bottom:12px">
             Entradas são todos os valores que <strong>aumentaram o saldo do caixa</strong> durante o turno.
-            Cada entrada deve ter uma descrição clara. O total de entradas é somado automaticamente na fórmula.
+            No sistema, cada entrada com valor deve preencher os campos <strong>Descrição</strong>, <strong>Categoria</strong>, <strong>Cliente</strong> e <strong>Valor (R$)</strong>. O total de entradas é somado automaticamente na fórmula do fechamento.
           </p>
           <div class="table-wrap">
             <table class="table">
@@ -1294,7 +1299,7 @@
           <h3 class="section-title">Saídas</h3>
           <p style="line-height:1.7;color:#374151;margin-bottom:12px">
             Saídas são retiradas <strong>autorizadas</strong> do caixa durante o turno. Elas reduzem o saldo disponível antes do repasse.
-            Toda saída deve ter categoria e descrição, e idealmente um comprovante em anexo.
+            No sistema, cada saída com valor deve preencher os campos <strong>Descrição da saída</strong>, <strong>Categoria</strong>, <strong>Fornecedor</strong> e <strong>Valor (R$)</strong>. Quando houver comprovante, anexe JPG, PNG ou PDF no fechamento.
           </p>
           <div class="table-wrap">
             <table class="table">
@@ -1607,6 +1612,7 @@
         <div class="card" style="margin-top:14px">
           <h3 class="section-title">Como funciona o caixa</h3>
           <p style="line-height:1.7;color:#374151;font-size:13px;margin-bottom:14px">Cada loja opera com um <strong>fundo padrão</strong> — um valor fixo que deve ficar sempre no caixa para o próximo turno. No fechamento, o operador transfere o dinheiro que exceder esse fundo.</p>
+          <p style="line-height:1.7;color:#374151;font-size:13px;margin-bottom:14px">Para entender um relatório, leia primeiro estes campos: <strong>Saldo Inicial</strong>, <strong>Entradas</strong>, <strong>Saídas</strong>, <strong>Repasse</strong>, <strong>Saldo Final Após Repasse</strong>, <strong>Fundo Padrão</strong>, <strong>Divergência Fundo</strong> e <strong>Status</strong>.</p>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
             <div style="background:#f0fdf4;border-radius:10px;padding:14px;border:1px solid #bbf7d0">
               <p style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px">FÓRMULA DO REPASSE</p>
@@ -1646,7 +1652,7 @@
                 <tr>
                   <td><strong>Status dos fechamentos</strong></td>
                   <td>Resumo por Fechamento</td>
-                  <td>Coluna "Saldo Final": deve ser igual ao fundo padrão da loja. Coluna "Recebimento": confirmado ou pendente. Coluna "Diferença": próximo de zero. Clique nos cabeçalhos para ordenar.</td>
+                  <td>Confira as colunas "Saldo Final Após Repasse", "Fundo Padrão", "Divergência Fundo", "Status" e "Recebimento". O ideal é Divergência Fundo igual a 0,00 R$ e Status OK.</td>
                 </tr>
                 <tr>
                   <td><strong>Repasses recebidos</strong></td>
@@ -1662,6 +1668,11 @@
                   <td><strong>Movimento por loja</strong></td>
                   <td>Dashboard</td>
                   <td>Gráfico "Entradas x Saídas por Loja" — comparação rápida entre as lojas. Útil para notar uma loja com movimento muito abaixo do normal.</td>
+                </tr>
+                <tr>
+                  <td><strong>Relatório Conta Azul</strong></td>
+                  <td>Relatórios → Conta Azul</td>
+                  <td>Exporta entradas e saídas com Data, Valor, Categoria, Descrição e Cliente/Fornecedor. Antes de exportar, escolha se a coluna "Centro de Custo" deve receber o nome da Loja ou ficar vazia.</td>
                 </tr>
               </tbody>
             </table>
@@ -1758,7 +1769,7 @@
                 <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">PASSO 2</span>
                 <strong style="font-size:14px;color:#0d1720">Informe as entradas</strong>
               </div>
-              <p style="font-size:13px;color:#374151;line-height:1.6">Registre <strong>todo dinheiro que entrou no caixa</strong> durante o turno. Clique em "Adicionar entrada", informe a descrição e o valor. Adicione uma linha por tipo de entrada.</p>
+              <p style="font-size:13px;color:#374151;line-height:1.6">Registre <strong>todo dinheiro que entrou no caixa</strong> durante o turno. Clique em "Adicionar entrada" e preencha <strong>Descrição</strong>, <strong>Categoria</strong>, <strong>Cliente</strong> e <strong>Valor (R$)</strong>. Adicione uma linha por tipo de entrada.</p>
               <div style="background:#f0fdf4;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#166534">
                 <strong>Exemplos de entrada:</strong> "Vendas em dinheiro", "Troco recebido do fornecedor", "Complemento de fundo autorizado pelo gestor".
               </div>
@@ -1769,9 +1780,9 @@
                 <span style="background:#0d1720;color:var(--brand);font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px">PASSO 3</span>
                 <strong style="font-size:14px;color:#0d1720">Informe as saídas</strong>
               </div>
-              <p style="font-size:13px;color:#374151;line-height:1.6">Registre <strong>todo dinheiro retirado do caixa de forma autorizada</strong> durante o turno. Exemplos: ajuda de custo, taxa de entrega, compra de material. Informe a categoria e a descrição.</p>
+              <p style="font-size:13px;color:#374151;line-height:1.6">Registre <strong>todo dinheiro retirado do caixa de forma autorizada</strong> durante o turno. Exemplos: ajuda de custo, taxa de entrega, compra de material. Preencha <strong>Descrição da saída</strong>, <strong>Categoria</strong>, <strong>Fornecedor</strong> e <strong>Valor (R$)</strong>.</p>
               <div style="background:#fee2e2;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#991b1b">
-                <strong>Atenção:</strong> Toda saída precisa ter descrição real. "Saída diversa" ou "outros" não é aceito. Em caso de dúvida sobre o que pode ser retirado, consulte as Regras Operacionais da loja.
+                <strong>Atenção:</strong> Toda saída precisa ter descrição real e fornecedor selecionado. "Saída diversa" ou "outros" não é aceito. Em caso de dúvida sobre o que pode ser retirado, consulte as Regras Operacionais da loja.
               </div>
             </div>
 
@@ -1997,7 +2008,7 @@
             <div class="field full"><label>Observações</label><textarea id="openingAdjustmentNotes"></textarea></div>
           </div>
           <div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" onclick="saveOpeningAdjustment()">Salvar saldo autorizado</button></div>
-          <div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Loja</th><th>Data</th><th>Turno</th><th>Valor</th><th>Motivo</th><th>Autorizado por</th></tr></thead><tbody id="openingAdjustmentsBody"></tbody></table></div>
+          <div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Loja</th><th>Data</th><th>Turno</th><th>Valor</th><th>Motivo</th><th>Autorizado por</th><th>Ações</th></tr></thead><tbody id="openingAdjustmentsBody"></tbody></table></div>
         </div>
       </div>
     </section>
@@ -2157,6 +2168,10 @@
           <div class="report-card" id="rpt_azul" data-submod-card="sub_rel_azul">
             <h4>Exportação Conta Azul</h4>
             <p class="subtle">Lançamentos (entradas e saídas) no modelo de planilha Excel para importação no Conta Azul. Repasses não entram aqui — use o relatório de Repasses.</p>
+            <label style="display:flex;align-items:flex-start;gap:8px;margin:10px 0 12px;font-size:13px;color:#374151;line-height:1.5">
+              <input type="checkbox" data-conta-azul-cost-center checked style="width:16px;height:16px;margin-top:2px"/>
+              <span>Preencher <strong>Centro de Custo</strong> com o nome da loja. Se desmarcar, a coluna será exportada vazia.</span>
+            </label>
             <div class="btn-row"><button class="btn" onclick="exportContaAzulXLSX()">Exportar Excel (.xlsx)</button></div>
           </div>
           <div class="report-card" id="rpt_aud" data-submod-card="sub_rel_aud">
@@ -2582,4 +2597,3 @@
 
 </body>
 </html>
-
