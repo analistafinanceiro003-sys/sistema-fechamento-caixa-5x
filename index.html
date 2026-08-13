@@ -717,7 +717,25 @@
             <input type="checkbox" data-conta-azul-cost-center checked style="width:16px;height:16px;margin-top:2px"/>
             <span>Preencher <strong>Centro de Custo</strong> com o nome da loja. Se desmarcar, a coluna será exportada vazia.</span>
           </label>
-          <div class="btn-row"><button class="btn btn-primary" onclick="exportContaAzulXLSX()">Exportar Excel (.xlsx)</button></div>
+          <div id="contaAzulStatusMaster" class="subtle" style="margin:8px 0">Conta Azul: não verificado.</div>
+          <div class="btn-row">
+            <button class="btn" onclick="checkContaAzulStatus()">Verificar conexão</button>
+            <button class="btn btn-brand" onclick="connectContaAzul()">Conectar Conta Azul</button>
+            <button class="btn btn-primary" onclick="buildContaAzulApprovalPreview()">Gerar prévia para aprovação</button>
+            <button class="btn" onclick="exportContaAzulXLSX()">Exportar Excel (.xlsx)</button>
+          </div>
+        </div>
+        <div class="card" id="contaAzulApprovalCard" style="margin-top:16px;display:none">
+          <h3 class="section-title">Aprovação de lançamentos Conta Azul</h3>
+          <p class="subtle" style="margin-bottom:12px">Revise antes de enviar. O envio via API só deve acontecer depois que os lançamentos estiverem aprovados e os IDs de categoria, conta financeira e cliente/fornecedor estiverem mapeados.</p>
+          <div class="btn-row" style="margin-bottom:12px">
+            <button class="btn btn-primary" onclick="approveContaAzulPreview()">Aprovar selecionados</button>
+            <button class="btn" onclick="clearContaAzulPreview()">Limpar prévia</button>
+          </div>
+          <div class="table-wrap compact-table"><table><thead><tr>
+            <th><input type="checkbox" id="contaAzulSelectAll" onchange="toggleContaAzulPreviewSelection(this.checked)" style="width:16px;height:16px"/></th>
+            <th>Status</th><th>Data</th><th>Tipo</th><th>Descrição</th><th>Categoria</th><th>Cliente/Fornecedor</th><th>Centro de Custo</th><th>Valor</th>
+          </tr></thead><tbody id="contaAzulApprovalBody"></tbody></table></div>
         </div>
       </div>
     </section>
@@ -734,7 +752,6 @@
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-backup',this)">Backup e Manutenção</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-logs',this)">Logs de Auditoria</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-documentos',this)">Documentos</button>
-        <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-manual',this)">Manual 5X</button>
       </div>
 
       <!-- Configurações -->
@@ -973,13 +990,19 @@
           <div id="masterDocFolders"></div>
         </div>
       </div>
-    <div class="inner-tab-panel hidden" id="sis-manual"><div id="manualImplantacao">
+    </section>
+
+    <!-- ============================================================
+         MANUAL 5X
+    ============================================================ -->
+    <section class="page hidden" id="manual">
+    <div id="manualImplantacao">
 
       <!-- Cabeçalho do manual com botão PDF -->
       <div class="card" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
         <div>
           <h3 class="section-title" style="margin-bottom:4px">Manual de Implantação — Conferência Caixa em Dinheiro</h3>
-          <p class="subtle">Referência completa para implantação e operação do sistema. Exclusivo Gestão 5X.</p>
+          <p class="subtle">Referência completa para implantação e operação do sistema. Acesso Gestão 5X e Analistas.</p>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="exportManualPDF()" style="white-space:nowrap">↓ Exportar tudo</button>
@@ -1906,7 +1929,7 @@
 
       </div><!-- fim man-operador -->
 
-    </div></div><!-- fim manualImplantacao / sis-manual -->
+    </div><!-- fim manualImplantacao -->
     </section>
 
     <!-- ============================================================
@@ -2586,6 +2609,7 @@
 <script src="src/db.js"></script>
 <script src="src/closing.js"></script>
 <script src="src/reports.js"></script>
+<script src="src/contaAzul.js"></script>
 <script src="src/render.js"></script>
 <script src="src/app.js"></script>
 
