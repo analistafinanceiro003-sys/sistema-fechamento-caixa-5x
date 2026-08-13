@@ -23,7 +23,16 @@ function setContaAzulStatus(message, kind = '') {
 async function invokeContaAzulFunction(name, payload = {}) {
   if (!sb || USE_LOCAL_FALLBACK) throw new Error('Supabase é obrigatório para conectar o Conta Azul.');
   const { data, error } = await sb.functions.invoke(name, { body: payload });
-  if (error) throw new Error(error.message || 'Falha na função Conta Azul.');
+  if (error) {
+    let message = error.message || 'Falha na função Conta Azul.';
+    if (error.context && typeof error.context.json === 'function') {
+      try {
+        const body = await error.context.json();
+        if (body?.error) message = body.error;
+      } catch (_) { /* corpo não era JSON, mantém mensagem genérica */ }
+    }
+    throw new Error(message);
+  }
   if (data && data.ok === false) throw new Error(data.error || 'Operação Conta Azul recusada.');
   return data;
 }
