@@ -686,6 +686,62 @@ function _updateExtratSortUI(view) {
   });
 }
 
+/* --- Ordenação dos Repasses --- */
+const _repasseSort = { master: { col: 'date', dir: -1 }, admin: { col: 'date', dir: -1 } };
+
+function _repasseCalc(c, receipts) {
+  const receipt = receipts.find((r) => r.closingId === c.id);
+  const waiver  = (state.transferWaivers || []).find((w) => w.closingId === c.id);
+  const expected = Math.max(0, Number(c.expected || 0) - Number(c.standardFund || 0));
+  const informed = Number(c.transfer || 0);
+  return {
+    receipt, waiver, expected, informed,
+    diff: informed - expected,
+    status: waiver ? 'Diferença aceita' : (receipt ? 'Recebido' : 'Pendente'),
+    confirmedBy: receipt?.confirmedBy || waiver?.waivedBy || '',
+    confirmedAt: receipt?.confirmedAt || waiver?.waivedAt || '',
+  };
+}
+
+function _sortRepasses(rows, s, receipts) {
+  if (!s.col) return rows;
+  return [...rows].sort((a, b) => {
+    const ca = _repasseCalc(a, receipts);
+    const cb = _repasseCalc(b, receipts);
+    switch (s.col) {
+      case 'company':     return s.dir * companyName(a.companyId).localeCompare(companyName(b.companyId), 'pt-BR');
+      case 'date':        return s.dir * ((parseBR(a.date) || '').localeCompare(parseBR(b.date) || '') || (a.shift || '').localeCompare(b.shift || '', 'pt-BR'));
+      case 'store':       return s.dir * storeName(a.storeId).localeCompare(storeName(b.storeId), 'pt-BR');
+      case 'operator':    return s.dir * (a.responsible || a.operator || '').localeCompare(b.responsible || b.operator || '', 'pt-BR');
+      case 'initial':     return s.dir * (Number(a.initial || 0) - Number(b.initial || 0));
+      case 'entries':     return s.dir * (Number(a.entries || 0) - Number(b.entries || 0));
+      case 'expenses':    return s.dir * (Number(a.expenses || 0) - Number(b.expenses || 0));
+      case 'expected':    return s.dir * (ca.expected - cb.expected);
+      case 'informed':    return s.dir * (ca.informed - cb.informed);
+      case 'diff':        return s.dir * (ca.diff - cb.diff);
+      case 'status':      return s.dir * ca.status.localeCompare(cb.status, 'pt-BR');
+      case 'confirmedBy': return s.dir * ca.confirmedBy.localeCompare(cb.confirmedBy, 'pt-BR');
+      case 'confirmedAt': return s.dir * ca.confirmedAt.localeCompare(cb.confirmedAt);
+      default: return 0;
+    }
+  });
+}
+
+function sortRepasses(col, view) {
+  const s = _repasseSort[view];
+  if (s.col === col) s.dir *= -1; else { s.col = col; s.dir = -1; }
+  if (view === 'master') renderFechamentos(); else renderAdminViews();
+}
+
+function _updateRepassesSortUI(view) {
+  const s = _repasseSort[view];
+  const p = view === 'master' ? 'rp-m-' : 'rp-a-';
+  ['company','date','store','operator','initial','entries','expenses','expected','informed','diff','status','confirmedBy','confirmedAt'].forEach((col) => {
+    const el = document.getElementById(p + col);
+    if (el) el.textContent = s.col === col ? (s.dir > 0 ? ' ↑' : ' ↓') : '';
+  });
+}
+
 /* --- HELPER: linha de resumo por fechamento (master + admin) --- */
 function buildResumoRow(c, receipt, includeEmpresa) {
   const transfer    = Number(c.transfer || 0);
@@ -846,7 +902,7 @@ function renderFechamentos() {
   const repStart2 = val('masterRepasseStart');
   const repEnd2   = val('masterRepasseEnd');
   const repStat2  = val('masterRepasseStatus');
-  const masterRepasseRows = getScopedClosings({ scope: 'master', operatorId: repOp2 }).filter((c) =>
+  let masterRepasseRows = getScopedClosings({ scope: 'master', operatorId: repOp2 }).filter((c) =>
     Number(c.transfer || 0) > 0 &&
     (!repComp   || c.companyId === repComp) &&
     (!repStore2 || c.storeId === repStore2) &&
@@ -869,11 +925,10 @@ function renderFechamentos() {
       </div>
     </div>`
   );
+  masterRepasseRows = masterRepasseRows.filter((c) => !repStat2 || _repasseCalc(c, allReceiptsMaster).status === repStat2);
+  masterRepasseRows = _sortRepasses(masterRepasseRows, _repasseSort.master, allReceiptsMaster);
   html('masterRepassesBody', masterRepasseRows.map((c) => {
-    const receipt  = allReceiptsMaster.find((r) => r.closingId === c.id);
-    const waiver   = (state.transferWaivers || []).find((w) => w.closingId === c.id);
-    const status   = waiver ? 'Diferença aceita' : (receipt ? 'Recebido' : 'Pendente');
-    if (repStat2 && status !== repStat2) return '';
+    const { receipt, waiver, status } = _repasseCalc(c, allReceiptsMaster);
     const esperado = Math.max(0, Number(c.expected||0) - Number(c.standardFund||0));
     const informado = Number(c.transfer||0);
     const diff = informado - esperado;
@@ -902,7 +957,8 @@ function renderFechamentos() {
       <td>${receipt ? new Date(receipt.confirmedAt).toLocaleString('pt-BR') : (waiver ? new Date(waiver.waivedAt).toLocaleString('pt-BR') : '-')}</td>
       <td>${actionHtml}</td>
     </tr>`;
-  }).filter(Boolean).join('') || emptyRow(11));
+  }).join('') || emptyRow(11));
+  _updateRepassesSortUI('master');
 
   /* Divergências — só lista o que ainda está pendente de revisão. Uma vez
      revisada/justificada/resolvida na aba Divergências do cliente, ou aceita
@@ -1199,7 +1255,7 @@ function renderAdminViews() {
   const repStart  = val('adminRepasseStart');
   const repEnd    = val('adminRepasseEnd');
   const repStatus = val('adminRepasseStatusFilter');
-  const repasseRows = rows.filter((c) =>
+  let repasseRows = rows.filter((c) =>
     Number(c.transfer || 0) > 0 &&
     (!repStore || c.storeId === repStore) &&
     (!repStart || parseBR(c.date) >= repStart) &&
@@ -1224,11 +1280,10 @@ function renderAdminViews() {
       </div>
     </div>`
   );
+  repasseRows = repasseRows.filter((c) => !repStatus || _repasseCalc(c, receipts).status === repStatus);
+  repasseRows = _sortRepasses(repasseRows, _repasseSort.admin, receipts);
   html('adminRepassesBody', repasseRows.map((c) => {
-    const receipt = receipts.find((r) => r.closingId === c.id);
-    const waiver  = (state.transferWaivers || []).find((w) => w.closingId === c.id);
-    const status  = waiver ? 'Diferença aceita' : (receipt ? 'Recebido' : 'Pendente');
-    if (repStatus && status !== repStatus) return '';
+    const { receipt, waiver, status } = _repasseCalc(c, receipts);
     const esperado  = Math.max(0, Number(c.expected ?? 0) - Number(c.standardFund ?? 0));
     const informado = Number(c.transfer || 0);
     const diff      = informado - esperado;
@@ -1255,7 +1310,8 @@ function renderAdminViews() {
           : '<span class="status success">✓</span>'
       }</td>
     </tr>`;
-  }).filter(Boolean).join('') || emptyRow(13));
+  }).join('') || emptyRow(13));
+  _updateRepassesSortUI('admin');
 
   /* Divergências — com filtro de status */
   setOptions('adminDivergenceStoreFilter', stores.map((s) => [s.id, s.name]), 'Todas');
@@ -1580,6 +1636,6 @@ Object.assign(window, {
   renderAll, renderMetrics, renderMasterDashboard, renderCadastros,
   renderUsersByCompany, renderOperacao, renderFechamentos, renderSistema, renderFornecedoresCategorias,
   renderAdminViews, renderOperatorViews, renderModuleManager, switchCentral,
-  renderDocumentos, sortResumo, sortExtrato, toggleOptionCompanyField,
+  renderDocumentos, sortResumo, sortExtrato, sortRepasses, toggleOptionCompanyField,
   implantProgress, goToImplantacao,
 });

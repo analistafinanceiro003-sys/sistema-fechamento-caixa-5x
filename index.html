@@ -635,9 +635,17 @@
             <div class="field"><label>Status</label><select id="masterRepasseStatus" onchange="renderFechamentos()"><option value="">Todos</option><option value="Recebido">Confirmados</option><option value="Pendente">Pendentes</option><option value="Diferença aceita">Diferença aceita</option></select></div>
           </div>
           <div class="table-wrap"><table><thead><tr>
-            <th>Data</th><th>Empresa</th><th>Loja</th><th>Operador</th>
-            <th>Rep. Esperado</th><th>Rep. Informado</th><th>Diferença</th>
-            <th>Status</th><th>Confirmado por</th><th>Confirmado em</th><th>Ação</th>
+            <th class="th-sort" onclick="sortRepasses('date','master')">Data<span id="rp-m-date"></span></th>
+            <th class="th-sort" onclick="sortRepasses('company','master')">Empresa<span id="rp-m-company"></span></th>
+            <th class="th-sort" onclick="sortRepasses('store','master')">Loja<span id="rp-m-store"></span></th>
+            <th class="th-sort" onclick="sortRepasses('operator','master')">Operador<span id="rp-m-operator"></span></th>
+            <th class="th-sort" onclick="sortRepasses('expected','master')">Rep. Esperado<span id="rp-m-expected"></span></th>
+            <th class="th-sort" onclick="sortRepasses('informed','master')">Rep. Informado<span id="rp-m-informed"></span></th>
+            <th class="th-sort" onclick="sortRepasses('diff','master')">Diferença<span id="rp-m-diff"></span></th>
+            <th class="th-sort" onclick="sortRepasses('status','master')">Status<span id="rp-m-status"></span></th>
+            <th class="th-sort" onclick="sortRepasses('confirmedBy','master')">Confirmado por<span id="rp-m-confirmedBy"></span></th>
+            <th class="th-sort" onclick="sortRepasses('confirmedAt','master')">Confirmado em<span id="rp-m-confirmedAt"></span></th>
+            <th>Ação</th>
           </tr></thead><tbody id="masterRepassesBody"></tbody></table></div>
         </div>
       </div>
@@ -2086,7 +2094,21 @@
             <div class="field"><label>Data final</label><input id="adminRepasseEnd" type="date" onchange="renderAdminViews()"/></div>
             <div class="field"><label>Status</label><select id="adminRepasseStatusFilter" onchange="renderAdminViews()"><option value="">Todos</option><option value="Pendente">Pendente</option><option value="Recebido">Recebido</option><option value="Diferença aceita">Diferença aceita</option></select></div>
           </div>
-          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Operador</th><th>Saldo Inicial</th><th>Entradas</th><th>Saídas</th><th>Repasse Esperado</th><th>Repasse Informado</th><th>Diferença</th><th>Status</th><th>Confirmado em</th><th>Por</th><th>Ação</th></tr></thead><tbody id="adminRepassesBody"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr>
+            <th class="th-sort" onclick="sortRepasses('date','admin')">Data<span id="rp-a-date"></span></th>
+            <th class="th-sort" onclick="sortRepasses('store','admin')">Loja<span id="rp-a-store"></span></th>
+            <th class="th-sort" onclick="sortRepasses('operator','admin')">Operador<span id="rp-a-operator"></span></th>
+            <th class="th-sort" onclick="sortRepasses('initial','admin')">Saldo Inicial<span id="rp-a-initial"></span></th>
+            <th class="th-sort" onclick="sortRepasses('entries','admin')">Entradas<span id="rp-a-entries"></span></th>
+            <th class="th-sort" onclick="sortRepasses('expenses','admin')">Saídas<span id="rp-a-expenses"></span></th>
+            <th class="th-sort" onclick="sortRepasses('expected','admin')">Repasse Esperado<span id="rp-a-expected"></span></th>
+            <th class="th-sort" onclick="sortRepasses('informed','admin')">Repasse Informado<span id="rp-a-informed"></span></th>
+            <th class="th-sort" onclick="sortRepasses('diff','admin')">Diferença<span id="rp-a-diff"></span></th>
+            <th class="th-sort" onclick="sortRepasses('status','admin')">Status<span id="rp-a-status"></span></th>
+            <th class="th-sort" onclick="sortRepasses('confirmedAt','admin')">Confirmado em<span id="rp-a-confirmedAt"></span></th>
+            <th class="th-sort" onclick="sortRepasses('confirmedBy','admin')">Por<span id="rp-a-confirmedBy"></span></th>
+            <th>Ação</th>
+          </tr></thead><tbody id="adminRepassesBody"></tbody></table></div>
         </div>
       </div>
 
