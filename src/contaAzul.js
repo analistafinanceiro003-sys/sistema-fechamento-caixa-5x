@@ -31,13 +31,19 @@ async function invokeContaAzulFunction(name, payload = {}) {
 async function connectContaAzul() {
   const companyId = currentContaAzulCompanyId();
   if (!companyId) return alert('Selecione uma empresa no filtro do relatório antes de conectar.');
+  const popup = window.open('', '_blank', 'width=980,height=760');
   try {
     setContaAzulStatus('Conta Azul: abrindo autorização...');
     const data = await invokeContaAzulFunction('conta-azul-auth-start', { company_id: companyId });
     if (!data?.authorization_url) throw new Error('URL de autorização não retornada.');
-    window.open(data.authorization_url, '_blank', 'noopener,noreferrer,width=980,height=760');
+    if (popup && !popup.closed) {
+      popup.location.href = data.authorization_url;
+    } else if (!window.open(data.authorization_url, '_blank', 'width=980,height=760')) {
+      throw new Error('Pop-up bloqueado pelo navegador. Permita pop-ups para este site e tente novamente.');
+    }
     setContaAzulStatus('Conta Azul: autorização aberta. Conclua o login na aba da Conta Azul.');
   } catch (e) {
+    if (popup && !popup.closed) popup.close();
     setContaAzulStatus('Conta Azul: ' + (e.message || 'erro ao iniciar conexão.'), 'error');
     alert('Não foi possível iniciar a conexão Conta Azul: ' + (e.message || 'tente novamente.'));
   }
