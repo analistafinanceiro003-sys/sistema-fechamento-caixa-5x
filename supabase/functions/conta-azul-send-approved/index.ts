@@ -186,6 +186,35 @@ function parcelaId(parcela: any) {
   return clean(parcela?.id || parcela?.uuid || parcela?.id_parcela || parcela?.idParcela);
 }
 
+function findNestedParcelaId(value: any): string {
+  if (!value || typeof value !== 'object') return '';
+  const direct = clean(value.id_parcela || value.idParcela || value.parcela_id || value.parcelaId || value.id_parcela_financeira);
+  if (direct) return direct;
+  const parcela = value.parcela || value.parcela_financeira || value.parcelaFinanceira;
+  const nested = parcelaId(parcela);
+  if (nested) return nested;
+  if (Array.isArray(value.parcelas) && value.parcelas.length) {
+    const found = findNestedParcelaId(value.parcelas[0]);
+    if (found) return found;
+  }
+  if (looksLikeParcela(value)) {
+    const own = parcelaId(value);
+    if (own) return own;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findNestedParcelaId(item);
+      if (found) return found;
+    }
+  } else {
+    for (const item of Object.values(value)) {
+      const found = findNestedParcelaId(item);
+      if (found) return found;
+    }
+  }
+  return '';
+}
+
 function looksLikeParcela(value: any) {
   return !!value && typeof value === 'object' && (
     value.data_vencimento ||
@@ -213,7 +242,7 @@ function createdRefs(created: any) {
     first?.eventId
   ) || findNestedEventId(first);
   const parcela = first?.parcela || first?.parcelas?.[0] || (looksLikeParcela(first) ? first : null);
-  const parcelaIdValue = parcela ? parcelaId(parcela) : '';
+  const parcelaIdValue = (parcela ? parcelaId(parcela) : '') || findNestedParcelaId(first);
   const protocolId = clean(first?.protocolId || first?.protocolo || first?.id_protocolo || first?.protocolo_id);
   return { eventId, parcelaId: parcelaIdValue && parcelaIdValue !== eventId ? parcelaIdValue : '', protocolId };
 }
@@ -321,6 +350,44 @@ async function searchCreatedEvent(accessToken: string, row: Record<string, unkno
       (!Number.isFinite(amount) || !amount || Math.abs(Math.abs(amount) - value) < 0.01);
   }) || items[0];
   return findNestedEventId(match) || objectId(match);
+}
+
+async function searchCreatedParcela(accessToken: string, row: Record<string, unknown>, direction: string) {
+  const date = requireISODate(row);
+  const description = clean(rowValue(row, 'Descrição', 'DescriÃ§Ã£o', 'DescriÃƒÂ§ÃƒÂ£o', 'DescriÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o'));
+  const value = moneyNumber(row.Valor);
+  const params = new URLSearchParams({
+    pagina: '1',
+    tamanho_pagina: '20',
+    data_vencimento_de: date,
+    data_vencimento_ate: date,
+    data_competencia_de: date,
+    data_competencia_ate: date,
+  });
+  if (description) params.set('descricao', description);
+  const path = direction === 'Entrada'
+    ? `/v1/financeiro/eventos-financeiros/contas-a-receber/buscar?${params.toString()}`
+    : `/v1/financeiro/eventos-financeiros/contas-a-pagar/buscar?${params.toString()}`;
+  const data = await caFetch(accessToken, path, { method: 'GET' });
+  const items = firstArray(data, ['itens', 'items', 'data']);
+  const wantedDescription = normalize(description);
+  const match = items.find((item: any) => {
+    const desc = normalize(item.descricao || item.description || item.nome);
+    const amount = Number(item.valor || item.valor_total || item.total || item.valor_bruto || 0);
+    return (!wantedDescription || desc.includes(wantedDescription) || wantedDescription.includes(desc)) &&
+      (!Number.isFinite(amount) || !amount || Math.abs(Math.abs(amount) - value) < 0.01);
+  }) || items[0];
+  return findNestedParcelaId(match);
+}
+
+async function waitCreatedParcela(accessToken: string, row: Record<string, unknown>, direction: string) {
+  const attempts = [700, 1000, 1400, 1800, 2300, 2800, 3500, 4500, 5500, 6500];
+  for (let i = 0; i < attempts.length; i += 1) {
+    const id = await searchCreatedParcela(accessToken, row, direction).catch(() => '');
+    if (id) return id;
+    await sleep(attempts[i]);
+  }
+  return await searchCreatedParcela(accessToken, row, direction).catch(() => '');
 }
 
 async function waitCreatedEvent(accessToken: string, row: Record<string, unknown>, direction: string) {
@@ -567,7 +634,8 @@ Deno.serve(async (req) => {
       const refs = createdRefs(created);
       const protocolId = refs.protocolId || clean(created?.protocolId || created?.protocolo || created?.id);
       const eventId = refs.eventId || await waitProtocolEventId(accessToken, protocolId) || await waitCreatedEvent(accessToken, row, direction);
-      const baixa = await markPaid(accessToken, row, direction, { eventId, parcelaId: refs.parcelaId }, accountId, clean(eventPayload.observacao));
+      const foundParcelaId = refs.parcelaId || await waitCreatedParcela(accessToken, row, direction);
+      const baixa = await markPaid(accessToken, row, direction, { eventId, parcelaId: foundParcelaId }, accountId, clean(eventPayload.observacao));
 
       await admin.from('conta_azul_launch_queue').upsert({
         company_id: companyId,
