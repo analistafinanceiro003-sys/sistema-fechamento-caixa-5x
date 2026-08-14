@@ -358,7 +358,6 @@ async function findSyncedFinancialAccount(admin: any, companyId: string, externa
     .eq('company_id', companyId)
     .eq('kind', 'conta_financeira')
     .eq('active', true)
-    .eq('allowed_for_operator', true)
     .eq('external_id', externalId)
     .maybeSingle();
   if (error || !data?.external_id) return null;

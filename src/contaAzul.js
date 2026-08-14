@@ -389,7 +389,6 @@ async function loadContaAzulFinancialAccounts(companyId) {
     .eq('company_id', companyId)
     .eq('kind', 'conta_financeira')
     .eq('active', true)
-    .eq('allowed_for_operator', true)
     .order('name', { ascending: true });
   if (error) {
     console.warn('Nao foi possivel carregar contas financeiras Conta Azul.', error);
@@ -409,7 +408,7 @@ async function loadContaAzulFinancialAccounts(companyId) {
     select.appendChild(option);
   });
   if (!contaAzulFinancialAccountRows.length) {
-    select.innerHTML = '<option value="">Nenhuma conta financeira liberada para esta empresa</option>';
+    select.innerHTML = '<option value="">Nenhuma conta financeira sincronizada para esta empresa</option>';
     return;
   }
   select.disabled = false;
