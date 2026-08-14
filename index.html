@@ -795,6 +795,7 @@
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-coordenadores',this)">Coordenadores</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-fornecedores',this)">Fornecedores e Categorias</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-conta-azul-cadastros',this);renderContaAzulCatalog()">Cadastros Conta Azul</button>
+        <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-conta-azul-auditoria',this);renderContaAzulLaunchAudit()">Auditoria Conta Azul</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-backup',this)">Backup e Manutenção</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-logs',this)">Logs de Auditoria</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-documentos',this)">Documentos</button>
@@ -1045,6 +1046,39 @@
               <input class="fc-search" id="caCatalogCentroCustoSearch" placeholder="Buscar centro de custo..." oninput="renderContaAzulCatalogTables()"/>
               <div class="table-wrap compact-table fc-table-wrap"><table><thead><tr><th>Liberado</th><th>Centro de custo</th></tr></thead><tbody id="caCatalogCentroCustoBody"></tbody></table></div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auditoria Conta Azul -->
+      <div class="inner-tab-panel hidden" id="sis-conta-azul-auditoria">
+        <div class="card">
+          <div class="section-head-5x">
+            <div>
+              <h3 class="section-title">Auditoria de lancamentos Conta Azul</h3>
+              <p class="subtle">Acompanhe os lancamentos enviados por analistas, masters e coordenadores. Use os filtros para validar competencia, vencimento, pagamento, categoria, cliente/fornecedor, conta financeira, centro de custo, protocolo e erros.</p>
+            </div>
+            <button class="btn btn-sm" onclick="reloadContaAzulLaunchAudit()">Recarregar</button>
+          </div>
+          <div class="filter-bar-5x" style="margin-bottom:16px">
+            <div class="field"><label>Empresa</label><select id="caAuditCompany" onchange="renderContaAzulLaunchAudit()"><option value="">Todas as empresas</option></select></div>
+            <div class="field"><label>Status</label><select id="caAuditStatus" onchange="renderContaAzulLaunchAudit()"><option value="">Todos</option><option>Enviado</option><option>Erro</option><option>Pendente</option><option>Aprovado</option><option>Ignorado</option></select></div>
+            <div class="field"><label>Responsavel</label><select id="caAuditUser" onchange="renderContaAzulLaunchAudit()"><option value="">Todos</option></select></div>
+            <div class="field"><label>De</label><input id="caAuditStart" type="date" onchange="renderContaAzulLaunchAudit()"/></div>
+            <div class="field"><label>Ate</label><input id="caAuditEnd" type="date" onchange="renderContaAzulLaunchAudit()"/></div>
+            <div class="field"><label>Buscar</label><input id="caAuditSearch" placeholder="Descricao, categoria, protocolo..." oninput="renderContaAzulLaunchAudit()"/></div>
+          </div>
+          <div id="caAuditSummary" class="manual-steps" style="margin-bottom:14px"></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Status</th><th>Empresa</th><th>Responsavel</th><th>Enviado em</th><th>Tipo</th>
+                <th>Competencia</th><th>Vencimento</th><th>Pagamento</th><th>Descricao</th>
+                <th>Categoria</th><th>Cliente/Fornecedor</th><th>Conta financeira</th><th>Centro de custo</th>
+                <th>Valor</th><th>Protocolo</th><th>Erro</th>
+              </tr></thead>
+              <tbody id="caAuditBody"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -2713,6 +2747,7 @@
 <script src="src/db.js"></script>
 <script src="src/closing.js"></script>
 <script src="src/reports.js"></script>
+<script src="src/manual.js"></script>
 <script src="src/contaAzul.js"></script>
 <script src="src/render.js"></script>
 <script src="src/app.js"></script>

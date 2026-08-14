@@ -119,6 +119,45 @@ async function caFetch(accessToken: string, path: string, init: RequestInit = {}
   return body;
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function firstArray(value: any, keys: string[]) {
+  for (const key of keys) {
+    if (Array.isArray(value?.[key])) return value[key];
+  }
+  return [];
+}
+
+function objectId(value: any) {
+  return clean(value?.id || value?.uuid || value?.id_evento || value?.idEvento || value?.evento_id || value?.eventoId);
+}
+
+function findNestedEventId(value: any): string {
+  if (!value || typeof value !== 'object') return '';
+  const direct = clean(value.id_evento || value.idEvento || value.evento_id || value.eventoId || value.eventoFinanceiroId || value.idEventoFinanceiro);
+  if (direct) return direct;
+  const eventId = objectId(value.evento || value.evento_financeiro || value.eventoFinanceiro);
+  if (eventId) return eventId;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findNestedEventId(item);
+      if (found) return found;
+    }
+  } else {
+    for (const item of Object.values(value)) {
+      const found = findNestedEventId(item);
+      if (found) return found;
+    }
+  }
+  return '';
+}
+
+function parcelaId(parcela: any) {
+  return clean(parcela?.id || parcela?.uuid || parcela?.id_parcela || parcela?.idParcela);
+}
+
 async function findPessoa(accessToken: string, name: string, profile: 'Cliente' | 'Fornecedor') {
   const params = new URLSearchParams({
     pagina: '1',
@@ -177,6 +216,92 @@ async function findCentroCusto(accessToken: string, name: string) {
     || items.find((c: any) => normalize(c.nome).includes(wanted))
     || items[0];
   return match ? (match.id || match.uuid) : '';
+}
+
+async function waitProtocolEventId(accessToken: string, protocolId: string) {
+  if (!protocolId) return '';
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const protocol = await caFetch(accessToken, `/v1/protocolo/${protocolId}`, { method: 'GET' }).catch(() => null);
+    const status = clean(protocol?.status || protocol?.situacao).toUpperCase();
+    if (status === 'ERROR') {
+      throw new Error(clean(protocol?.message || protocol?.mensagem || protocol?.error || 'Conta Azul retornou erro no protocolo.'));
+    }
+    const eventId = findNestedEventId(protocol);
+    if (eventId && eventId !== protocolId) return eventId;
+    if (status === 'SUCCESS' && eventId) return eventId;
+    await sleep(1200);
+  }
+  return '';
+}
+
+async function searchCreatedEvent(accessToken: string, row: Record<string, unknown>, direction: string) {
+  const date = toISODate(rowValue(row, 'Data de CompetÃªncia', 'Data de CompetÃƒÂªncia'));
+  const description = clean(rowValue(row, 'DescriÃ§Ã£o', 'DescriÃƒÂ§ÃƒÂ£o'));
+  const value = moneyNumber(row.Valor);
+  const params = new URLSearchParams({
+    pagina: '1',
+    tamanho_pagina: '20',
+    data_vencimento_de: date,
+    data_vencimento_ate: date,
+    data_competencia_de: date,
+    data_competencia_ate: date,
+  });
+  if (description) params.set('descricao', description);
+  const path = direction === 'Entrada'
+    ? `/v1/financeiro/eventos-financeiros/contas-a-receber/buscar?${params.toString()}`
+    : `/v1/financeiro/eventos-financeiros/contas-a-pagar/buscar?${params.toString()}`;
+  const data = await caFetch(accessToken, path, { method: 'GET' });
+  const items = firstArray(data, ['itens', 'items', 'data']);
+  const wantedDescription = normalize(description);
+  const match = items.find((item: any) => {
+    const desc = normalize(item.descricao || item.description || item.nome);
+    const amount = Number(item.valor || item.valor_total || item.total || item.valor_bruto || 0);
+    return (!wantedDescription || desc.includes(wantedDescription) || wantedDescription.includes(desc)) &&
+      (!Number.isFinite(amount) || !amount || Math.abs(Math.abs(amount) - value) < 0.01);
+  }) || items[0];
+  return objectId(match);
+}
+
+function extractParcelas(data: any): any[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data.flatMap(extractParcelas);
+  const direct = firstArray(data, ['parcelas', 'itens', 'items', 'data']);
+  if (direct.length) return direct.flatMap(extractParcelas);
+  if (parcelaId(data) && (data.status || data.data_vencimento || data.vencimento || data.valor_composicao || data.conta_financeira)) return [data];
+  return [];
+}
+
+async function findParcelas(accessToken: string, eventId: string) {
+  const data = await caFetch(accessToken, `/v1/financeiro/eventos-financeiros/${eventId}/parcelas`, { method: 'GET' });
+  const parcelas = extractParcelas(data);
+  if (!parcelas.length) throw new Error('Lancamento criado, mas a parcela para baixa nao foi encontrada no Conta Azul.');
+  return parcelas;
+}
+
+async function markPaid(accessToken: string, row: Record<string, unknown>, direction: string, eventId: string, accountId: string, observation: string) {
+  const date = toISODate(rowValue(row, 'Data de CompetÃªncia', 'Data de CompetÃƒÂªncia'));
+  const value = moneyNumber(row.Valor);
+  const parcelas = await findParcelas(accessToken, eventId);
+  const pending = parcelas.find((p: any) => clean(p.status).toUpperCase() !== 'QUITADO') || parcelas[0];
+  if (clean(pending.status).toUpperCase() === 'QUITADO') return { skipped: true, status: 'QUITADO' };
+  const id = parcelaId(pending);
+  if (!id) throw new Error('Lancamento criado, mas o ID da parcela para baixa nao foi retornado pelo Conta Azul.');
+  return await caFetch(accessToken, `/v1/financeiro/eventos-financeiros/parcelas/${id}/baixa`, {
+    method: 'POST',
+    body: JSON.stringify({
+      data_pagamento: date,
+      composicao_valor: {
+        multa: 0,
+        juros: 0,
+        valor_bruto: value,
+        desconto: 0,
+        taxa: 0,
+      },
+      conta_financeira: accountId,
+      metodo_pagamento: 'DINHEIRO',
+      observacao: observation || `Baixa automatica Central de Caixa 5X - ${direction}`,
+    }),
+  });
 }
 
 async function findCatalogExternalId(admin: any, companyId: string, name: string, kind: string) {
@@ -300,6 +425,7 @@ Deno.serve(async (req) => {
   }
 
   const accountIdInput = clean(payload.account_id);
+  const accountNameInput = clean(payload.account_name);
   if (!accountIdInput) return error(req, 'Selecione a Conta Financeira sincronizada antes de enviar.', 400);
   const syncedAccount = await findSyncedFinancialAccount(admin, companyId, accountIdInput);
   if (!syncedAccount) return error(req, 'Conta Financeira nao encontrada nos cadastros sincronizados desta empresa. Sincronize o Conta Azul e selecione a conta novamente.', 400);
@@ -344,13 +470,24 @@ Deno.serve(async (req) => {
         : '/v1/financeiro/eventos-financeiros/contas-a-pagar';
       const created = await caFetch(accessToken, path, { method: 'POST', body: JSON.stringify(eventPayload) });
       const protocolId = clean(created.protocolId || created.protocolo || created.id);
+      const eventId = clean(created.eventId || created.id_evento || created.evento?.id)
+        || await waitProtocolEventId(accessToken, protocolId)
+        || await searchCreatedEvent(accessToken, row, direction);
+      if (!eventId) throw new Error('Lancamento criado, mas nao foi possivel localizar o evento para marcar como pago/recebido.');
+      const baixa = await markPaid(accessToken, row, direction, eventId, accountId, clean(eventPayload.observacao));
 
       await admin.from('conta_azul_launch_queue').upsert({
         company_id: companyId,
         closing_id: clean(item.source?.closingId) || null,
         direction,
         source_key: sourceKey,
-        payload: eventPayload,
+        payload: {
+          ...eventPayload,
+          auditoria_origem: row,
+          conta_financeira_nome: accountNameInput || syncedAccount.name || '',
+          conta_azul_event_id: eventId,
+          conta_azul_baixa: baixa,
+        },
         status: 'Enviado',
         approved_by: requester.id,
         approved_at: new Date().toISOString(),
@@ -359,7 +496,7 @@ Deno.serve(async (req) => {
         error_message: null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'company_id,source_key' });
-      results.push({ id: item.id, ok: true, status: 'Enviado', protocolId });
+      results.push({ id: item.id, ok: true, status: 'Enviado', protocolId, eventId, paid: true });
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Erro ao enviar lancamento.';
       await admin.from('conta_azul_launch_queue').upsert({

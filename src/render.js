@@ -1074,6 +1074,142 @@ function selectSistemaOptionCategory(key) {
   renderSistema();
 }
 
+function caPayloadSource(payload = {}) {
+  return payload.auditoria_origem || payload.row || payload.origem || {};
+}
+
+function caPayloadParcela(payload = {}) {
+  return payload?.condicao_pagamento?.parcelas?.[0] || {};
+}
+
+function caPayloadBaixa(payload = {}) {
+  const baixa = payload.conta_azul_baixa || {};
+  return Array.isArray(baixa) ? (baixa[0] || {}) : baixa;
+}
+
+function caAuditValue(item, field) {
+  const payload = item.payload || {};
+  const source = caPayloadSource(payload);
+  const parcela = caPayloadParcela(payload);
+  const baixa = caPayloadBaixa(payload);
+  const rateio = payload.rateio?.[0] || {};
+  const costCenter = rateio.rateio_centro_custo?.[0] || {};
+  const map = {
+    competencia: source['Data de Competência'] || source['Data de CompetÃªncia'] || payload.data_competencia || '',
+    vencimento: parcela.data_vencimento || source['Data de Vencimento'] || '',
+    pagamento: baixa.data_pagamento || parcela.data_pagamento || parcela.data_pagamento_previsto || '',
+    descricao: source['Descrição'] || source['DescriÃ§Ã£o'] || payload.descricao || '',
+    categoria: source.Categoria || rateio.categoria_nome || rateio.id_categoria || '',
+    pessoa: source['Cliente/Fornecedor'] || payload.contato_nome || payload.contato || '',
+    conta: payload.conta_financeira_nome || source['Conta Financeira'] || payload.conta_financeira || '',
+    centro: source['Centro de Custo'] || costCenter.nome || costCenter.id_centro_custo || '',
+    valor: Number(source.Valor ?? payload.valor ?? 0),
+  };
+  return map[field];
+}
+
+function caAuditUserName(profileId) {
+  const user = (state.users || []).find((u) => u.id === profileId || u.authId === profileId);
+  if (!user) return profileId || 'Sistema';
+  const roleLabel = user.role === 'analyst' ? 'Analista' : user.role === 'master' ? (user.isOwner ? 'Master' : 'Coordenador') : user.role;
+  return `${user.name} (${roleLabel})`;
+}
+
+function caAuditDateOnly(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
+function filteredContaAzulLaunchAudit() {
+  const companyId = val('caAuditCompany') || '';
+  const status = val('caAuditStatus') || '';
+  const userId = val('caAuditUser') || '';
+  const start = val('caAuditStart') || '';
+  const end = val('caAuditEnd') || '';
+  const term = (val('caAuditSearch') || '').trim().toLowerCase();
+  return [...(state.contaAzulLaunchAudit || [])]
+    .filter((item) => !companyId || item.companyId === companyId)
+    .filter((item) => !status || item.status === status)
+    .filter((item) => !userId || item.approvedBy === userId)
+    .filter((item) => {
+      const sentDate = caAuditDateOnly(item.sentAt || item.approvedAt || item.createdAt);
+      return (!start || sentDate >= start) && (!end || sentDate <= end);
+    })
+    .filter((item) => {
+      if (!term) return true;
+      const haystack = [
+        companyName(item.companyId), caAuditUserName(item.approvedBy), item.status, item.direction,
+        caAuditValue(item, 'competencia'), caAuditValue(item, 'vencimento'), caAuditValue(item, 'pagamento'),
+        caAuditValue(item, 'descricao'), caAuditValue(item, 'categoria'), caAuditValue(item, 'pessoa'),
+        caAuditValue(item, 'conta'), caAuditValue(item, 'centro'), item.protocolId, item.errorMessage,
+      ].join(' ').toLowerCase();
+      return haystack.includes(term);
+    })
+    .sort((a, b) => String(b.sentAt || b.approvedAt || b.createdAt || '').localeCompare(String(a.sentAt || a.approvedAt || a.createdAt || '')));
+}
+
+function renderContaAzulLaunchAudit() {
+  if (!$('caAuditBody')) return;
+  const companySelect = $('caAuditCompany');
+  if (companySelect && companySelect.options.length <= 1) {
+    companySelect.innerHTML = '<option value="">Todas as empresas</option>' +
+      visibleCompanies().map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  }
+  const userSelect = $('caAuditUser');
+  if (userSelect && userSelect.options.length <= 1) {
+    const users = (state.users || []).filter((u) => ['analyst', 'master'].includes(u.role));
+    userSelect.innerHTML = '<option value="">Todos</option>' +
+      users.map((u) => `<option value="${u.id}">${esc(caAuditUserName(u.id))}</option>`).join('');
+  }
+
+  const rows = filteredContaAzulLaunchAudit();
+  const total = rows.length;
+  const sent = rows.filter((r) => r.status === 'Enviado').length;
+  const errors = rows.filter((r) => r.status === 'Erro').length;
+  const amount = rows.reduce((sum, item) => sum + Math.abs(Number(caAuditValue(item, 'valor') || 0)), 0);
+  html('caAuditSummary', `
+    <div class="manual-step"><strong>${total}</strong><span>Lancamento(s) filtrado(s)</span></div>
+    <div class="manual-step"><strong>${sent}</strong><span>Enviado(s)</span></div>
+    <div class="manual-step"><strong>${errors}</strong><span>Com erro</span></div>
+    <div class="manual-step"><strong>${money(amount)}</strong><span>Valor total</span></div>
+  `);
+  html('caAuditBody', rows.map((item) => `
+    <tr>
+      <td>${tag(item.status)}</td>
+      <td>${esc(companyName(item.companyId))}</td>
+      <td>${esc(caAuditUserName(item.approvedBy))}</td>
+      <td>${item.sentAt ? esc(new Date(item.sentAt).toLocaleString('pt-BR')) : '-'}</td>
+      <td>${esc(item.direction)}</td>
+      <td>${esc(caAuditValue(item, 'competencia'))}</td>
+      <td>${esc(caAuditValue(item, 'vencimento'))}</td>
+      <td>${esc(caAuditValue(item, 'pagamento'))}</td>
+      <td>${esc(caAuditValue(item, 'descricao'))}</td>
+      <td>${esc(caAuditValue(item, 'categoria'))}</td>
+      <td>${esc(caAuditValue(item, 'pessoa'))}</td>
+      <td>${esc(caAuditValue(item, 'conta'))}</td>
+      <td>${esc(caAuditValue(item, 'centro') || '-')}</td>
+      <td>${money(caAuditValue(item, 'valor'))}</td>
+      <td>${esc(item.protocolId || '-')}</td>
+      <td>${esc(item.errorMessage || '-')}</td>
+    </tr>
+  `).join('') || emptyRow(16, 'Nenhum lancamento encontrado.'));
+}
+
+async function reloadContaAzulLaunchAudit() {
+  if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return toast('Supabase obrigatorio para recarregar auditoria.', 'error');
+  try {
+    const { data, error } = await sb.from('conta_azul_launch_queue').select('*');
+    if (error) throw error;
+    state.contaAzulLaunchAudit = (data || []).map(mapContaAzulLaunchAudit);
+    renderContaAzulLaunchAudit();
+    toast('Auditoria Conta Azul atualizada.');
+  } catch (e) {
+    alert('Nao foi possivel carregar auditoria Conta Azul: ' + (e.message || 'tente novamente.'));
+  }
+}
+
 /* --- SISTEMA (sub-abas: config, backup, logs) --- */
 function renderSistema() {
   toggleOptionCompanyField();
@@ -1132,6 +1268,7 @@ function renderSistema() {
   ).join('') || emptyRow(5));
 
   renderFornecedoresCategorias();
+  renderContaAzulLaunchAudit();
 }
 
 /* --- Fornecedores e Categorias por empresa (aba dedicada em Sistema → Configurações) ---
@@ -1648,7 +1785,7 @@ function renderDocumentos() {
       <div class="rule-company-card" style="margin-bottom:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
           <h4 style="margin:0">${header} <span class="subtle">(${storeDocs.length} arquivo${storeDocs.length!==1?'s':''})</span></h4>
-          ${uploadedCount ? `<div class="btn-row" style="margin:0"><button class="btn btn-sm" onclick="downloadStoreDocumentsZip('${s.id}')">Baixar ZIP</button><button class="btn btn-danger btn-sm" onclick="handleClearStoreDocuments('${s.id}','${esc(s.name)}')">Limpar pasta</button></div>` : ''}
+          ${storeDocs.length ? `<div class="btn-row" style="margin:0"><button class="btn btn-sm" onclick="downloadStoreDocumentsZip('${s.id}')">Baixar ZIP</button>${uploadedCount ? `<button class="btn btn-danger btn-sm" onclick="handleClearStoreDocuments('${s.id}','${esc(s.name)}')">Limpar pasta</button>` : ''}</div>` : ''}
         </div>
         ${storeDocs.length
           ? storeDocs.map(docItem).join('')
@@ -1686,6 +1823,7 @@ Object.assign(window, {
   renderAll, renderMetrics, renderMasterDashboard, renderCadastros,
   renderUsersByCompany, renderOperacao, renderFechamentos, renderSistema, renderFornecedoresCategorias,
   renderAdminViews, renderOperatorViews, renderModuleManager, switchCentral,
-  renderDocumentos, sortResumo, sortExtrato, sortRepasses, toggleOptionCompanyField, selectSistemaOptionCategory,
+  renderDocumentos, renderContaAzulLaunchAudit, reloadContaAzulLaunchAudit,
+  sortResumo, sortExtrato, sortRepasses, toggleOptionCompanyField, selectSistemaOptionCategory,
   implantProgress, goToImplantacao,
 });

@@ -548,6 +548,7 @@ async function sendApprovedContaAzulPreview() {
     });
     const sent = (data.results || []).filter((r) => r.ok).length;
     const failed = (data.results || []).length - sent;
+    if (window.reloadContaAzulLaunchAudit) await reloadContaAzulLaunchAudit();
     renderContaAzulApprovalPreview();
     toast(`${sent} lancamento(s) enviado(s).${failed ? ` ${failed} com erro.` : ''}`, failed ? 'warning' : 'success');
   } catch (e) {

@@ -16,7 +16,7 @@ const NORMALIZED_TABLES = [
   'companies','stores','profiles','module_permissions','operation_rules','operation_configs',
   'closings','closing_entries','closing_expenses','closing_attachments',
   'cash_opening_adjustments','divergence_reviews','audit_logs','select_options',
-  'implant_steps','transfer_waivers',
+  'implant_steps','transfer_waivers','conta_azul_launch_queue',
 ];
 
 const IMPLANT_STEP_LIST = [
@@ -82,6 +82,7 @@ function defaultState() {
     selectOptions: defaultSelectOptions(),
     companySelectOptions: {},
     contaAzulAllowedOptions: {},
+    contaAzulLaunchAudit: [],
     audit: [],
     transferReceipts: [],
     transferWaivers: [],
@@ -364,7 +365,7 @@ async function reopenTransferWaiver(closingId) {
 
 function normalizeState() {
   state = (state && typeof state === 'object') ? state : defaultState();
-  ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit','transferReceipts','transferWaivers','storeDocuments','rectificationRequests','analystCompanies'].forEach((k) => {
+  ['companies','stores','users','rules','closings','cashOpeningAdjustments','divergenceReviews','implant','audit','transferReceipts','transferWaivers','storeDocuments','rectificationRequests','analystCompanies','contaAzulLaunchAudit'].forEach((k) => {
     if (!Array.isArray(state[k])) state[k] = [];
   });
   /* Migração: importa recibos salvos na chave antiga (localStorage separado) */
@@ -441,6 +442,25 @@ function mapProfile(row) {
     role: row.role,
     status: row.status || 'Ativo',
     isOwner: !!row.is_owner,
+  };
+}
+
+function mapContaAzulLaunchAudit(row) {
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    closingId: row.closing_id,
+    direction: row.direction,
+    sourceKey: row.source_key,
+    payload: row.payload || {},
+    status: row.status || 'Pendente',
+    approvedBy: row.approved_by || '',
+    approvedAt: row.approved_at,
+    sentAt: row.sent_at,
+    protocolId: row.conta_azul_protocol_id || '',
+    errorMessage: row.error_message || '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -608,7 +628,7 @@ async function loadFromNormalizedSupabase() {
   const [
     companies, stores, profiles, modulePermissions, rules, operationConfigs,
     closings, entries, expenses, attachments, openingAdjustments, reviews, audit, selectOptions,
-    transferReceiptsRows, implantStepsRows, storeDocumentsRows, analystCompanyRows, transferWaiversRows,
+    transferReceiptsRows, implantStepsRows, storeDocumentsRows, analystCompanyRows, transferWaiversRows, contaAzulLaunchRows,
   ] = await Promise.all([
     selectTable('companies'),
     selectTable('stores'),
@@ -634,6 +654,7 @@ async function loadFromNormalizedSupabase() {
     selectTable('analyst_companies').catch(() => []),
     /* tabela transfer_waivers — execute a migração migration_diferenca_repasse.sql para ativar */
     selectTable('transfer_waivers').catch(() => []),
+    selectTable('conta_azul_launch_queue').catch(() => []),
   ]);
 
   const entriesByClosing = groupBy(entries, 'closing_id');
@@ -669,6 +690,7 @@ async function loadFromNormalizedSupabase() {
     transferWaivers: transferWaiversRows.map(mapTransferWaiver),
     storeDocuments: storeDocumentsRows.map(mapStoreDocument),
     analystCompanies: analystCompanyRows.map((r) => ({ id: r.id, profileId: r.profile_id, companyId: r.company_id })),
+    contaAzulLaunchAudit: contaAzulLaunchRows.map(mapContaAzulLaunchAudit),
   };
   state.contaAzulAllowedOptions = readContaAzulAllowedOptionsCache();
   applyModuleRows(modulePermissions);
@@ -3217,19 +3239,40 @@ function downloadBlob(filename, blob) {
   URL.revokeObjectURL(url);
 }
 
+function closingAttachmentDocsForStore(storeId) {
+  return (state.closings || [])
+    .filter((c) => c.storeId === storeId)
+    .flatMap((c) => (c.attachments || []).map((a) => ({
+      id:          a.id || a.path || a.url || '',
+      name:        a.name || a.fileName || 'Anexo',
+      path:        a.path || extractStoragePath(a.url || '', 'closing-attachments'),
+      bucket:      'closing-attachments',
+      description: `Fechamento ${c.date}${c.shift ? ' - ' + c.shift : ''}`,
+      createdAt:   a.createdAt || c.createdAt || '',
+    })))
+    .filter((d) => d.path);
+}
+
 async function downloadStoreDocumentsZip(storeId) {
   try {
     const store = state.stores.find((s) => s.id === storeId);
     if (!store) return alert('Loja não encontrada.');
-    const docs = (state.storeDocuments || []).filter((d) => d.storeId === storeId && d.path);
+    const docs = [
+      ...(state.storeDocuments || [])
+        .filter((d) => d.storeId === storeId && d.path)
+        .map((d) => ({ ...d, bucket: 'store-documents' })),
+      ...closingAttachmentDocsForStore(storeId),
+    ];
     if (!docs.length) return toast('Não há documentos enviados nesta pasta.');
     if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return alert('Login necessário para baixar documentos.');
     const files = [];
     const usedNames = new Set();
     for (const doc of docs) {
-      const { data, error } = await sb.storage.from('store-documents').download(doc.path);
+      const bucket = doc.bucket || 'store-documents';
+      const { data, error } = await sb.storage.from(bucket).download(doc.path);
       if (error || !data) throw new Error(`Falha ao baixar "${doc.name}": ${error?.message || 'arquivo indisponível'}`);
-      const baseName = safeZipName(doc.name || doc.path.split('/').pop());
+      const prefix = bucket === 'closing-attachments' ? 'fechamentos' : 'documentos';
+      const baseName = `${prefix}/${safeZipName(doc.name || doc.path.split('/').pop())}`;
       const dot = baseName.lastIndexOf('.');
       const stem = dot > 0 ? baseName.slice(0, dot) : baseName;
       const ext = dot > 0 ? baseName.slice(dot) : '';
@@ -3393,7 +3436,7 @@ Object.assign(window, {
   fillReportStore, fillReportOperator, fillClientReportStore, fillClientReportOperator, fillMasterExtractStore,
   fillMasterMovementStore, fillMasterDivergenceStore, fillMasterResumoStore, fillMasterRepasseStore,
   fillUserManageSelect, fillEditUserStore, toggleUserStore,
-  mapStoreDocument, uploadStoreDocument, deleteStoreDocument, clearStoreDocumentsByStore, downloadStoreDocumentsZip,
+  mapStoreDocument, mapContaAzulLaunchAudit, uploadStoreDocument, deleteStoreDocument, clearStoreDocumentsByStore, downloadStoreDocumentsZip,
   previewDocUpload, handleDocUpload, handleDeleteDoc, handleClearStoreDocuments,
   viewStorageFile, openFileViewer, closeFileViewer, reloadStoreDocuments,
   saveRectificationRequest,
