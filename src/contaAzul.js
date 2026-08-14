@@ -322,6 +322,7 @@ async function loadContaAzulCatalog() {
   if (typeof applyContaAzulAllowedOptionRows === 'function') applyContaAzulAllowedOptionRows(contaAzulCatalogRows.filter((row) => row.allowed_for_operator && row.active !== false));
   setContaAzulCatalogStatus(`${contaAzulCatalogRows.length} item(ns) sincronizado(s).`, 'success');
   renderContaAzulCatalogTables();
+  if (companyId === currentContaAzulCompanyId()) await loadContaAzulFinancialAccounts(companyId);
 }
 
 async function syncContaAzulCatalog(companyIdOverride = '') {
@@ -337,6 +338,7 @@ async function syncContaAzulCatalog(companyIdOverride = '') {
       .join(' | ');
     setContaAzulCatalogStatus(`${total} item(ns) sincronizado(s) do Conta Azul.${details ? ` ${details}` : ''}`, 'success');
     if (!companyIdOverride) await loadContaAzulCatalog();
+    if (companyId === currentContaAzulCompanyId()) await loadContaAzulFinancialAccounts(companyId);
   } catch (e) {
     setContaAzulCatalogStatus(e.message || 'Erro ao sincronizar Conta Azul.', 'error');
     alert('Nao foi possivel sincronizar cadastros Conta Azul: ' + (e.message || 'tente novamente.'));
@@ -363,6 +365,7 @@ async function clearContaAzulCatalog() {
     }
     renderContaAzulCatalogTables();
     setContaAzulCatalogStatus(`${data.deleted || 0} item(ns) sincronizado(s) removido(s) de ${company}.`, 'success');
+    if (companyId === currentContaAzulCompanyId()) await loadContaAzulFinancialAccounts(companyId);
     toast('Sincronizacao Conta Azul limpa para esta empresa.');
     await loadContaAzulCompanyStatuses();
     if (window.renderCadastros) renderCadastros();
@@ -377,6 +380,7 @@ async function loadContaAzulFinancialAccounts(companyId) {
   if (!select) return;
   select.innerHTML = '<option value="">Selecione a conta sincronizada</option>';
   select.dataset.companyId = companyId || '';
+  select.disabled = true;
   contaAzulFinancialAccountRows = [];
   if (!companyId || !sb || USE_LOCAL_FALLBACK) return;
   const { data, error } = await sb
@@ -385,6 +389,7 @@ async function loadContaAzulFinancialAccounts(companyId) {
     .eq('company_id', companyId)
     .eq('kind', 'conta_financeira')
     .eq('active', true)
+    .eq('allowed_for_operator', true)
     .order('name', { ascending: true });
   if (error) {
     console.warn('Nao foi possivel carregar contas financeiras Conta Azul.', error);
@@ -404,8 +409,10 @@ async function loadContaAzulFinancialAccounts(companyId) {
     select.appendChild(option);
   });
   if (!contaAzulFinancialAccountRows.length) {
-    select.innerHTML = '<option value="">Nenhuma conta financeira sincronizada para esta empresa</option>';
+    select.innerHTML = '<option value="">Nenhuma conta financeira liberada para esta empresa</option>';
+    return;
   }
+  select.disabled = false;
 }
 
 function renderContaAzulCatalogTables() {
