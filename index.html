@@ -718,7 +718,7 @@
       <div class="card">
         <h3 class="section-title">Filtros de relatório</h3>
         <div class="form-grid three">
-          <div class="field"><label>Empresa</label><select id="reportCompany" onchange="fillReportStore();fillReportOperator();refreshContaAzulSelectedCompanyStatus();renderAll()"></select></div>
+          <div class="field"><label>Empresa</label><select id="reportCompany" onchange="handleReportCompanyChange()"></select></div>
           <div class="field"><label>Loja / caixa</label><select id="reportStore" onchange="renderAll()"><option value="">Todas</option></select></div>
           <div class="field"><label>Operador</label><select id="reportOperator" onchange="renderAll()"><option value="">Todos</option></select></div>
           <div class="field"><label>Data inicial</label><input id="reportStart" type="date" onchange="renderAll()"/></div>

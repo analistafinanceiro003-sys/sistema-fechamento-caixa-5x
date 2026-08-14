@@ -20,6 +20,60 @@ function currentContaAzulCompanyName() {
   return companyName(currentContaAzulCompanyId()) || 'empresa selecionada';
 }
 
+function handleReportCompanyChange() {
+  if (typeof fillReportStore === 'function') fillReportStore();
+  if (typeof fillReportOperator === 'function') fillReportOperator();
+  refreshContaAzulSelectedCompanyStatus();
+  contaAzulPreviewRows = [];
+  renderContaAzulApprovalPreview();
+  loadContaAzulFinancialAccounts(currentContaAzulCompanyId());
+  if (typeof renderAll === 'function') renderAll();
+}
+
+async function loadContaAzulAllowedOptionsForCompany(companyId) {
+  if (!companyId || !sb || USE_LOCAL_FALLBACK) return;
+  const categoryByKind = {
+    fornecedor: 'fornecedores',
+    cliente: 'clientes',
+    categoria_entrada: 'entryCategories',
+    categoria_saida: 'expenseCategories',
+  };
+  const next = {
+    fornecedores: [],
+    clientes: [],
+    entryCategories: [],
+    expenseCategories: [],
+  };
+  const seen = {
+    fornecedores: new Set(),
+    clientes: new Set(),
+    entryCategories: new Set(),
+    expenseCategories: new Set(),
+  };
+  const { data, error } = await sb
+    .from('conta_azul_catalog_items')
+    .select('kind, name')
+    .eq('company_id', companyId)
+    .eq('allowed_for_operator', true)
+    .eq('active', true);
+  if (error) {
+    console.warn('Nao foi possivel carregar cadastros liberados Conta Azul.', error);
+    return;
+  }
+  (data || []).forEach((row) => {
+    const category = categoryByKind[row.kind];
+    if (!category || !row.name) return;
+    const key = String(row.name).trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (!key || seen[category].has(key)) return;
+    seen[category].add(key);
+    next[category].push(row.name);
+  });
+  Object.values(next).forEach((values) => values.sort((a, b) => a.localeCompare(b, 'pt-BR')));
+  state.contaAzulAllowedOptions = state.contaAzulAllowedOptions || {};
+  state.contaAzulAllowedOptions[companyId] = next;
+  if (typeof writeContaAzulAllowedOptionsCache === 'function') writeContaAzulAllowedOptionsCache(state.contaAzulAllowedOptions);
+}
+
 function setContaAzulStatus(message, kind = '') {
   ['contaAzulStatusMaster'].forEach((id) => {
     const el = $(id);
@@ -293,6 +347,7 @@ async function loadContaAzulFinancialAccounts(companyId) {
   const select = $('contaAzulAccountSelect');
   if (!select) return;
   select.innerHTML = '<option value="">Selecione a conta sincronizada</option>';
+  select.dataset.companyId = companyId || '';
   contaAzulFinancialAccountRows = [];
   if (!companyId || !sb || USE_LOCAL_FALLBACK) return;
   const { data, error } = await sb
@@ -306,13 +361,22 @@ async function loadContaAzulFinancialAccounts(companyId) {
     console.warn('Nao foi possivel carregar contas financeiras Conta Azul.', error);
     return;
   }
-  contaAzulFinancialAccountRows = data || [];
+  const seen = new Set();
+  contaAzulFinancialAccountRows = (data || []).filter((account) => {
+    const key = account.external_id || account.name;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   contaAzulFinancialAccountRows.forEach((account) => {
     const option = document.createElement('option');
     option.value = account.external_id || '';
     option.textContent = account.name || account.external_id || '';
     select.appendChild(option);
   });
+  if (!contaAzulFinancialAccountRows.length) {
+    select.innerHTML = '<option value="">Nenhuma conta financeira sincronizada para esta empresa</option>';
+  }
 }
 
 function renderContaAzulCatalogTables() {
@@ -383,7 +447,9 @@ async function toggleContaAzulCatalogAllowed(id, allowed) {
 }
 
 function contaAzulApprovalRows() {
+  const companyId = currentContaAzulCompanyId();
   return allMovementRows(reportFilteredClosings())
+    .filter((r) => !companyId || r.companyId === companyId)
     .filter((r) => r.Tipo === 'Entrada' || r.Tipo === 'Saída')
     .map((r, idx) => ({
       id: `preview_${idx}`,
@@ -405,6 +471,8 @@ function contaAzulPreviewOptions(item, field) {
   const category = field === 'Categoria'
     ? (item.type === 'Entrada' ? 'entryCategories' : 'expenseCategories')
     : (item.type === 'Entrada' ? 'clientes' : 'fornecedores');
+  const syncedValues = state.contaAzulAllowedOptions?.[companyId]?.[category];
+  if (Array.isArray(syncedValues)) return syncedValues;
   return optionsForCompany(companyId, category);
 }
 
@@ -457,6 +525,8 @@ function renderContaAzulApprovalPreview() {
 }
 
 async function buildContaAzulApprovalPreview() {
+  if (role === 'master' && !currentContaAzulCompanyId()) return alert('Selecione uma empresa antes de gerar a previa Conta Azul.');
+  await loadContaAzulAllowedOptionsForCompany(currentContaAzulCompanyId());
   contaAzulPreviewRows = contaAzulApprovalRows();
   await loadContaAzulFinancialAccounts(currentContaAzulCompanyId());
   renderContaAzulApprovalPreview();
@@ -533,6 +603,10 @@ async function sendApprovedContaAzulPreview() {
   const accountId = val('contaAzulAccountSelect');
   const accountName = accountId ? (accountSelect?.selectedOptions?.[0]?.textContent || '').trim() : '';
   if (!accountId) return alert('Selecione a Conta Financeira sincronizada onde os lancamentos devem ser feitos.');
+  if (accountSelect?.dataset.companyId !== companyId || !contaAzulFinancialAccountRows.some((account) => account.external_id === accountId)) {
+    await loadContaAzulFinancialAccounts(companyId);
+    return alert('Selecione uma Conta Financeira sincronizada da empresa atual antes de enviar.');
+  }
   const approved = contaAzulPreviewRows.filter((r) => r.selected && r.approved && !r.sent);
   if (!approved.length) return alert('Selecione ao menos um lancamento aprovado ainda nao enviado.');
   const invalid = approved.filter((r) => contaAzulPreviewMissingFields(r).length);
@@ -631,6 +705,7 @@ Object.assign(window, {
   loadContaAzulCompanyStatuses, refreshContaAzulCompanyStatusesIfNeeded,
   contaAzulCompanyStatusHtml, syncContaAzulCatalogForCompany,
   renderContaAzulCatalog, loadContaAzulCatalog, syncContaAzulCatalog,
+  handleReportCompanyChange, loadContaAzulFinancialAccounts,
   renderContaAzulCatalogTables, toggleContaAzulCatalogAllowed,
   buildContaAzulApprovalPreview, renderContaAzulApprovalPreview,
   setContaAzulPreviewSelected, toggleContaAzulPreviewSelection,
