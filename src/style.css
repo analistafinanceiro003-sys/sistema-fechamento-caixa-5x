@@ -146,6 +146,15 @@ button,input,select,textarea{font-family:var(--font)}
 .form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
 .form-grid.three{grid-template-columns:repeat(3,1fr)}
 .full{grid-column:1/-1}
+.section-head-5x{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.section-head-5x .section-title{margin-bottom:4px}
+.store-form-card{padding:22px}
+.store-form-grid{grid-template-columns:1.2fr 1.2fr .75fr .9fr}
+.store-form-grid .field:nth-child(1),.store-form-grid .field:nth-child(2){grid-column:span 2}
+.checkbox-line-5x{min-height:42px;border:1px solid #d0d5dd;border-radius:12px;padding:10px 12px;background:#f8fafc;display:flex!important;align-items:center;gap:9px;color:#344054;cursor:pointer}
+.checkbox-line-5x input{width:16px;height:16px;flex:0 0 auto;padding:0}
+.store-filter-panel{background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.pill{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#f2f4f7;border:1px solid var(--line);color:#475467;font-size:12px;font-weight:700;padding:5px 10px;white-space:nowrap}
 
 /* ============================================================
    INPUTS
@@ -484,6 +493,8 @@ tr:hover td{background:#fafbfc}
 
 @media(max-width:900px){
   .panel-grid{grid-template-columns:1fr}
+  .store-form-grid{grid-template-columns:repeat(2,1fr)}
+  .store-form-grid .field:nth-child(1),.store-form-grid .field:nth-child(2){grid-column:auto}
   .form-grid.three{grid-template-columns:repeat(2,1fr)}
   .report-grid{grid-template-columns:1fr 1fr}
   .filter-bar-5x{grid-template-columns:1fr 1fr}
@@ -527,7 +538,8 @@ tr:hover td{background:#fafbfc}
 
 @media(max-width:700px){
   .cards{grid-template-columns:1fr}
-  .form-grid,.form-grid.three,.user-edit-grid,.filter-bar-5x{grid-template-columns:1fr}
+  .form-grid,.form-grid.three,.store-form-grid,.user-edit-grid,.filter-bar-5x{grid-template-columns:1fr}
+  .section-head-5x{display:grid;gap:10px}
   .launch-row,.launch-row.expense-row,.launch-row.entry-row{grid-template-columns:1fr}
   .report-grid,.client-report-grid{grid-template-columns:1fr}
   .main{padding:12px!important;padding-top:0!important;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))!important}

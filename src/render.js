@@ -460,14 +460,25 @@ function renderCadastros() {
 
   /* Lojas — com filtro e ações de editar/excluir */
   const storeSearch = (val('storeFilter') || '').toLowerCase();
+  const storeCompanyFilter = val('storeFilterCompany');
+  const storeStatusFilter = val('storeFilterStatus');
+  const storeTypeFilter = val('storeFilterCashType');
   const filteredStores = visibleStores().filter((s) =>
-    !storeSearch || s.name.toLowerCase().includes(storeSearch) || (s.code || '').toLowerCase().includes(storeSearch)
+    (!storeCompanyFilter || s.companyId === storeCompanyFilter) &&
+    (!storeStatusFilter || s.status === storeStatusFilter) &&
+    (!storeTypeFilter || s.cashType === storeTypeFilter) &&
+    (!storeSearch ||
+      s.name.toLowerCase().includes(storeSearch) ||
+      companyName(s.companyId).toLowerCase().includes(storeSearch) ||
+      (s.code || '').toLowerCase().includes(storeSearch))
   );
+  text('storesCount', `${filteredStores.length} loja(s)`);
   html('storesBody', filteredStores.map((s) => {
     const hasClosings = (state.closings || []).some((c) => c.storeId === s.id);
     return `<tr>
       <td>${esc(companyName(s.companyId))}</td><td>${esc(s.name)}</td>
       <td>${esc(s.code)}</td><td>${esc(s.cashType)}</td>
+      <td>${esc(s.contaAzulCostCenterName || '-')}</td>
       <td>${money(s.standardFund)}</td>
       <td>${tag(s.status)}</td>
       <td style="white-space:nowrap">
@@ -475,7 +486,7 @@ function renderCadastros() {
         <button class="btn btn-danger btn-sm" onclick="deleteStore('${s.id}')" ${hasClosings ? 'title="Esta loja possui fechamentos vinculados"' : ''}>Excluir</button>
       </td>
     </tr>`;
-  }).join('') || emptyRow(7));
+  }).join('') || emptyRow(8));
 
   /* Usuários */
   renderUsersByCompany();

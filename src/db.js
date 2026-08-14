@@ -2979,11 +2979,11 @@ function fillSelects() {
   if (!state) return;
   const companies = visibleCompanies().map((c) => [c.id, c.name]);
   [
-    'storeCompany','opCompany','ruleCompany','implantCompanyFilter','operationCompany',
+    'storeCompany','storeFilterCompany','opCompany','ruleCompany','implantCompanyFilter','operationCompany',
     'ruleFilterCompany','moduleCompany','reportCompany','masterExtractCompany',
     'masterMovementCompanyFilter','masterDivergenceCompanyFilter','masterResumoCompany','masterRepasseCompany',
     'userManageCompany','usersCompanyFilter','dashCompanyFilter',
-  ].forEach((id) => setOptions(id, companies, id === 'dashCompanyFilter' ? 'Todas as empresas' : undefined));
+  ].forEach((id) => setOptions(id, companies, id === 'dashCompanyFilter' ? 'Todas as empresas' : id === 'storeFilterCompany' ? 'Todas' : undefined));
 
   fillStoreSelect();
   fillClosingStoreSelect();
