@@ -843,13 +843,13 @@
         </div>
 
         <div class="inner-tab-panel hidden" id="sisconf-exclusoes">
-          <div class="management-block">
+          <div class="management-block" id="sisconf-exclusoes-tabs">
             <div class="card"><div class="section-head-5x"><div><h3 class="section-title">Exclusões e manutenção de cadastros</h3><p class="subtle">Use com cuidado: a exclusão remove registros da base.</p></div></div></div>
             <div class="inner-tabs compact-tabs-5x">
-              <button class="inner-tab-btn active" onclick="showSubTab('sisconf-exclusoes','sisdel-empresas',this)">Empresas</button>
-              <button class="inner-tab-btn" onclick="showSubTab('sisconf-exclusoes','sisdel-lojas',this)">Lojas / caixas</button>
-              <button class="inner-tab-btn" onclick="showSubTab('sisconf-exclusoes','sisdel-usuarios',this)">Usuários</button>
-              <button class="inner-tab-btn" onclick="showSubTab('sisconf-exclusoes','sisdel-regras',this)">Regras operacionais</button>
+              <button class="inner-tab-btn active" onclick="showSubTab('sisconf-exclusoes-tabs','sisdel-empresas',this)">Empresas</button>
+              <button class="inner-tab-btn" onclick="showSubTab('sisconf-exclusoes-tabs','sisdel-lojas',this)">Lojas / caixas</button>
+              <button class="inner-tab-btn" onclick="showSubTab('sisconf-exclusoes-tabs','sisdel-usuarios',this)">Usuários</button>
+              <button class="inner-tab-btn" onclick="showSubTab('sisconf-exclusoes-tabs','sisdel-regras',this)">Regras operacionais</button>
             </div>
             <div class="inner-tab-panel active" id="sisdel-empresas"><div class="management-card"><h4>Empresas</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Status</th><th>Ação</th></tr></thead><tbody id="settingsCompaniesBody"></tbody></table></div></div></div>
             <div class="inner-tab-panel hidden" id="sisdel-lojas"><div class="management-card"><h4>Lojas / caixas</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Loja</th><th>Ação</th></tr></thead><tbody id="settingsStoresBody"></tbody></table></div></div></div>
