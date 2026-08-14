@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get('SERVICE_ROLE_KEY');
   const clientId = Deno.env.get('CONTA_AZUL_CLIENT_ID');
   const redirectUri = Deno.env.get('CONTA_AZUL_REDIRECT_URI');
-  const authUrl = Deno.env.get('CONTA_AZUL_AUTH_URL') || 'https://auth.contaazul.com/oauth2/authorize';
+  const authUrl = Deno.env.get('CONTA_AZUL_AUTH_URL') || 'https://auth.contaazul.com/login';
   const scope = Deno.env.get('CONTA_AZUL_SCOPE') || 'openid profile aws.cognito.signin.user.admin';
   if (!supabaseUrl || !serviceKey || !clientId || !redirectUri) {
     return error(req, 'Secrets da integração Conta Azul incompletos.', 500);
