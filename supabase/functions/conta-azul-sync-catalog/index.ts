@@ -29,6 +29,10 @@ function basicAuth(clientId: string, clientSecret: string) {
   return btoa(`${clientId}:${clientSecret}`);
 }
 
+function onlyDigits(value: unknown) {
+  return clean(value).replace(/\D/g, '');
+}
+
 async function ensureAccessToken(admin: any, connection: any) {
   const clientId = Deno.env.get('CONTA_AZUL_CLIENT_ID');
   const clientSecret = Deno.env.get('CONTA_AZUL_CLIENT_SECRET');
@@ -76,6 +80,10 @@ async function caFetch(accessToken: string, path: string) {
     throw new Error(Array.isArray(msg) ? msg.join(', ') : String(msg));
   }
   return body;
+}
+
+async function connectedAccount(accessToken: string) {
+  return await caFetch(accessToken, '/v1/pessoas/conta-conectada');
 }
 
 async function fetchPages(accessToken: string, path: string, itemKey = 'items') {
@@ -206,6 +214,27 @@ Deno.serve(async (req) => {
   }
 
   const accessToken = await ensureAccessToken(admin, connection);
+  const { data: company } = await admin.from('companies')
+    .select('name, legal_name, cnpj')
+    .eq('id', companyId)
+    .maybeSingle();
+  const expectedDocument = onlyDigits(company?.cnpj);
+  const account = await connectedAccount(accessToken);
+  const connectedDocument = onlyDigits(account?.documento || account?.cnpj);
+  if (expectedDocument && connectedDocument && expectedDocument !== connectedDocument) {
+    const message = `A empresa selecionada (${company?.name || companyId}, CNPJ ${company?.cnpj}) esta conectada no Conta Azul errado (${account?.nome_fantasia || account?.razao_social || 'conta sem nome'}, documento ${account?.documento || 'nao informado'}). Reconecte esta empresa usando o usuario correto do Conta Azul.`;
+    await admin.from('conta_azul_connections').update({
+      last_error: message,
+      status: 'Conta divergente',
+      updated_at: new Date().toISOString(),
+    }).eq('id', connection.id);
+    return error(req, message, 409);
+  }
+  await admin.from('conta_azul_connections').update({
+    last_error: null,
+    status: 'Conectado',
+    updated_at: new Date().toISOString(),
+  }).eq('id', connection.id);
   const counts: Record<string, number> = {};
   const steps: Array<{ label: string; count: number }> = [];
   try {
