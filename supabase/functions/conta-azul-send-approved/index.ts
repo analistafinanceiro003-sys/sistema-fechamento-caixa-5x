@@ -211,11 +211,28 @@ function createdRefs(created: any) {
     first?.evento_id ||
     first?.eventoId ||
     first?.eventId
-  );
+  ) || findNestedEventId(first);
   const parcela = first?.parcela || first?.parcelas?.[0] || (looksLikeParcela(first) ? first : null);
   const parcelaIdValue = parcela ? parcelaId(parcela) : '';
   const protocolId = clean(first?.protocolId || first?.protocolo || first?.id_protocolo || first?.protocolo_id);
   return { eventId, parcelaId: parcelaIdValue && parcelaIdValue !== eventId ? parcelaIdValue : '', protocolId };
+}
+
+async function protocolEventId(accessToken: string, protocolId: string) {
+  if (!protocolId) return '';
+  const data = await caFetch(accessToken, `/v1/protocolo/${protocolId}`, { method: 'GET' });
+  return findNestedEventId(data);
+}
+
+async function waitProtocolEventId(accessToken: string, protocolId: string) {
+  if (!protocolId) return '';
+  const attempts = [700, 1000, 1400, 1800, 2300, 2800, 3500, 4500, 5500, 6500];
+  for (let i = 0; i < attempts.length; i += 1) {
+    const eventId = await protocolEventId(accessToken, protocolId).catch(() => '');
+    if (eventId) return eventId;
+    await sleep(attempts[i]);
+  }
+  return await protocolEventId(accessToken, protocolId).catch(() => '');
 }
 
 async function findPessoa(accessToken: string, name: string, profile: 'Cliente' | 'Fornecedor') {
@@ -303,7 +320,7 @@ async function searchCreatedEvent(accessToken: string, row: Record<string, unkno
     return (!wantedDescription || desc.includes(wantedDescription) || wantedDescription.includes(desc)) &&
       (!Number.isFinite(amount) || !amount || Math.abs(Math.abs(amount) - value) < 0.01);
   }) || items[0];
-  return objectId(match);
+  return findNestedEventId(match) || objectId(match);
 }
 
 async function waitCreatedEvent(accessToken: string, row: Record<string, unknown>, direction: string) {
@@ -548,9 +565,9 @@ Deno.serve(async (req) => {
         : '/v1/financeiro/eventos-financeiros/contas-a-pagar';
       const created = await caFetch(accessToken, path, { method: 'POST', body: JSON.stringify(eventPayload) });
       const refs = createdRefs(created);
-      const eventId = refs.eventId || await waitCreatedEvent(accessToken, row, direction);
-      const baixa = await markPaid(accessToken, row, direction, { eventId, parcelaId: refs.parcelaId }, accountId, clean(eventPayload.observacao));
       const protocolId = refs.protocolId || clean(created?.protocolId || created?.protocolo || created?.id);
+      const eventId = refs.eventId || await waitProtocolEventId(accessToken, protocolId) || await waitCreatedEvent(accessToken, row, direction);
+      const baixa = await markPaid(accessToken, row, direction, { eventId, parcelaId: refs.parcelaId }, accountId, clean(eventPayload.observacao));
 
       await admin.from('conta_azul_launch_queue').upsert({
         company_id: companyId,
