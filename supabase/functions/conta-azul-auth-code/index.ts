@@ -33,7 +33,9 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get('SERVICE_ROLE_KEY');
   const clientId = Deno.env.get('CONTA_AZUL_CLIENT_ID');
   const clientSecret = Deno.env.get('CONTA_AZUL_CLIENT_SECRET');
-  const redirectUri = Deno.env.get('CONTA_AZUL_REDIRECT_URI');
+  const configuredRedirectUri = Deno.env.get('CONTA_AZUL_REDIRECT_URI');
+  const appRedirectUri = Deno.env.get('CONTA_AZUL_APP_REDIRECT_URI');
+  const redirectUri = appRedirectUri || configuredRedirectUri;
   const tokenUrl = Deno.env.get('CONTA_AZUL_TOKEN_URL') || 'https://auth.contaazul.com/oauth2/token';
   if (!supabaseUrl || !serviceKey || !clientId || !clientSecret || !redirectUri) {
     return error(req, 'Secrets da integracao Conta Azul incompletos.', 500);

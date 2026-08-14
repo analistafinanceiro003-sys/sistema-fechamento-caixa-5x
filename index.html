@@ -678,7 +678,7 @@
       <div class="card">
         <h3 class="section-title">Filtros de relatório</h3>
         <div class="form-grid three">
-          <div class="field"><label>Empresa</label><select id="reportCompany" onchange="fillReportStore();fillReportOperator();renderAll()"></select></div>
+          <div class="field"><label>Empresa</label><select id="reportCompany" onchange="fillReportStore();fillReportOperator();refreshContaAzulSelectedCompanyStatus();renderAll()"></select></div>
           <div class="field"><label>Loja / caixa</label><select id="reportStore" onchange="renderAll()"><option value="">Todas</option></select></div>
           <div class="field"><label>Operador</label><select id="reportOperator" onchange="renderAll()"><option value="">Todos</option></select></div>
           <div class="field"><label>Data inicial</label><input id="reportStart" type="date" onchange="renderAll()"/></div>
@@ -719,9 +719,8 @@
           </label>
           <div id="contaAzulStatusMaster" class="subtle" style="margin:8px 0">Conta Azul: não verificado.</div>
           <div class="btn-row">
-            <button class="btn" onclick="checkContaAzulStatus()">Verificar conexão</button>
-            <button class="btn btn-brand" onclick="connectContaAzul()">Conectar Conta Azul</button>
-            <button class="btn" onclick="finishContaAzulManualAuth()">Informar codigo de autorizacao</button>
+            <button class="btn conta-azul-admin-control" onclick="checkContaAzulStatus()">Verificar conexão</button>
+            <button class="btn btn-brand conta-azul-admin-control" onclick="connectContaAzul()">Conectar Conta Azul</button>
             <button class="btn btn-primary" onclick="buildContaAzulApprovalPreview()">Gerar prévia para aprovação</button>
             <button class="btn" onclick="exportContaAzulXLSX()">Exportar Excel (.xlsx)</button>
           </div>

@@ -11,6 +11,10 @@ function currentContaAzulCompanyId() {
   return val('reportCompany') || '';
 }
 
+function currentContaAzulCompanyName() {
+  return companyName(currentContaAzulCompanyId()) || 'empresa selecionada';
+}
+
 function setContaAzulStatus(message, kind = '') {
   ['contaAzulStatusMaster'].forEach((id) => {
     const el = $(id);
@@ -37,12 +41,27 @@ async function invokeContaAzulFunction(name, payload = {}) {
   return data;
 }
 
+function refreshContaAzulSelectedCompanyStatus() {
+  const companyId = currentContaAzulCompanyId();
+  if (!companyId) return setContaAzulStatus('Conta Azul: selecione a empresa que deseja conectar.');
+  setContaAzulStatus(`Conta Azul: pronto para conectar ${currentContaAzulCompanyName()}. Use o usuario Conta Azul desta empresa no login.`);
+}
+
+function applyContaAzulRoleControls() {
+  all('.conta-azul-admin-control').forEach((el) => {
+    el.style.display = role === 'analyst' ? 'none' : '';
+  });
+}
+
 async function connectContaAzul() {
   const companyId = currentContaAzulCompanyId();
+  const company = currentContaAzulCompanyName();
   if (!companyId) return alert('Selecione uma empresa no filtro do relatório antes de conectar.');
+  const confirmed = confirm(`Conectar Conta Azul para: ${company}\n\nNa tela da Conta Azul, entre com o usuario dessa mesma empresa. Se o navegador abrir outra conta automaticamente, saia da Conta Azul e tente novamente.`);
+  if (!confirmed) return;
   const popup = window.open('', '_blank', 'width=980,height=760');
   try {
-    setContaAzulStatus('Conta Azul: abrindo autorização...');
+    setContaAzulStatus(`Conta Azul: abrindo autorizacao para ${company}...`);
     const data = await invokeContaAzulFunction('conta-azul-auth-start', { company_id: companyId });
     if (!data?.authorization_url) throw new Error('URL de autorização não retornada.');
     if (popup && !popup.closed) {
@@ -50,7 +69,7 @@ async function connectContaAzul() {
     } else if (!window.open(data.authorization_url, '_blank', 'width=980,height=760')) {
       throw new Error('Pop-up bloqueado pelo navegador. Permita pop-ups para este site e tente novamente.');
     }
-    setContaAzulStatus('Conta Azul: autorização aberta. Conclua o login na aba da Conta Azul.');
+    setContaAzulStatus(`Conta Azul: autorizacao aberta para ${company}. Conclua o login usando o usuario Conta Azul desta empresa.`);
   } catch (e) {
     if (popup && !popup.closed) popup.close();
     setContaAzulStatus('Conta Azul: ' + (e.message || 'erro ao iniciar conexão.'), 'error');
@@ -90,6 +109,24 @@ async function finishContaAzulManualAuth() {
   } catch (e) {
     setContaAzulStatus('Conta Azul: ' + (e.message || 'erro ao validar codigo.'), 'error');
     alert('Nao foi possivel concluir a conexao Conta Azul: ' + (e.message || 'tente novamente.'));
+  }
+}
+
+async function finishContaAzulAuthFromUrl() {
+  const params = new URLSearchParams(window.location.search || '');
+  const code = params.get('code') || '';
+  const state = params.get('state') || '';
+  if (!code || !state) return false;
+  try {
+    setContaAzulStatus('Conta Azul: finalizando conexao...');
+    await invokeContaAzulFunction('conta-azul-auth-code', { code, state });
+    setContaAzulStatus('Conta Azul: conectado com sucesso.', 'success');
+    toast('Conta Azul conectada com sucesso.');
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+    return true;
+  } catch (e) {
+    setContaAzulStatus('Conta Azul: ' + (e.message || 'erro ao finalizar conexao.'), 'error');
+    return false;
   }
 }
 
@@ -223,9 +260,14 @@ function clearContaAzulPreview() {
 
 Object.assign(window, {
   connectContaAzul, checkContaAzulStatus,
-  finishContaAzulManualAuth,
+  refreshContaAzulSelectedCompanyStatus, applyContaAzulRoleControls,
   buildContaAzulApprovalPreview, renderContaAzulApprovalPreview,
   setContaAzulPreviewSelected, toggleContaAzulPreviewSelection,
   updateContaAzulPreviewField,
   approveContaAzulPreview, clearContaAzulPreview,
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  applyContaAzulRoleControls();
+  finishContaAzulAuthFromUrl();
 });

@@ -20,6 +20,7 @@ function renderAll() {
   try { renderModuleManager(); } catch(e) { console.warn('renderModuleManager:', e); }
   try { renderAttachments(); } catch(e) { console.warn('renderAttachments:', e); }
   try { renderDocumentos(); } catch(e) { console.warn('renderDocumentos:', e); }
+  try { if (window.applyContaAzulRoleControls) applyContaAzulRoleControls(); } catch(e) { console.warn('applyContaAzulRoleControls:', e); }
   try { calc(); } catch(e) { console.warn('calc:', e); }
 }
 
