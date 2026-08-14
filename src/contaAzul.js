@@ -96,7 +96,7 @@ function parseContaAzulAuthInput(input) {
 }
 
 async function finishContaAzulManualAuth() {
-  const pasted = prompt('Cole aqui a URL final da Conta Azul depois do login, ou cole o code de autorizacao.');
+  const pasted = prompt('Cole aqui a URL completa da barra do navegador da Conta Azul depois do login.');
   if (!pasted) return;
   const { code, state } = parseContaAzulAuthInput(pasted);
   if (!code) return alert('Nao encontrei o code de autorizacao. Copie a URL completa que ficou na barra do navegador depois do login.');
@@ -260,7 +260,7 @@ function clearContaAzulPreview() {
 
 Object.assign(window, {
   connectContaAzul, checkContaAzulStatus,
-  refreshContaAzulSelectedCompanyStatus, applyContaAzulRoleControls,
+  finishContaAzulManualAuth, refreshContaAzulSelectedCompanyStatus, applyContaAzulRoleControls,
   buildContaAzulApprovalPreview, renderContaAzulApprovalPreview,
   setContaAzulPreviewSelected, toggleContaAzulPreviewSelection,
   updateContaAzulPreviewField,
