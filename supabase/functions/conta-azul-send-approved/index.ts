@@ -332,6 +332,25 @@ async function findParcelas(accessToken: string, eventId: string) {
   return parcelas;
 }
 
+async function waitParcelas(accessToken: string, eventId: string) {
+  const attempts = [700, 1000, 1400, 1800, 2300, 2800, 3500, 4500, 5500, 6500];
+  let lastError = '';
+  for (let i = 0; i < attempts.length; i += 1) {
+    try {
+      const parcelas = await findParcelas(accessToken, eventId);
+      if (parcelas.length) return parcelas;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : 'Parcela nao encontrada.';
+    }
+    await sleep(attempts[i]);
+  }
+  try {
+    return await findParcelas(accessToken, eventId);
+  } catch (e) {
+    throw new Error(lastError || 'Lancamento criado, mas a parcela para baixa nao foi encontrada no Conta Azul.');
+  }
+}
+
 async function createBaixa(accessToken: string, parcelaIdValue: string, row: Record<string, unknown>, direction: string, accountId: string, observation: string) {
   const date = requireISODate(row);
   const value = moneyNumber(row.Valor);
@@ -357,7 +376,7 @@ async function createBaixa(accessToken: string, parcelaIdValue: string, row: Rec
 async function markPaid(accessToken: string, row: Record<string, unknown>, direction: string, refs: { eventId?: string; parcelaId?: string }, accountId: string, observation: string) {
   if (refs.parcelaId) return await createBaixa(accessToken, refs.parcelaId, row, direction, accountId, observation);
   if (!refs.eventId) throw new Error('Lancamento criado, mas nao foi possivel localizar a parcela para marcar como pago/recebido.');
-  const parcelas = await findParcelas(accessToken, refs.eventId);
+  const parcelas = await waitParcelas(accessToken, refs.eventId);
   const pending = parcelas.find((p: any) => clean(p.status).toUpperCase() !== 'QUITADO') || parcelas[0];
   if (clean(pending.status).toUpperCase() === 'QUITADO') return { skipped: true, status: 'QUITADO' };
   return await createBaixa(accessToken, parcelaId(pending), row, direction, accountId, observation);
