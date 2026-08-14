@@ -58,6 +58,41 @@ async function connectContaAzul() {
   }
 }
 
+function parseContaAzulAuthInput(input) {
+  const raw = String(input || '').trim();
+  if (!raw) return {};
+  try {
+    const parsed = new URL(raw);
+    return {
+      code: parsed.searchParams.get('code') || '',
+      state: parsed.searchParams.get('state') || '',
+    };
+  } catch (_) {
+    const params = new URLSearchParams(raw.replace(/^[?#]/, ''));
+    return {
+      code: params.get('code') || raw,
+      state: params.get('state') || '',
+    };
+  }
+}
+
+async function finishContaAzulManualAuth() {
+  const pasted = prompt('Cole aqui a URL final da Conta Azul depois do login, ou cole o code de autorizacao.');
+  if (!pasted) return;
+  const { code, state } = parseContaAzulAuthInput(pasted);
+  if (!code) return alert('Nao encontrei o code de autorizacao. Copie a URL completa que ficou na barra do navegador depois do login.');
+  if (!state) return alert('Nao encontrei o state. Cole a URL completa da barra do navegador para validar a autorizacao com seguranca.');
+  try {
+    setContaAzulStatus('Conta Azul: validando codigo de autorizacao...');
+    await invokeContaAzulFunction('conta-azul-auth-code', { code, state });
+    setContaAzulStatus('Conta Azul: conectado com sucesso.', 'success');
+    toast('Conta Azul conectada com sucesso.');
+  } catch (e) {
+    setContaAzulStatus('Conta Azul: ' + (e.message || 'erro ao validar codigo.'), 'error');
+    alert('Nao foi possivel concluir a conexao Conta Azul: ' + (e.message || 'tente novamente.'));
+  }
+}
+
 async function checkContaAzulStatus() {
   const companyId = currentContaAzulCompanyId();
   if (!companyId) return setContaAzulStatus('Conta Azul: selecione uma empresa para verificar.', 'error');
@@ -88,8 +123,36 @@ function contaAzulApprovalRows(includeCostCenter) {
       selected: true,
       approved: false,
       row: contaAzulRow(r, 'Importado Central de Caixa 5X', includeCostCenter),
+      source: r,
       type: r.Tipo,
     }));
+}
+
+function contaAzulPreviewOptions(item, field) {
+  const companyId = item.source?.companyId || currentContaAzulCompanyId();
+  const category = field === 'Categoria'
+    ? (item.type === 'Entrada' ? 'entryCategories' : 'expenseCategories')
+    : (item.type === 'Entrada' ? 'clientes' : 'fornecedores');
+  return optionsForCompany(companyId, category);
+}
+
+function contaAzulSelectHtml(item, field) {
+  const current = item.row[field] || '';
+  const options = contaAzulPreviewOptions(item, field);
+  const merged = current && !options.includes(current) ? [current, ...options] : options;
+  return `<select class="ca-preview-select ${current ? '' : 'is-invalid'}" onchange="updateContaAzulPreviewField('${esc(item.id)}','${esc(field)}',this.value,this)">
+    <option value="">Selecione</option>
+    ${merged.map((option) => `<option value="${esc(option)}" ${option === current ? 'selected' : ''}>${esc(option)}</option>`).join('')}
+  </select>`;
+}
+
+function contaAzulInputHtml(item, field) {
+  const current = item.row[field] || '';
+  return `<input class="ca-preview-input ${current ? '' : 'is-invalid'}" value="${esc(current)}" oninput="updateContaAzulPreviewField('${esc(item.id)}','${esc(field)}',this.value,this)" placeholder="${esc(field)}"/>`;
+}
+
+function contaAzulPreviewMissingFields(item) {
+  return ['Descrição', 'Categoria', 'Cliente/Fornecedor'].filter((field) => !String(item.row[field] || '').trim());
 }
 
 function renderContaAzulApprovalPreview() {
@@ -97,15 +160,18 @@ function renderContaAzulApprovalPreview() {
   if (card) card.style.display = contaAzulPreviewRows.length ? '' : 'none';
   html('contaAzulApprovalBody', contaAzulPreviewRows.map((item) => {
     const r = item.row;
-    const status = item.approved ? '<span class="status success">Aprovado</span>' : '<span class="status warning">Pendente</span>';
+    const missing = contaAzulPreviewMissingFields(item);
+    const status = missing.length
+      ? '<span class="status danger">Incompleto</span>'
+      : item.approved ? '<span class="status success">Aprovado</span>' : '<span class="status warning">Pendente</span>';
     return `<tr>
       <td><input type="checkbox" data-ca-preview-id="${esc(item.id)}" ${item.selected ? 'checked' : ''} onchange="setContaAzulPreviewSelected('${esc(item.id)}',this.checked)" style="width:16px;height:16px"/></td>
       <td>${status}</td>
       <td>${esc(r['Data de Competência'])}</td>
       <td>${esc(item.type)}</td>
-      <td>${esc(r.Descrição)}</td>
-      <td>${esc(r.Categoria)}</td>
-      <td>${esc(r['Cliente/Fornecedor'])}</td>
+      <td>${contaAzulInputHtml(item, 'Descrição')}</td>
+      <td>${contaAzulSelectHtml(item, 'Categoria')}</td>
+      <td>${contaAzulSelectHtml(item, 'Cliente/Fornecedor')}</td>
       <td>${esc(r['Centro de Custo'])}</td>
       <td style="color:${Number(r.Valor) >= 0 ? 'var(--success)' : 'var(--danger)'}">${money(r.Valor)}</td>
     </tr>`;
@@ -124,6 +190,14 @@ function setContaAzulPreviewSelected(id, selected) {
   if (item) item.selected = selected;
 }
 
+function updateContaAzulPreviewField(id, field, value, el = null) {
+  const item = contaAzulPreviewRows.find((r) => r.id === id);
+  if (!item) return;
+  item.row[field] = value;
+  item.approved = false;
+  if (el) el.classList.toggle('is-invalid', !String(value || '').trim());
+}
+
 function toggleContaAzulPreviewSelection(selected) {
   contaAzulPreviewRows.forEach((r) => { r.selected = selected; });
   renderContaAzulApprovalPreview();
@@ -132,6 +206,11 @@ function toggleContaAzulPreviewSelection(selected) {
 function approveContaAzulPreview() {
   const selected = contaAzulPreviewRows.filter((r) => r.selected);
   if (!selected.length) return alert('Selecione ao menos um lançamento para aprovar.');
+  const invalid = selected.filter((r) => contaAzulPreviewMissingFields(r).length);
+  if (invalid.length) {
+    renderContaAzulApprovalPreview();
+    return alert('Preencha Descrição, Categoria e Cliente/Fornecedor em todos os lançamentos selecionados antes de aprovar.');
+  }
   selected.forEach((r) => { r.approved = true; });
   renderContaAzulApprovalPreview();
   toast(`${selected.length} lançamento(s) aprovado(s) para envio Conta Azul.`);
@@ -144,7 +223,9 @@ function clearContaAzulPreview() {
 
 Object.assign(window, {
   connectContaAzul, checkContaAzulStatus,
+  finishContaAzulManualAuth,
   buildContaAzulApprovalPreview, renderContaAzulApprovalPreview,
   setContaAzulPreviewSelected, toggleContaAzulPreviewSelection,
+  updateContaAzulPreviewField,
   approveContaAzulPreview, clearContaAzulPreview,
 });

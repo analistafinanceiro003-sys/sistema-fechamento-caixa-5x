@@ -184,6 +184,8 @@ th,td{padding:11px 13px;border-bottom:1px solid var(--line);font-size:13px;text-
 th{background:#f8fafc;color:#475467;font-size:11px;text-transform:uppercase;letter-spacing:.3px;font-weight:700}
 tr:last-child td{border-bottom:0}
 tr:hover td{background:#fafbfc}
+.ca-preview-input,.ca-preview-select{min-width:180px;border-radius:8px;padding:7px 9px;font-size:12px}
+.ca-preview-input.is-invalid,.ca-preview-select.is-invalid{border-color:#fca5a5;background:#fff7f7}
 
 /* ============================================================
    STATUS BADGES
