@@ -679,6 +679,34 @@ body.role-operator #closing .panel-grid{grid-template-columns:1fr}
   .toast{min-width:0;max-width:100%;width:100%}
 }
 
+/* ============================================================
+   CENTRAL DE PROCESSAMENTO / NOTIFICACOES
+============================================================ */
+.notification-toggle{position:relative;padding:8px 12px!important;font-size:12px!important}
+.notification-badge{position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--danger);color:#fff;font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;border:2px solid #fff}
+.processing-panel{position:fixed;top:0;right:0;width:min(420px,94vw);height:100vh;background:#fff;border-left:1px solid var(--line);box-shadow:-24px 0 60px rgba(16,24,40,.16);z-index:1200;transform:translateX(105%);transition:transform .22s ease;display:flex;flex-direction:column}
+.processing-panel.open{transform:translateX(0)}
+.processing-panel-head{padding:18px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.processing-panel-head strong{display:block;font-size:16px}
+.processing-panel-head span{display:block;color:var(--muted);font-size:12px;margin-top:3px}
+.processing-list{padding:12px;overflow:auto;display:grid;gap:10px;flex:1;background:#f8fafc}
+.processing-item{background:#fff;border:1px solid var(--line);border-left:4px solid var(--info);border-radius:14px;padding:12px;box-shadow:0 8px 20px rgba(16,24,40,.05)}
+.processing-item.is-unread{box-shadow:0 0 0 3px rgba(54,199,189,.12),0 8px 20px rgba(16,24,40,.06)}
+.processing-item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px}
+.processing-item-top strong{font-size:13px;color:#0d1720}
+.processing-item-top span{font-size:10px;text-transform:uppercase;font-weight:800;letter-spacing:.3px;color:#475467;background:#f1f5f9;border-radius:999px;padding:4px 7px;white-space:nowrap}
+.processing-item p{font-size:13px;color:#344054;line-height:1.45;margin-bottom:6px}
+.processing-item small{display:block;color:#667085;font-size:12px;line-height:1.45;margin-bottom:6px}
+.processing-item time{display:block;color:#98a2b3;font-size:11px}
+.processing-processing{border-left-color:var(--info)}
+.processing-success{border-left-color:var(--success)}
+.processing-error{border-left-color:var(--danger)}
+.processing-warning{border-left-color:var(--warning)}
+.processing-panel-foot{padding:12px 18px;border-top:1px solid var(--line);background:#fff}
+@media(max-width:700px){
+  .processing-panel{width:100vw}
+}
+
 /* ===== INFO TOOLTIP ===== */
 #infoTooltip {
   display: none;

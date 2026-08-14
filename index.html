@@ -119,6 +119,7 @@
       <div class="top-right">
         <span id="realtimeStatus" style="font-size:12px;font-weight:700;color:#d97706">○ Conectando</span>
         <button class="btn" onclick="manualRefresh()" style="padding:8px 12px;font-size:12px">↻</button>
+        <button class="btn notification-toggle" onclick="toggleProcessingPanel()" title="Processamentos e notificacoes">Notificacoes <span id="notificationBadge" class="notification-badge hidden">0</span></button>
         <button class="btn" onclick="changePassword()" style="padding:8px 12px;font-size:12px" title="Alterar minha senha">Senha</button>
         <div class="chip" id="profileChip">Perfil: Gestão 5X</div>
       </div>
@@ -2587,6 +2588,21 @@
 
 <!-- Toast notifications -->
 <div id="toastContainer"></div>
+
+<!-- Central de processamento e notificacoes -->
+<div id="processingPanel" class="processing-panel">
+  <div class="processing-panel-head">
+    <div>
+      <strong>Processamentos</strong>
+      <span>Envios e retornos importantes</span>
+    </div>
+    <button class="btn btn-sm" onclick="toggleProcessingPanel(false)">Fechar</button>
+  </div>
+  <div id="processingList" class="processing-list"></div>
+  <div class="processing-panel-foot">
+    <button class="btn btn-sm" onclick="clearProcessingNotifications()">Limpar notificacoes</button>
+  </div>
+</div>
 
 <!-- Modal: Alterar senha -->
 <div id="changePasswordModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">

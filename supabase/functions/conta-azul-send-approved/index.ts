@@ -119,10 +119,6 @@ async function caFetch(accessToken: string, path: string, init: RequestInit = {}
   return body;
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function firstArray(value: any, keys: string[]) {
   for (const key of keys) {
     if (Array.isArray(value?.[key])) return value[key];
@@ -156,6 +152,38 @@ function findNestedEventId(value: any): string {
 
 function parcelaId(parcela: any) {
   return clean(parcela?.id || parcela?.uuid || parcela?.id_parcela || parcela?.idParcela);
+}
+
+function looksLikeParcela(value: any) {
+  return !!value && typeof value === 'object' && (
+    value.data_vencimento ||
+    value.vencimento ||
+    value.valor_composicao ||
+    value.detalhe_valor ||
+    value.conta_financeira ||
+    value.id_conta_financeira ||
+    value.baixas ||
+    value.baixa_agendada ||
+    value.evento
+  );
+}
+
+function createdRefs(created: any) {
+  const first = Array.isArray(created) ? created[0] : created;
+  const eventId = clean(
+    first?.evento?.id ||
+    first?.evento_financeiro?.id ||
+    first?.eventoFinanceiro?.id ||
+    first?.id_evento ||
+    first?.idEvento ||
+    first?.evento_id ||
+    first?.eventoId ||
+    first?.eventId
+  );
+  const parcela = first?.parcela || first?.parcelas?.[0] || (looksLikeParcela(first) ? first : null);
+  const parcelaIdValue = parcela ? parcelaId(parcela) : '';
+  const protocolId = clean(first?.protocolId || first?.protocolo || first?.id_protocolo || first?.protocolo_id);
+  return { eventId, parcelaId: parcelaIdValue && parcelaIdValue !== eventId ? parcelaIdValue : '', protocolId };
 }
 
 async function findPessoa(accessToken: string, name: string, profile: 'Cliente' | 'Fornecedor') {
@@ -218,22 +246,6 @@ async function findCentroCusto(accessToken: string, name: string) {
   return match ? (match.id || match.uuid) : '';
 }
 
-async function waitProtocolEventId(accessToken: string, protocolId: string) {
-  if (!protocolId) return '';
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const protocol = await caFetch(accessToken, `/v1/protocolo/${protocolId}`, { method: 'GET' }).catch(() => null);
-    const status = clean(protocol?.status || protocol?.situacao).toUpperCase();
-    if (status === 'ERROR') {
-      throw new Error(clean(protocol?.message || protocol?.mensagem || protocol?.error || 'Conta Azul retornou erro no protocolo.'));
-    }
-    const eventId = findNestedEventId(protocol);
-    if (eventId && eventId !== protocolId) return eventId;
-    if (status === 'SUCCESS' && eventId) return eventId;
-    await sleep(1200);
-  }
-  return '';
-}
-
 async function searchCreatedEvent(accessToken: string, row: Record<string, unknown>, direction: string) {
   const date = toISODate(rowValue(row, 'Data de CompetÃªncia', 'Data de CompetÃƒÂªncia'));
   const description = clean(rowValue(row, 'DescriÃ§Ã£o', 'DescriÃƒÂ§ÃƒÂ£o'));
@@ -278,15 +290,11 @@ async function findParcelas(accessToken: string, eventId: string) {
   return parcelas;
 }
 
-async function markPaid(accessToken: string, row: Record<string, unknown>, direction: string, eventId: string, accountId: string, observation: string) {
+async function createBaixa(accessToken: string, parcelaIdValue: string, row: Record<string, unknown>, direction: string, accountId: string, observation: string) {
   const date = toISODate(rowValue(row, 'Data de CompetÃªncia', 'Data de CompetÃƒÂªncia'));
   const value = moneyNumber(row.Valor);
-  const parcelas = await findParcelas(accessToken, eventId);
-  const pending = parcelas.find((p: any) => clean(p.status).toUpperCase() !== 'QUITADO') || parcelas[0];
-  if (clean(pending.status).toUpperCase() === 'QUITADO') return { skipped: true, status: 'QUITADO' };
-  const id = parcelaId(pending);
-  if (!id) throw new Error('Lancamento criado, mas o ID da parcela para baixa nao foi retornado pelo Conta Azul.');
-  return await caFetch(accessToken, `/v1/financeiro/eventos-financeiros/parcelas/${id}/baixa`, {
+  if (!parcelaIdValue) throw new Error('Lancamento criado, mas o ID da parcela para baixa nao foi retornado pelo Conta Azul.');
+  return await caFetch(accessToken, `/v1/financeiro/eventos-financeiros/parcelas/${parcelaIdValue}/baixa`, {
     method: 'POST',
     body: JSON.stringify({
       data_pagamento: date,
@@ -302,6 +310,15 @@ async function markPaid(accessToken: string, row: Record<string, unknown>, direc
       observacao: observation || `Baixa automatica Central de Caixa 5X - ${direction}`,
     }),
   });
+}
+
+async function markPaid(accessToken: string, row: Record<string, unknown>, direction: string, refs: { eventId?: string; parcelaId?: string }, accountId: string, observation: string) {
+  if (refs.parcelaId) return await createBaixa(accessToken, refs.parcelaId, row, direction, accountId, observation);
+  if (!refs.eventId) throw new Error('Lancamento criado, mas nao foi possivel localizar a parcela para marcar como pago/recebido.');
+  const parcelas = await findParcelas(accessToken, refs.eventId);
+  const pending = parcelas.find((p: any) => clean(p.status).toUpperCase() !== 'QUITADO') || parcelas[0];
+  if (clean(pending.status).toUpperCase() === 'QUITADO') return { skipped: true, status: 'QUITADO' };
+  return await createBaixa(accessToken, parcelaId(pending), row, direction, accountId, observation);
 }
 
 async function findCatalogExternalId(admin: any, companyId: string, name: string, kind: string) {
@@ -469,12 +486,10 @@ Deno.serve(async (req) => {
         ? '/v1/financeiro/eventos-financeiros/contas-a-receber'
         : '/v1/financeiro/eventos-financeiros/contas-a-pagar';
       const created = await caFetch(accessToken, path, { method: 'POST', body: JSON.stringify(eventPayload) });
-      const protocolId = clean(created.protocolId || created.protocolo || created.id);
-      const eventId = clean(created.eventId || created.id_evento || created.evento?.id)
-        || await waitProtocolEventId(accessToken, protocolId)
-        || await searchCreatedEvent(accessToken, row, direction);
-      if (!eventId) throw new Error('Lancamento criado, mas nao foi possivel localizar o evento para marcar como pago/recebido.');
-      const baixa = await markPaid(accessToken, row, direction, eventId, accountId, clean(eventPayload.observacao));
+      const refs = createdRefs(created);
+      const eventId = refs.eventId || await searchCreatedEvent(accessToken, row, direction);
+      const baixa = await markPaid(accessToken, row, direction, { eventId, parcelaId: refs.parcelaId }, accountId, clean(eventPayload.observacao));
+      const protocolId = refs.protocolId || clean(created?.protocolId || created?.protocolo || created?.id);
 
       await admin.from('conta_azul_launch_queue').upsert({
         company_id: companyId,

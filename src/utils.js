@@ -197,6 +197,98 @@ function toast(message, type = 'success', duration = 3500) {
   }, duration);
 }
 
+const PROCESSING_NOTIFICATIONS_KEY = 'caixa5x_processing_notifications_v1';
+
+function getProcessingNotifications() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PROCESSING_NOTIFICATIONS_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveProcessingNotifications(list) {
+  localStorage.setItem(PROCESSING_NOTIFICATIONS_KEY, JSON.stringify((list || []).slice(0, 40)));
+}
+
+function processingStatusLabel(status) {
+  return status === 'processing' ? 'Processando'
+    : status === 'success' ? 'Concluido'
+    : status === 'error' ? 'Erro'
+    : status === 'warning' ? 'Atencao'
+    : 'Info';
+}
+
+function renderProcessingNotifications() {
+  const list = getProcessingNotifications();
+  const active = list.filter((n) => n.status === 'processing' || n.unread).length;
+  const badge = $('notificationBadge');
+  if (badge) {
+    badge.textContent = String(active);
+    badge.classList.toggle('hidden', active === 0);
+  }
+  const target = $('processingList');
+  if (!target) return;
+  target.innerHTML = list.length
+    ? list.map((n) => `
+      <div class="processing-item processing-${esc(n.status || 'info')} ${n.unread ? 'is-unread' : ''}">
+        <div class="processing-item-top">
+          <strong>${esc(n.title || 'Processamento')}</strong>
+          <span>${esc(processingStatusLabel(n.status))}</span>
+        </div>
+        <p>${esc(n.message || '')}</p>
+        ${n.detail ? `<small>${esc(n.detail)}</small>` : ''}
+        <time>${esc(new Date(n.updatedAt || n.createdAt || Date.now()).toLocaleString('pt-BR'))}</time>
+      </div>
+    `).join('')
+    : '<p class="subtle" style="padding:12px">Nenhuma notificacao registrada.</p>';
+}
+
+function addProcessingNotification({ title, message, detail = '', status = 'info' }) {
+  const list = getProcessingNotifications();
+  const item = {
+    id: uid('proc'),
+    title,
+    message,
+    detail,
+    status,
+    unread: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  list.unshift(item);
+  saveProcessingNotifications(list);
+  renderProcessingNotifications();
+  return item.id;
+}
+
+function updateProcessingNotification(id, patch = {}) {
+  const list = getProcessingNotifications();
+  const item = list.find((n) => n.id === id);
+  if (!item) return;
+  Object.assign(item, patch, { updatedAt: new Date().toISOString(), unread: true });
+  saveProcessingNotifications(list);
+  renderProcessingNotifications();
+}
+
+function toggleProcessingPanel(force) {
+  const panel = $('processingPanel');
+  if (!panel) return;
+  const open = typeof force === 'boolean' ? force : !panel.classList.contains('open');
+  panel.classList.toggle('open', open);
+  if (open) {
+    const list = getProcessingNotifications().map((n) => ({ ...n, unread: false }));
+    saveProcessingNotifications(list);
+    renderProcessingNotifications();
+  }
+}
+
+function clearProcessingNotifications() {
+  saveProcessingNotifications([]);
+  renderProcessingNotifications();
+}
+
 function downloadFile(filename, content, type = 'text/plain;charset=utf-8') {
   const blob = new Blob([content], { type });
   const url  = URL.createObjectURL(blob);
@@ -265,7 +357,12 @@ Object.assign(window, {
   todayISO, todayBR, parseBR, toBRFromISO, dateFromISO, dateToISO,
   formatDateBR, parseDateBR, toISODate,
   validateDateRange, readDateRange,
-  uid, esc, emptyRow, tag, flash, toast, downloadFile,
+  uid, esc, emptyRow, tag, flash, toast,
+  getProcessingNotifications, renderProcessingNotifications, addProcessingNotification,
+  updateProcessingNotification, toggleProcessingPanel, clearProcessingNotifications,
+  downloadFile,
   csvCell, buildCSV, exportGenericCSV, showSubTab,
   showInfoTooltip, hideInfoTooltip,
 });
+
+document.addEventListener('DOMContentLoaded', renderProcessingNotifications);

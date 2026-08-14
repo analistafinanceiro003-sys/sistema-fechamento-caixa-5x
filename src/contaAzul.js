@@ -497,9 +497,24 @@ function approveContaAzulPreview() {
   toast(`${selected.length} lançamento(s) aprovado(s) para envio Conta Azul.`);
 }
 
+function contaAzulProcessingDetail(rows, companyNameText) {
+  const start = val('reportStart') || '';
+  const end = val('reportEnd') || '';
+  const period = start || end
+    ? `Periodo ${start ? toBRFromISO(start) : 'inicio'} ate ${end ? toBRFromISO(end) : 'fim'}`
+    : 'Periodo nao informado';
+  const selectedStoreId = val('reportStore') || '';
+  const stores = selectedStoreId
+    ? [storeName(selectedStoreId)]
+    : [...new Set(rows.map((item) => storeName(item.source?.storeId)).filter(Boolean))];
+  const storeText = stores.length === 1 ? `Loja ${stores[0]}` : stores.length > 1 ? `${stores.length} lojas` : 'Todas as lojas';
+  return `${period} - ${companyNameText} - ${storeText}`;
+}
+
 async function sendApprovedContaAzulPreview() {
   const companyId = currentContaAzulCompanyId();
   if (!companyId) return alert('Selecione a empresa conectada ao Conta Azul.');
+  const companyNameText = currentContaAzulCompanyName();
   const accountSelect = $('contaAzulAccountSelect');
   const accountId = val('contaAzulAccountSelect');
   const accountName = accountId ? (accountSelect?.selectedOptions?.[0]?.textContent || '').trim() : '';
@@ -519,6 +534,13 @@ async function sendApprovedContaAzulPreview() {
     item.error = '';
   });
   renderContaAzulApprovalPreview();
+  const processingId = window.addProcessingNotification ? addProcessingNotification({
+    title: 'Enviando lancamentos Conta Azul',
+    message: `${approved.length} lancamento(s) em processamento.`,
+    detail: contaAzulProcessingDetail(approved, companyNameText),
+    status: 'processing',
+  }) : '';
+  if (window.toggleProcessingPanel) toggleProcessingPanel(true);
 
   try {
     const data = await invokeContaAzulFunction('conta-azul-send-approved', {
@@ -550,6 +572,13 @@ async function sendApprovedContaAzulPreview() {
     const failed = (data.results || []).length - sent;
     if (window.reloadContaAzulLaunchAudit) await reloadContaAzulLaunchAudit();
     renderContaAzulApprovalPreview();
+    if (window.updateProcessingNotification && processingId) {
+      updateProcessingNotification(processingId, {
+        status: failed ? 'warning' : 'success',
+        title: failed ? 'Envio Conta Azul concluido com alerta' : 'Envio Conta Azul concluido',
+        message: `Lancamentos ${contaAzulProcessingDetail(approved, companyNameText)}: ${sent} enviado(s) com sucesso${failed ? ` e ${failed} com erro` : ''}.`,
+      });
+    }
     toast(`${sent} lancamento(s) enviado(s).${failed ? ` ${failed} com erro.` : ''}`, failed ? 'warning' : 'success');
   } catch (e) {
     approved.forEach((item) => {
@@ -557,6 +586,14 @@ async function sendApprovedContaAzulPreview() {
       item.error = e.message || 'Erro ao enviar ao Conta Azul.';
     });
     renderContaAzulApprovalPreview();
+    if (window.updateProcessingNotification && processingId) {
+      updateProcessingNotification(processingId, {
+        status: 'error',
+        title: 'Falha no envio Conta Azul',
+        message: `Lancamentos ${contaAzulProcessingDetail(approved, companyNameText)} nao foram enviados.`,
+        detail: e.message || 'Tente novamente.',
+      });
+    }
     alert('Nao foi possivel enviar ao Conta Azul: ' + (e.message || 'tente novamente.'));
   }
 }
