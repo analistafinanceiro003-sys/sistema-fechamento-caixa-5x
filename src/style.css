@@ -186,6 +186,10 @@ tr:last-child td{border-bottom:0}
 tr:hover td{background:#fafbfc}
 .ca-preview-input,.ca-preview-select{min-width:180px;border-radius:8px;padding:7px 9px;font-size:12px}
 .ca-preview-input.is-invalid,.ca-preview-select.is-invalid{border-color:#fca5a5;background:#fff7f7}
+.ca-preview-feedback{margin-top:5px;font-size:11px;color:var(--muted);max-width:180px;word-break:break-word;text-transform:none;letter-spacing:0}
+.ca-preview-feedback.error{color:var(--danger)}
+.ca-company-cell{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:210px}
+.ca-company-cell .subtle{font-size:11px}
 
 /* ============================================================
    STATUS BADGES

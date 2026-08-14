@@ -21,6 +21,7 @@ function renderAll() {
   try { renderAttachments(); } catch(e) { console.warn('renderAttachments:', e); }
   try { renderDocumentos(); } catch(e) { console.warn('renderDocumentos:', e); }
   try { if (window.applyContaAzulRoleControls) applyContaAzulRoleControls(); } catch(e) { console.warn('applyContaAzulRoleControls:', e); }
+  try { if (window.renderContaAzulCatalog) renderContaAzulCatalog(); } catch(e) { console.warn('renderContaAzulCatalog:', e); }
   try { calc(); } catch(e) { console.warn('calc:', e); }
 }
 
@@ -441,6 +442,7 @@ function renderMasterDashboard() {
 
 /* --- CADASTROS (sub-abas) --- */
 function renderCadastros() {
+  if (window.refreshContaAzulCompanyStatusesIfNeeded) refreshContaAzulCompanyStatusesIfNeeded();
   /* Empresas */
   html('companiesBody', state.companies.map((c) =>
     `<tr>
@@ -448,11 +450,12 @@ function renderCadastros() {
       <td>${esc(c.segment)}</td><td>${tag(c.status)}</td><td>${esc(c.plan)}</td>
       <td>${state.stores.filter((s) => s.companyId === c.id).length}</td>
       <td>${state.users.filter((u) => u.companyId === c.id).length}</td>
+      <td>${window.contaAzulCompanyStatusHtml ? contaAzulCompanyStatusHtml(c.id) : '<span class="subtle">-</span>'}</td>
       <td>
         <button class="btn btn-sm" onclick="toggleCompany('${c.id}')">${c.status === 'Inativa' ? 'Ativar' : 'Inativar'}</button>
       </td>
     </tr>`
-  ).join('') || emptyRow(9));
+  ).join('') || emptyRow(10));
 
   /* Lojas — com filtro e ações de editar/excluir */
   const storeSearch = (val('storeFilter') || '').toLowerCase();

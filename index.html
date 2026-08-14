@@ -265,7 +265,7 @@
         <div class="card">
           <h3 class="section-title">Empresas cadastradas</h3>
           <div class="table-wrap">
-            <table><thead><tr><th>Empresa</th><th>Razão social</th><th>CNPJ</th><th>Segmento</th><th>Status</th><th>Plano</th><th>Lojas</th><th>Usuários</th><th>Ação</th></tr></thead>
+            <table><thead><tr><th>Empresa</th><th>Razão social</th><th>CNPJ</th><th>Segmento</th><th>Status</th><th>Plano</th><th>Lojas</th><th>Usuários</th><th>Conta Azul</th><th>Ação</th></tr></thead>
             <tbody id="companiesBody"></tbody></table>
           </div>
         </div>
@@ -731,6 +731,7 @@
           <p class="subtle" style="margin-bottom:12px">Revise antes de enviar. O envio via API só deve acontecer depois que os lançamentos estiverem aprovados e os IDs de categoria, conta financeira e cliente/fornecedor estiverem mapeados.</p>
           <div class="btn-row" style="margin-bottom:12px">
             <button class="btn btn-primary" onclick="approveContaAzulPreview()">Aprovar selecionados</button>
+            <button class="btn btn-brand" onclick="sendApprovedContaAzulPreview()">Enviar aprovados para Conta Azul</button>
             <button class="btn" onclick="clearContaAzulPreview()">Limpar prévia</button>
           </div>
           <div class="table-wrap compact-table"><table><thead><tr>
@@ -750,6 +751,7 @@
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-analistas',this)">Analistas</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-coordenadores',this)">Coordenadores</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-fornecedores',this)">Fornecedores e Categorias</button>
+        <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-conta-azul-cadastros',this);renderContaAzulCatalog()">Cadastros Conta Azul</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-backup',this)">Backup e Manutenção</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-logs',this)">Logs de Auditoria</button>
         <button class="inner-tab-btn" onclick="showSubTab('sistema','sis-documentos',this)">Documentos</button>
@@ -941,6 +943,54 @@
                 <input class="fc-search" id="fcCategoriasEntradaSearch" placeholder="Buscar categoria..." oninput="renderFornecedoresCategorias()"/>
                 <div class="table-wrap compact-table fc-table-wrap"><table><thead><tr><th>Categoria</th><th>Ação</th></tr></thead><tbody id="fcCategoriasEntradaBody"></tbody></table></div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cadastros Conta Azul (espelho separado da operação atual) -->
+      <div class="inner-tab-panel hidden" id="sis-conta-azul-cadastros">
+        <div class="card">
+          <h3 class="section-title">Cadastros Conta Azul</h3>
+          <p class="subtle" style="margin-bottom:14px">Sincronize os cadastros reais do Conta Azul e libere quais itens poderão ser usados pelos operadores. Esta aba não altera os cadastros manuais nem os fechamentos atuais.</p>
+          <div class="form-grid three" style="margin-bottom:14px">
+            <div class="field"><label>Empresa</label><select id="caCatalogCompany" onchange="loadContaAzulCatalog()"></select></div>
+            <div class="field"><label>Status</label><div id="caCatalogStatus" class="subtle" style="padding:10px 0">Selecione uma empresa.</div></div>
+          </div>
+          <div class="btn-row" style="margin-bottom:14px">
+            <button class="btn btn-brand" onclick="syncContaAzulCatalog()">Sincronizar Conta Azul</button>
+            <button class="btn" onclick="loadContaAzulCatalog()">Recarregar cadastros</button>
+          </div>
+          <div class="management-grid">
+            <div class="management-card">
+              <div class="option-group-head"><h4>Fornecedores</h4><span class="pill" id="caCatalogFornecedorCount">0</span></div>
+              <input class="fc-search" id="caCatalogFornecedorSearch" placeholder="Buscar fornecedor..." oninput="renderContaAzulCatalogTables()"/>
+              <div class="table-wrap compact-table fc-table-wrap"><table><thead><tr><th>Liberado</th><th>Fornecedor</th></tr></thead><tbody id="caCatalogFornecedorBody"></tbody></table></div>
+            </div>
+            <div class="management-card">
+              <div class="option-group-head"><h4>Categorias de saída</h4><span class="pill" id="caCatalogCategoriaSaidaCount">0</span></div>
+              <input class="fc-search" id="caCatalogCategoriaSaidaSearch" placeholder="Buscar categoria..." oninput="renderContaAzulCatalogTables()"/>
+              <div class="table-wrap compact-table fc-table-wrap"><table><thead><tr><th>Liberado</th><th>Categoria</th></tr></thead><tbody id="caCatalogCategoriaSaidaBody"></tbody></table></div>
+            </div>
+            <div class="management-card">
+              <div class="option-group-head"><h4>Clientes</h4><span class="pill" id="caCatalogClienteCount">0</span></div>
+              <input class="fc-search" id="caCatalogClienteSearch" placeholder="Buscar cliente..." oninput="renderContaAzulCatalogTables()"/>
+              <div class="table-wrap compact-table fc-table-wrap"><table><thead><tr><th>Liberado</th><th>Cliente</th></tr></thead><tbody id="caCatalogClienteBody"></tbody></table></div>
+            </div>
+            <div class="management-card">
+              <div class="option-group-head"><h4>Categorias de entrada</h4><span class="pill" id="caCatalogCategoriaEntradaCount">0</span></div>
+              <input class="fc-search" id="caCatalogCategoriaEntradaSearch" placeholder="Buscar categoria..." oninput="renderContaAzulCatalogTables()"/>
+              <div class="table-wrap compact-table fc-table-wrap"><table><thead><tr><th>Liberado</th><th>Categoria</th></tr></thead><tbody id="caCatalogCategoriaEntradaBody"></tbody></table></div>
+            </div>
+            <div class="management-card">
+              <div class="option-group-head"><h4>Contas financeiras</h4><span class="pill" id="caCatalogContaFinanceiraCount">0</span></div>
+              <input class="fc-search" id="caCatalogContaFinanceiraSearch" placeholder="Buscar conta..." oninput="renderContaAzulCatalogTables()"/>
+              <div class="table-wrap compact-table fc-table-wrap"><table><thead><tr><th>Preferencial</th><th>Conta</th></tr></thead><tbody id="caCatalogContaFinanceiraBody"></tbody></table></div>
+            </div>
+            <div class="management-card">
+              <div class="option-group-head"><h4>Centros de custo</h4><span class="pill" id="caCatalogCentroCustoCount">0</span></div>
+              <input class="fc-search" id="caCatalogCentroCustoSearch" placeholder="Buscar centro de custo..." oninput="renderContaAzulCatalogTables()"/>
+              <div class="table-wrap compact-table fc-table-wrap"><table><thead><tr><th>Liberado</th><th>Centro de custo</th></tr></thead><tbody id="caCatalogCentroCustoBody"></tbody></table></div>
             </div>
           </div>
         </div>
