@@ -511,6 +511,20 @@ function contaAzulProcessingDetail(rows, companyNameText) {
   return `${period} - ${companyNameText} - ${storeText}`;
 }
 
+function contaAzulPayloadRows(rows, companyId) {
+  return rows.map((item) => ({
+    id: item.id,
+    source_key: item.sourceKey,
+    approved: item.approved,
+    type: item.type,
+    row: item.row,
+    source: {
+      companyId: item.source?.companyId || companyId,
+      closingId: item.source?.closingId || item.source?.['ID Fechamento'] || '',
+    },
+  }));
+}
+
 async function sendApprovedContaAzulPreview() {
   const companyId = currentContaAzulCompanyId();
   if (!companyId) return alert('Selecione a empresa conectada ao Conta Azul.');
@@ -542,34 +556,37 @@ async function sendApprovedContaAzulPreview() {
   }) : '';
   if (window.toggleProcessingPanel) toggleProcessingPanel(true);
 
+  const results = [];
   try {
-    const data = await invokeContaAzulFunction('conta-azul-send-approved', {
-      company_id: companyId,
-      account_id: accountId,
-      account_name: accountName,
-      rows: approved.map((item) => ({
-        id: item.id,
-        source_key: item.sourceKey,
-        approved: item.approved,
-        type: item.type,
-        row: item.row,
-        source: {
-          companyId: item.source?.companyId || companyId,
-          closingId: item.source?.closingId || item.source?.['ID Fechamento'] || '',
-        },
-      })),
-    });
-    (data.results || []).forEach((result) => {
-      const item = contaAzulPreviewRows.find((r) => r.id === result.id);
-      if (!item) return;
-      item.sending = false;
-      item.sent = !!result.ok;
-      item.approved = !!result.ok;
-      item.protocolId = result.protocolId || '';
-      item.error = result.ok ? '' : (result.error || 'Erro ao enviar.');
-    });
-    const sent = (data.results || []).filter((r) => r.ok).length;
-    const failed = (data.results || []).length - sent;
+    for (let i = 0; i < approved.length; i += 1) {
+      const item = approved[i];
+      if (window.updateProcessingNotification && processingId) {
+        updateProcessingNotification(processingId, {
+          status: 'processing',
+          message: `Enviando ${i + 1} de ${approved.length} lancamento(s).`,
+        });
+      }
+      const data = await invokeContaAzulFunction('conta-azul-send-approved', {
+        company_id: companyId,
+        account_id: accountId,
+        account_name: accountName,
+        rows: contaAzulPayloadRows([item], companyId),
+      });
+      const rowResults = data.results || [];
+      results.push(...rowResults);
+      rowResults.forEach((result) => {
+        const previewItem = contaAzulPreviewRows.find((r) => r.id === result.id);
+        if (!previewItem) return;
+        previewItem.sending = false;
+        previewItem.sent = !!result.ok;
+        previewItem.approved = !!result.ok;
+        previewItem.protocolId = result.protocolId || '';
+        previewItem.error = result.ok ? '' : (result.error || 'Erro ao enviar.');
+      });
+      renderContaAzulApprovalPreview();
+    }
+    const sent = results.filter((r) => r.ok).length;
+    const failed = results.length - sent;
     if (window.reloadContaAzulLaunchAudit) await reloadContaAzulLaunchAudit();
     renderContaAzulApprovalPreview();
     if (window.updateProcessingNotification && processingId) {
@@ -582,15 +599,20 @@ async function sendApprovedContaAzulPreview() {
     toast(`${sent} lancamento(s) enviado(s).${failed ? ` ${failed} com erro.` : ''}`, failed ? 'warning' : 'success');
   } catch (e) {
     approved.forEach((item) => {
+      if (!item.sending) return;
       item.sending = false;
       item.error = e.message || 'Erro ao enviar ao Conta Azul.';
     });
     renderContaAzulApprovalPreview();
     if (window.updateProcessingNotification && processingId) {
+      const sent = results.filter((r) => r.ok).length;
+      const failed = results.length - sent;
       updateProcessingNotification(processingId, {
         status: 'error',
         title: 'Falha no envio Conta Azul',
-        message: `Lancamentos ${contaAzulProcessingDetail(approved, companyNameText)} nao foram enviados.`,
+        message: sent
+          ? `Envio interrompido: ${sent} enviado(s) com sucesso e ${Math.max(approved.length - sent, failed)} pendente(s)/com erro.`
+          : `Lancamentos ${contaAzulProcessingDetail(approved, companyNameText)} nao foram enviados.`,
         detail: e.message || 'Tente novamente.',
       });
     }
