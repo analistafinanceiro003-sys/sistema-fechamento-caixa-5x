@@ -204,6 +204,17 @@ Deno.serve(async (req) => {
   if (!companyId) return error(req, 'Selecione a empresa para sincronizar.', 400);
   const allowed = requester.role === 'master';
   if (!allowed) return error(req, 'Apenas Master pode sincronizar cadastros Conta Azul.', 403);
+  if (payload.clear_only === true) {
+    const { count, error: deleteError } = await admin.from('conta_azul_catalog_items')
+      .delete({ count: 'exact' })
+      .eq('company_id', companyId);
+    if (deleteError) return error(req, deleteError.message || 'Nao foi possivel limpar cadastros sincronizados.', 500);
+    await admin.from('conta_azul_connections').update({
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    }).eq('company_id', companyId);
+    return json(req, { ok: true, deleted: count || 0 });
+  }
 
   const { data: connection, error: connError } = await admin.from('conta_azul_connections')
     .select('*')

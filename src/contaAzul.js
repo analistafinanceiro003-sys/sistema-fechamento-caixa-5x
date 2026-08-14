@@ -343,6 +343,35 @@ async function syncContaAzulCatalog(companyIdOverride = '') {
   }
 }
 
+async function clearContaAzulCatalog() {
+  const companyId = contaAzulCatalogCompanyId();
+  if (role !== 'master') return alert('Apenas Master pode limpar sincronizacoes Conta Azul.');
+  if (!companyId) return alert('Selecione a empresa para limpar.');
+  const company = companyName(companyId);
+  const typed = prompt(`Para limpar SOMENTE os cadastros sincronizados do Conta Azul desta empresa, digite exatamente:\n\n${company}`);
+  if (typed !== company) return alert('Limpeza cancelada. O nome digitado nao confere.');
+  try {
+    setContaAzulCatalogStatus(`Limpando cadastros sincronizados de ${company}...`);
+    const data = await invokeContaAzulFunction('conta-azul-sync-catalog', {
+      company_id: companyId,
+      clear_only: true,
+    });
+    contaAzulCatalogRows = [];
+    if (state.contaAzulAllowedOptions?.[companyId]) {
+      delete state.contaAzulAllowedOptions[companyId];
+      if (typeof writeContaAzulAllowedOptionsCache === 'function') writeContaAzulAllowedOptionsCache(state.contaAzulAllowedOptions);
+    }
+    renderContaAzulCatalogTables();
+    setContaAzulCatalogStatus(`${data.deleted || 0} item(ns) sincronizado(s) removido(s) de ${company}.`, 'success');
+    toast('Sincronizacao Conta Azul limpa para esta empresa.');
+    await loadContaAzulCompanyStatuses();
+    if (window.renderCadastros) renderCadastros();
+  } catch (e) {
+    setContaAzulCatalogStatus(e.message || 'Erro ao limpar sincronizacao Conta Azul.', 'error');
+    alert('Nao foi possivel limpar a sincronizacao Conta Azul: ' + (e.message || 'tente novamente.'));
+  }
+}
+
 async function loadContaAzulFinancialAccounts(companyId) {
   const select = $('contaAzulAccountSelect');
   if (!select) return;
@@ -705,6 +734,7 @@ Object.assign(window, {
   loadContaAzulCompanyStatuses, refreshContaAzulCompanyStatusesIfNeeded,
   contaAzulCompanyStatusHtml, syncContaAzulCatalogForCompany,
   renderContaAzulCatalog, loadContaAzulCatalog, syncContaAzulCatalog,
+  clearContaAzulCatalog,
   handleReportCompanyChange, loadContaAzulFinancialAccounts,
   renderContaAzulCatalogTables, toggleContaAzulCatalogAllowed,
   buildContaAzulApprovalPreview, renderContaAzulApprovalPreview,
