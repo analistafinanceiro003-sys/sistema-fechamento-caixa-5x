@@ -66,6 +66,10 @@ function rowValue(row: Record<string, unknown>, ...keys: string[]) {
   return '';
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function ensureAccessToken(admin: any, connection: any) {
   const clientId = Deno.env.get('CONTA_AZUL_CLIENT_ID');
   const clientSecret = Deno.env.get('CONTA_AZUL_CLIENT_SECRET');
@@ -272,6 +276,16 @@ async function searchCreatedEvent(accessToken: string, row: Record<string, unkno
       (!Number.isFinite(amount) || !amount || Math.abs(Math.abs(amount) - value) < 0.01);
   }) || items[0];
   return objectId(match);
+}
+
+async function waitCreatedEvent(accessToken: string, row: Record<string, unknown>, direction: string) {
+  const attempts = [700, 1000, 1400, 1800, 2300, 2800, 3500, 4500];
+  for (let i = 0; i < attempts.length; i += 1) {
+    const eventId = await searchCreatedEvent(accessToken, row, direction).catch(() => '');
+    if (eventId) return eventId;
+    await sleep(attempts[i]);
+  }
+  return await searchCreatedEvent(accessToken, row, direction);
 }
 
 function extractParcelas(data: any): any[] {
@@ -487,7 +501,7 @@ Deno.serve(async (req) => {
         : '/v1/financeiro/eventos-financeiros/contas-a-pagar';
       const created = await caFetch(accessToken, path, { method: 'POST', body: JSON.stringify(eventPayload) });
       const refs = createdRefs(created);
-      const eventId = refs.eventId || await searchCreatedEvent(accessToken, row, direction);
+      const eventId = refs.eventId || await waitCreatedEvent(accessToken, row, direction);
       const baixa = await markPaid(accessToken, row, direction, { eventId, parcelaId: refs.parcelaId }, accountId, clean(eventPayload.observacao));
       const protocolId = refs.protocolId || clean(created?.protocolId || created?.protocolo || created?.id);
 
