@@ -82,7 +82,7 @@ async function fetchPages(accessToken: string, path: string, itemKey = 'items') 
   const rows = [];
   for (let page = 1; page <= 20; page += 1) {
     const sep = path.includes('?') ? '&' : '?';
-    const data = await caFetch(accessToken, `${path}${sep}pagina=${page}&tamanho_pagina=100`);
+    const data = await caFetch(accessToken, `${path}${sep}pagina=${page}&tamanho_pagina=200`);
     const items = data[itemKey] || data.items || data.itens || [];
     rows.push(...items);
     const total = Number(data.totalItems || data.itens_totais || 0);
@@ -97,20 +97,57 @@ async function fetchCategorias(accessToken: string, tipo: 'RECEITA' | 'DESPESA')
     `/v1/categorias?tipo=${tipo}&permite_apenas_filhos=true`,
     `/v1/categorias?tipo=${tipo}&apenas_filhos=true&permite_apenas_filhos=true`,
   ];
-  const results = await Promise.allSettled(paths.map((path) => fetchPages(accessToken, path, 'itens')));
-  if (!results.some((result) => result.status === 'fulfilled')) {
-    const firstError = results.find((result) => result.status === 'rejected') as PromiseRejectedResult | undefined;
-    throw new Error(firstError?.reason?.message || `Falha ao buscar categorias ${tipo}.`);
-  }
   const byId = new Map<string, any>();
-  for (const result of results) {
-    if (result.status !== 'fulfilled') continue;
-    for (const item of result.value) {
-      const id = clean(item.id || item.uuid);
-      if (id) byId.set(id, item);
+  let success = false;
+  let firstError = '';
+  for (const path of paths) {
+    try {
+      const items = await fetchPages(accessToken, path, 'itens');
+      success = true;
+      for (const item of items) {
+        const id = clean(item.id || item.uuid);
+        if (id) byId.set(id, item);
+      }
+    } catch (e) {
+      if (!firstError) firstError = e instanceof Error ? e.message : `Falha ao buscar categorias ${tipo}.`;
     }
   }
+  if (!success) throw new Error(firstError || `Falha ao buscar categorias ${tipo}.`);
   return Array.from(byId.values());
+}
+
+async function catalogBatch(companyId: string, kind: string, items: any[]) {
+  const byId = new Map<string, any>();
+  for (const item of items) {
+    const row = catalogRow(companyId, kind, item);
+    if (row?.external_id) byId.set(row.external_id, row);
+  }
+  return Array.from(byId.values());
+}
+
+async function upsertBatch(admin: any, rows: any[]) {
+  if (!rows.length) return;
+  const { error: upsertError } = await admin.from('conta_azul_catalog_items')
+    .upsert(rows, { onConflict: 'company_id,kind,external_id' });
+  if (upsertError) throw upsertError;
+}
+
+function addCounts(counts: Record<string, number>, rows: any[]) {
+  for (const row of rows) {
+    counts[row.kind] = (counts[row.kind] || 0) + 1;
+  }
+}
+
+async function syncStep(admin: any, counts: Record<string, number>, label: string, loadRows: () => Promise<any[]>) {
+  try {
+    const rows = await loadRows();
+    await upsertBatch(admin, rows);
+    addCounts(counts, rows);
+    return rows.length;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'erro desconhecido';
+    throw new Error(`${label}: ${message}`);
+  }
 }
 
 function catalogRow(companyId: string, kind: string, item: any) {
@@ -169,24 +206,44 @@ Deno.serve(async (req) => {
   }
 
   const accessToken = await ensureAccessToken(admin, connection);
-  const batches = await Promise.all([
-    fetchPages(accessToken, '/v1/pessoas?tipo_perfil=Cliente', 'items').then((rows) => rows.map((i) => catalogRow(companyId, 'cliente', i))),
-    fetchPages(accessToken, '/v1/pessoas?tipo_perfil=Fornecedor', 'items').then((rows) => rows.map((i) => catalogRow(companyId, 'fornecedor', i))),
-    fetchCategorias(accessToken, 'RECEITA').then((rows) => rows.map((i) => catalogRow(companyId, 'categoria_entrada', i))),
-    fetchCategorias(accessToken, 'DESPESA').then((rows) => rows.map((i) => catalogRow(companyId, 'categoria_saida', i))),
-    fetchPages(accessToken, '/v1/conta-financeira?apenas_ativo=true', 'itens').then((rows) => rows.map((i) => catalogRow(companyId, 'conta_financeira', i))),
-    fetchPages(accessToken, '/v1/centro-de-custo?filtro_rapido=ATIVO', 'items').then((rows) => rows.map((i) => catalogRow(companyId, 'centro_custo', i))),
-  ]);
-  const rows = batches.flat().filter(Boolean);
-  if (rows.length) {
-    const { error: upsertError } = await admin.from('conta_azul_catalog_items')
-      .upsert(rows, { onConflict: 'company_id,kind,external_id' });
-    if (upsertError) return error(req, upsertError.message, 500);
+  const counts: Record<string, number> = {};
+  const steps: Array<{ label: string; count: number }> = [];
+  try {
+    steps.push({
+      label: 'Clientes',
+      count: await syncStep(admin, counts, 'Clientes', async () =>
+        catalogBatch(companyId, 'cliente', await fetchPages(accessToken, '/v1/pessoas?tipo_perfil=Cliente', 'items'))),
+    });
+    steps.push({
+      label: 'Fornecedores',
+      count: await syncStep(admin, counts, 'Fornecedores', async () =>
+        catalogBatch(companyId, 'fornecedor', await fetchPages(accessToken, '/v1/pessoas?tipo_perfil=Fornecedor', 'items'))),
+    });
+    steps.push({
+      label: 'Categorias de entrada',
+      count: await syncStep(admin, counts, 'Categorias de entrada', async () =>
+        catalogBatch(companyId, 'categoria_entrada', await fetchCategorias(accessToken, 'RECEITA'))),
+    });
+    steps.push({
+      label: 'Categorias de saida',
+      count: await syncStep(admin, counts, 'Categorias de saida', async () =>
+        catalogBatch(companyId, 'categoria_saida', await fetchCategorias(accessToken, 'DESPESA'))),
+    });
+    steps.push({
+      label: 'Contas financeiras',
+      count: await syncStep(admin, counts, 'Contas financeiras', async () =>
+        catalogBatch(companyId, 'conta_financeira', await fetchPages(accessToken, '/v1/conta-financeira?apenas_ativo=true', 'itens'))),
+    });
+    steps.push({
+      label: 'Centros de custo',
+      count: await syncStep(admin, counts, 'Centros de custo', async () =>
+        catalogBatch(companyId, 'centro_custo', await fetchPages(accessToken, '/v1/centro-de-custo?filtro_rapido=ATIVO', 'items'))),
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Erro ao sincronizar cadastros Conta Azul.';
+    return error(req, message, 500);
   }
 
-  const counts = rows.reduce((acc: Record<string, number>, row: any) => {
-    acc[row.kind] = (acc[row.kind] || 0) + 1;
-    return acc;
-  }, {});
-  return json(req, { ok: true, counts, total: rows.length });
+  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  return json(req, { ok: true, counts, steps, total });
 });

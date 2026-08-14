@@ -9,6 +9,7 @@ let saveTimer = null;
 let realtimeChannel = null;
 let lastOwnSave = 0;
 let isBooting = true;
+const CONTA_AZUL_ALLOWED_CACHE_KEY = 'caixa5x_conta_azul_allowed_options_v1';
 const DEV_LOCAL_MODE = false;
 const USE_LOCAL_FALLBACK = DEV_LOCAL_MODE;
 const NORMALIZED_TABLES = [
@@ -49,6 +50,12 @@ function defaultSelectOptions() {
 /* Categorias cujas opções são específicas por empresa (cada cliente tem sua própria lista).
    As demais categorias do seletor continuam globais para todo o sistema. */
 const COMPANY_SCOPED_OPTION_CATEGORIES = ['expenseCategories', 'fornecedores', 'entryCategories', 'clientes'];
+const CONTA_AZUL_OPTION_CATEGORY_BY_KIND = {
+  fornecedor: 'fornecedores',
+  cliente: 'clientes',
+  categoria_entrada: 'entryCategories',
+  categoria_saida: 'expenseCategories',
+};
 
 /* Marcador salvo no Supabase quando uma empresa apaga todos os itens de uma categoria
    (inclusive os padrões). Sem ele, "zero linhas no banco" fica indistinguível de
@@ -74,6 +81,7 @@ function defaultState() {
     modules: {},
     selectOptions: defaultSelectOptions(),
     companySelectOptions: {},
+    contaAzulAllowedOptions: {},
     audit: [],
     transferReceipts: [],
     transferWaivers: [],
@@ -369,6 +377,8 @@ function normalizeState() {
   state.implantSteps = (state.implantSteps && typeof state.implantSteps === 'object' && !Array.isArray(state.implantSteps)) ? state.implantSteps : {};
   state.selectOptions = { ...defaultSelectOptions(), ...(state.selectOptions || {}) };
   state.companySelectOptions = (state.companySelectOptions && typeof state.companySelectOptions === 'object') ? state.companySelectOptions : {};
+  state.contaAzulAllowedOptions = (state.contaAzulAllowedOptions && typeof state.contaAzulAllowedOptions === 'object') ? state.contaAzulAllowedOptions : {};
+  if (!Object.keys(state.contaAzulAllowedOptions).length) state.contaAzulAllowedOptions = readContaAzulAllowedOptionsCache();
   state.stores.forEach((s) => { s.standardFund = Number(s.standardFund || 0); });
   state.companies.forEach((c) => {
     if (!state.operationConfigs[c.id]) {
@@ -543,6 +553,44 @@ function applySelectOptionRows(rows = []) {
   state.companySelectOptions = companyOptions;
 }
 
+function applyContaAzulAllowedOptionRows(rows = []) {
+  const options = {};
+  const seen = {};
+  rows.forEach((row) => {
+    const category = CONTA_AZUL_OPTION_CATEGORY_BY_KIND[row.kind];
+    if (!row.company_id || !category || !row.name) return;
+    options[row.company_id] = options[row.company_id] || {};
+    seen[row.company_id] = seen[row.company_id] || {};
+    options[row.company_id][category] = options[row.company_id][category] || [];
+    seen[row.company_id][category] = seen[row.company_id][category] || new Set();
+    const key = String(row.name || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (key && !seen[row.company_id][category].has(key)) {
+      seen[row.company_id][category].add(key);
+      options[row.company_id][category].push(row.name);
+    }
+  });
+  Object.values(options).forEach((companyOptions) => {
+    Object.values(companyOptions).forEach((values) => values.sort((a, b) => a.localeCompare(b, 'pt-BR')));
+  });
+  state.contaAzulAllowedOptions = options;
+  writeContaAzulAllowedOptionsCache(options);
+}
+
+function readContaAzulAllowedOptionsCache() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CONTA_AZUL_ALLOWED_CACHE_KEY) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeContaAzulAllowedOptionsCache(options) {
+  try {
+    localStorage.setItem(CONTA_AZUL_ALLOWED_CACHE_KEY, JSON.stringify(options || {}));
+  } catch {}
+}
+
 function buildImplantStepsState(rows = []) {
   const result = {};
   rows.forEach((row) => {
@@ -622,6 +670,7 @@ async function loadFromNormalizedSupabase() {
     storeDocuments: storeDocumentsRows.map(mapStoreDocument),
     analystCompanies: analystCompanyRows.map((r) => ({ id: r.id, profileId: r.profile_id, companyId: r.company_id })),
   };
+  state.contaAzulAllowedOptions = readContaAzulAllowedOptionsCache();
   applyModuleRows(modulePermissions);
   applySelectOptionRows(selectOptions);
   normalizeState();
@@ -1089,6 +1138,8 @@ async function saveSelectOptionsToSupabase() {
    específica da empresa se existir, senão cai para a lista global (compatibilidade). */
 function optionsForCompany(companyId, category) {
   if (COMPANY_SCOPED_OPTION_CATEGORIES.includes(category)) {
+    const contaAzulValues = state.contaAzulAllowedOptions?.[companyId]?.[category];
+    if (Array.isArray(contaAzulValues) && contaAzulValues.length) return contaAzulValues;
     const companyValues = state.companySelectOptions?.[companyId]?.[category];
     /* Uma vez que a empresa customizou a categoria (mesmo esvaziando tudo),
        companyValues é um array real (possivelmente []) e prevalece sobre os
@@ -1644,12 +1695,19 @@ async function createStore() {
      (code && String(s.code).toLowerCase() === code.toLowerCase()))
   );
   if (exists) return alert('Já existe uma loja com este nome ou código nesta empresa.');
+  const useCostCenter = !!$('storeUsesContaAzulCostCenter')?.checked;
+  const costCenterSelect = $('storeContaAzulCostCenter');
+  const costCenterId = useCostCenter ? val('storeContaAzulCostCenter') : '';
+  const costCenterName = costCenterId
+    ? (costCenterSelect?.selectedOptions?.[0]?.textContent || '').trim()
+    : '';
+  if (useCostCenter && !costCenterId) return alert('Selecione o Centro de Custo Conta Azul da loja.');
   const store = {
     id: uid('s'), companyId: cid, name, code,
     cashType: val('storeCashType') || 'Caixa diário',
     standardFund: Number(val('storeStandardFund')) || 0,
-    contaAzulCostCenterId: '',
-    contaAzulCostCenterName: '',
+    contaAzulCostCenterId: costCenterId,
+    contaAzulCostCenterName: costCenterName,
     status: val('storeStatus') || 'Ativa',
   };
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
@@ -1665,6 +1723,8 @@ async function createStore() {
   state.stores.push(store);
   ['storeName','storeCode'].forEach(clear);
   setVal('storeStandardFund', 100);
+  if ($('storeUsesContaAzulCostCenter')) $('storeUsesContaAzulCostCenter').checked = false;
+  await toggleStoreContaAzulCostCenter();
   addAudit('Cadastro de loja', name);
   save();
   renderAll();
@@ -1691,8 +1751,8 @@ async function updateStoreFund(id, value) {
   renderAll();
 }
 
-async function loadContaAzulCostCenterOptionsForStore(companyId, selectedId = '') {
-  const sel = $('editStoreContaAzulCostCenter');
+async function loadContaAzulCostCenterOptionsForStore(companyId, selectedId = '', selectId = 'editStoreContaAzulCostCenter') {
+  const sel = $(selectId);
   if (!sel) return;
   sel.innerHTML = '<option value="">Sem centro de custo</option>';
   if (!companyId || !sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return;
@@ -1721,6 +1781,18 @@ async function loadContaAzulCostCenterOptionsForStore(companyId, selectedId = ''
   } catch (e) {
     console.warn('Nao foi possivel carregar centros de custo Conta Azul.', e);
   }
+}
+
+async function toggleStoreContaAzulCostCenter() {
+  const enabled = !!$('storeUsesContaAzulCostCenter')?.checked;
+  const sel = $('storeContaAzulCostCenter');
+  if (!sel) return;
+  sel.disabled = !enabled;
+  if (!enabled) {
+    sel.value = '';
+    return;
+  }
+  await loadContaAzulCostCenterOptionsForStore(val('storeCompany'), sel.value || '', 'storeContaAzulCostCenter');
 }
 
 async function loadStoreToEdit(id) {
@@ -3184,7 +3256,7 @@ function toggleUserStore() {
 Object.assign(window, {
   state: null, isBooting: true,
   DEV_LOCAL_MODE, USE_LOCAL_FALLBACK, NORMALIZED_TABLES, IMPLANT_STEP_LIST,
-  defaultSelectOptions, defaultState, normalizeState, load, save, autosave, addAudit,
+  defaultSelectOptions, defaultState, normalizeState, applyContaAzulAllowedOptionRows, load, save, autosave, addAudit,
   setupRealtimeSync, stopRealtimeSync, manualRefresh,
   getCompanies, createCompany, updateCompany, inactivateCompany, deleteCompanyRecord,
   getStores, createStoreRecord, updateStore, deleteStoreRecord,
@@ -3200,7 +3272,7 @@ Object.assign(window, {
   companyName, storeName, visibleCompanies, visibleStores, cfg,
   saveClientSetup, clearClientSetup, openCompanyEditModal, closeCompanyEditModal, saveCompanyEdit,
   toggleCompany, activateCompanyFromImplant, deleteCompany,
-  createStore, updateStoreFund, deleteStore, loadContaAzulCostCenterOptionsForStore, loadStoreToEdit, saveStoreEdit, closeEditStoreModal,
+  createStore, updateStoreFund, deleteStore, loadContaAzulCostCenterOptionsForStore, toggleStoreContaAzulCostCenter, loadStoreToEdit, saveStoreEdit, closeEditStoreModal,
   createUserFromMaster, loadUserToEdit, openUserEditModal, closeUserEditModal, saveUserEdit,
   resetSelectedUserPassword, resetUserPasswordViaEdgeFunction, removeUserById,
   deleteSelectedUser, deleteUser,

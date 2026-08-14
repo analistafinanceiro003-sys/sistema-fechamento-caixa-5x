@@ -166,10 +166,10 @@ Object.assign(window, {
   manualRefresh,
 
   /* DB / CRUD */
-  save,
+  save, applyContaAzulAllowedOptionRows,
   saveClientSetup, clearClientSetup, openCompanyEditModal, closeCompanyEditModal, saveCompanyEdit,
   toggleCompany, deleteCompany,
-  createStore, updateStoreFund, deleteStore, loadContaAzulCostCenterOptionsForStore, loadStoreToEdit, saveStoreEdit, closeEditStoreModal,
+  createStore, updateStoreFund, deleteStore, loadContaAzulCostCenterOptionsForStore, toggleStoreContaAzulCostCenter, loadStoreToEdit, saveStoreEdit, closeEditStoreModal,
   createUserFromMaster, toggleUserStore, fillStoreSelect, fillUserManageSelect,
   loadUserToEdit, fillEditUserStore, saveUserEdit,
   resetSelectedUserPassword, deleteSelectedUser, deleteUser,

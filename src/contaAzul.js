@@ -163,22 +163,20 @@ async function loadContaAzulCompanyStatuses() {
   const companyIds = visibleCompanies().map((c) => c.id);
   try {
     if (!companyIds.length) return;
-    const [connections, catalog] = await Promise.all([
-      sb.from('conta_azul_connections').select('company_id, status, connected_at, last_error').in('company_id', companyIds),
-      sb.from('conta_azul_catalog_items').select('company_id, kind, synced_at').in('company_id', companyIds),
-    ]);
-    if (connections.error && catalog.error) return;
+    const connections = await sb
+      .from('conta_azul_connections')
+      .select('company_id, status, connected_at, last_error')
+      .in('company_id', companyIds);
+    if (connections.error) return;
     const next = {};
     (connections.data || []).forEach((row) => {
       next[row.company_id] = { ...(next[row.company_id] || {}), connection: row };
     });
-    (catalog.data || []).forEach((row) => {
-      const current = next[row.company_id] || {};
-      const syncedAt = current.synced_at && new Date(current.synced_at) > new Date(row.synced_at) ? current.synced_at : row.synced_at;
-      next[row.company_id] = {
+    Object.entries(state?.contaAzulAllowedOptions || {}).forEach(([companyId, groups]) => {
+      const current = next[companyId] || {};
+      next[companyId] = {
         ...current,
-        item_count: Number(current.item_count || 0) + 1,
-        synced_at: syncedAt,
+        item_count: Object.values(groups || {}).reduce((sum, values) => sum + (Array.isArray(values) ? values.length : 0), 0),
       };
     });
     contaAzulCompanyStatusCache = next;
@@ -267,6 +265,7 @@ async function loadContaAzulCatalog() {
     return renderContaAzulCatalogTables();
   }
   contaAzulCatalogRows = data || [];
+  if (typeof applyContaAzulAllowedOptionRows === 'function') applyContaAzulAllowedOptionRows(contaAzulCatalogRows.filter((row) => row.allowed_for_operator && row.active !== false));
   setContaAzulCatalogStatus(`${contaAzulCatalogRows.length} item(ns) sincronizado(s).`, 'success');
   renderContaAzulCatalogTables();
 }
@@ -276,10 +275,13 @@ async function syncContaAzulCatalog(companyIdOverride = '') {
   if (!companyId) return alert('Selecione a empresa para sincronizar.');
   if (!confirm(`Sincronizar cadastros do Conta Azul para ${companyName(companyId)}?\n\nIsto nao altera os cadastros operacionais atuais.`)) return;
   try {
-    setContaAzulCatalogStatus('Sincronizando cadastros do Conta Azul...');
+    setContaAzulCatalogStatus('Sincronizando cadastros do Conta Azul... isto pode levar alguns instantes.');
     const data = await invokeContaAzulFunction('conta-azul-sync-catalog', { company_id: companyId });
     const total = data.total || 0;
-    setContaAzulCatalogStatus(`${total} item(ns) sincronizado(s) do Conta Azul.`, 'success');
+    const details = Object.entries(data.counts || {})
+      .map(([kind, count]) => `${kind}: ${count}`)
+      .join(' | ');
+    setContaAzulCatalogStatus(`${total} item(ns) sincronizado(s) do Conta Azul.${details ? ` ${details}` : ''}`, 'success');
     if (!companyIdOverride) await loadContaAzulCatalog();
   } catch (e) {
     setContaAzulCatalogStatus(e.message || 'Erro ao sincronizar Conta Azul.', 'error');
@@ -314,6 +316,16 @@ async function loadContaAzulFinancialAccounts(companyId) {
 }
 
 function renderContaAzulCatalogTables() {
+  const renderLimit = 150;
+  const dedupeRows = (rows) => {
+    const seen = new Set();
+    return rows.filter((row) => {
+      const key = `${row.kind}|${String(row.name || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
   const groups = [
     ['fornecedor', 'caCatalogFornecedorBody', 'caCatalogFornecedorCount', 'caCatalogFornecedorSearch', 'Nenhum fornecedor sincronizado.'],
     ['categoria_saida', 'caCatalogCategoriaSaidaBody', 'caCatalogCategoriaSaidaCount', 'caCatalogCategoriaSaidaSearch', 'Nenhuma categoria de saida sincronizada.'],
@@ -323,14 +335,18 @@ function renderContaAzulCatalogTables() {
     ['centro_custo', 'caCatalogCentroCustoBody', 'caCatalogCentroCustoCount', 'caCatalogCentroCustoSearch', 'Nenhum centro de custo sincronizado.'],
   ];
   groups.forEach(([kind, bodyId, countId, searchId, empty]) => {
-    let rows = contaAzulCatalogRows.filter((r) => r.kind === kind);
+    let rows = dedupeRows(contaAzulCatalogRows.filter((r) => r.kind === kind));
     text(countId, String(rows.length));
     const term = val(searchId).trim().toLowerCase();
     if (term) rows = rows.filter((r) => String(r.name || '').toLowerCase().includes(term));
-    html(bodyId, rows.length ? rows.map((r) => `<tr>
+    const visibleRows = term ? rows : rows.slice(0, renderLimit);
+    const limitMessage = !term && rows.length > renderLimit
+      ? `<tr><td colspan="2" class="subtle">Mostrando ${renderLimit} de ${rows.length}. Use a busca para localizar os demais.</td></tr>`
+      : '';
+    html(bodyId, rows.length ? visibleRows.map((r) => `<tr>
       <td><input type="checkbox" ${r.allowed_for_operator ? 'checked' : ''} onchange="toggleContaAzulCatalogAllowed('${esc(r.id)}',this.checked)" style="width:16px;height:16px"/></td>
       <td>${esc(r.name)}<br><span class="subtle">ID Conta Azul: ${esc(r.external_id)}</span></td>
-    </tr>`).join('') : emptyRow(2, empty));
+    </tr>`).join('') + limitMessage : emptyRow(2, empty));
   });
 }
 
@@ -361,6 +377,8 @@ async function toggleContaAzulCatalogAllowed(id, allowed) {
     item.allowed_for_operator = !allowed;
     renderContaAzulCatalogTables();
     alert('Nao foi possivel salvar a liberacao: ' + error.message);
+  } else if (typeof applyContaAzulAllowedOptionRows === 'function') {
+    applyContaAzulAllowedOptionRows(contaAzulCatalogRows.filter((row) => row.allowed_for_operator && row.active !== false));
   }
 }
 
