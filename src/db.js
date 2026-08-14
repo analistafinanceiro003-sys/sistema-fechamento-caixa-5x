@@ -413,6 +413,8 @@ function mapStore(row) {
     standardFund: Number(row.standard_fund || 0),
     tolerance: row.tolerance,
     criticalDivergence: row.critical_divergence,
+    contaAzulCostCenterId: row.conta_azul_cost_center_id || '',
+    contaAzulCostCenterName: row.conta_azul_cost_center_name || '',
     status: row.status || 'Ativa',
   };
 }
@@ -877,6 +879,8 @@ async function createStoreRecord(store) {
     code: store.code,
     cash_type: store.cashType,
     standard_fund: store.standardFund,
+    conta_azul_cost_center_id: store.contaAzulCostCenterId || null,
+    conta_azul_cost_center_name: store.contaAzulCostCenterName || null,
     status: store.status,
   }));
   return row ? mapStore(row) : store;
@@ -891,6 +895,8 @@ async function updateStore(id, store) {
     standard_fund: store.standardFund,
     tolerance: store.tolerance ?? null,
     critical_divergence: store.criticalDivergence ?? null,
+    conta_azul_cost_center_id: store.contaAzulCostCenterId || null,
+    conta_azul_cost_center_name: store.contaAzulCostCenterName || null,
     status: store.status,
   }), { id });
   return row ? mapStore(row) : store;
@@ -1494,6 +1500,76 @@ function clearClientSetup() {
   setVal('setupStoreFund', 100);
 }
 
+function ensureSelectOption(selectId, value) {
+  const el = $(selectId);
+  if (!el || !value) return;
+  if (![...el.options].some((opt) => opt.value === value)) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = value;
+    el.appendChild(option);
+  }
+}
+
+function openCompanyEditModal(id) {
+  if (role !== 'master') return alert('Apenas o perfil Master pode editar clientes.');
+  const company = state.companies.find((c) => c.id === id);
+  if (!company) return;
+  setVal('editCompanyId', company.id);
+  setVal('editCompanyName', company.name || '');
+  setVal('editCompanyLegal', company.legal || '');
+  setVal('editCompanyCnpj', company.cnpj || '');
+  ensureSelectOption('editCompanySegment', company.segment || '');
+  ensureSelectOption('editCompanyPlan', company.plan || '');
+  ensureSelectOption('editCompanyStatus', company.status || '');
+  setVal('editCompanySegment', company.segment || '');
+  setVal('editCompanyPlan', company.plan || '');
+  setVal('editCompanyStatus', company.status || '');
+  setVal('editCompanyNotes', company.notes || '');
+  const modal = $('companyEditModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeCompanyEditModal() {
+  const modal = $('companyEditModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function saveCompanyEdit() {
+  const id = val('editCompanyId');
+  const company = state.companies.find((c) => c.id === id);
+  if (!company) return alert('Cliente não encontrado.');
+  const name = val('editCompanyName').trim();
+  if (!name) return alert('Informe o nome fantasia do cliente.');
+  const updated = {
+    ...company,
+    name,
+    legal: val('editCompanyLegal').trim(),
+    cnpj: val('editCompanyCnpj').trim(),
+    segment: val('editCompanySegment'),
+    plan: val('editCompanyPlan'),
+    status: val('editCompanyStatus'),
+    notes: val('editCompanyNotes').trim(),
+  };
+  if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
+    try {
+      const saved = await updateCompany(id, updated);
+      Object.assign(company, saved);
+    } catch (e) {
+      return alert(`Erro ao atualizar cliente no Supabase: ${e.message}`);
+    }
+  } else if (!DEV_LOCAL_MODE) {
+    return alert('Supabase Auth/Sessão obrigatório em produção para atualizar clientes.');
+  } else {
+    Object.assign(company, updated);
+  }
+  addAudit('Cliente editado', company.name);
+  closeCompanyEditModal();
+  save();
+  renderAll();
+  toast('Cliente atualizado com sucesso.');
+}
+
 async function toggleCompany(id) {
   const c = state.companies.find((x) => x.id === id);
   if (!c) return;
@@ -1572,6 +1648,8 @@ async function createStore() {
     id: uid('s'), companyId: cid, name, code,
     cashType: val('storeCashType') || 'Caixa diário',
     standardFund: Number(val('storeStandardFund')) || 0,
+    contaAzulCostCenterId: '',
+    contaAzulCostCenterName: '',
     status: val('storeStatus') || 'Ativa',
   };
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
@@ -1613,7 +1691,39 @@ async function updateStoreFund(id, value) {
   renderAll();
 }
 
-function loadStoreToEdit(id) {
+async function loadContaAzulCostCenterOptionsForStore(companyId, selectedId = '') {
+  const sel = $('editStoreContaAzulCostCenter');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Sem centro de custo</option>';
+  if (!companyId || !sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return;
+  try {
+    const { data, error } = await sb
+      .from('conta_azul_catalog_items')
+      .select('external_id,name')
+      .eq('company_id', companyId)
+      .eq('kind', 'centro_custo')
+      .eq('active', true)
+      .order('name', { ascending: true });
+    if (error) throw error;
+    (data || []).forEach((item) => {
+      const option = document.createElement('option');
+      option.value = item.external_id || '';
+      option.textContent = item.name || item.external_id || '';
+      sel.appendChild(option);
+    });
+    if (selectedId && !Array.from(sel.options).some((option) => option.value === selectedId)) {
+      const option = document.createElement('option');
+      option.value = selectedId;
+      option.textContent = selectedId;
+      sel.appendChild(option);
+    }
+    sel.value = selectedId || '';
+  } catch (e) {
+    console.warn('Nao foi possivel carregar centros de custo Conta Azul.', e);
+  }
+}
+
+async function loadStoreToEdit(id) {
   const s = state.stores.find((x) => x.id === id);
   if (!s) return;
   setVal('editStoreId', s.id);
@@ -1627,6 +1737,7 @@ function loadStoreToEdit(id) {
   if (sel) {
     sel.innerHTML = state.companies.map((c) => `<option value="${c.id}"${c.id === s.companyId ? ' selected' : ''}>${esc(c.name)}</option>`).join('');
   }
+  await loadContaAzulCostCenterOptionsForStore(s.companyId, s.contaAzulCostCenterId || '');
   const modal = $('editStoreModal');
   if (modal) { modal.style.display = 'flex'; }
 }
@@ -1642,6 +1753,11 @@ async function saveStoreEdit() {
   if (!s) return alert('Loja não encontrada.');
   const name = val('editStoreName').trim();
   if (!name) return alert('Informe o nome da loja.');
+  const costCenterSelect = $('editStoreContaAzulCostCenter');
+  const costCenterId = val('editStoreContaAzulCostCenter');
+  const costCenterName = costCenterId
+    ? (costCenterSelect?.selectedOptions?.[0]?.textContent || '').trim()
+    : '';
   const updated = {
     ...s,
     companyId:    val('editStoreCompany')    || s.companyId,
@@ -1649,6 +1765,8 @@ async function saveStoreEdit() {
     code:         val('editStoreCode').trim(),
     cashType:     val('editStoreCashType')   || s.cashType,
     standardFund: Number(val('editStoreStandardFund')) || 0,
+    contaAzulCostCenterId: costCenterId,
+    contaAzulCostCenterName: costCenterName,
     status:       val('editStoreStatus')     || s.status,
   };
   if (sb && !USE_LOCAL_FALLBACK && hasSupabaseSession()) {
@@ -3080,8 +3198,9 @@ Object.assign(window, {
   createDivergenceReview, getPendingDivergenceReviews, updateDivergenceReview,
   logAudit,
   companyName, storeName, visibleCompanies, visibleStores, cfg,
-  saveClientSetup, clearClientSetup, toggleCompany, activateCompanyFromImplant, deleteCompany,
-  createStore, updateStoreFund, deleteStore,
+  saveClientSetup, clearClientSetup, openCompanyEditModal, closeCompanyEditModal, saveCompanyEdit,
+  toggleCompany, activateCompanyFromImplant, deleteCompany,
+  createStore, updateStoreFund, deleteStore, loadContaAzulCostCenterOptionsForStore, loadStoreToEdit, saveStoreEdit, closeEditStoreModal,
   createUserFromMaster, loadUserToEdit, openUserEditModal, closeUserEditModal, saveUserEdit,
   resetSelectedUserPassword, resetUserPasswordViaEdgeFunction, removeUserById,
   deleteSelectedUser, deleteUser,

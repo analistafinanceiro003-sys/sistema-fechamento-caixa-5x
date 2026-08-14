@@ -452,6 +452,7 @@ function renderCadastros() {
       <td>${state.users.filter((u) => u.companyId === c.id).length}</td>
       <td>${window.contaAzulCompanyStatusHtml ? contaAzulCompanyStatusHtml(c.id) : '<span class="subtle">-</span>'}</td>
       <td>
+        <button class="btn btn-sm" onclick="openCompanyEditModal('${esc(c.id)}')">Editar</button>
         <button class="btn btn-sm" onclick="toggleCompany('${c.id}')">${c.status === 'Inativa' ? 'Ativar' : 'Inativar'}</button>
       </td>
     </tr>`

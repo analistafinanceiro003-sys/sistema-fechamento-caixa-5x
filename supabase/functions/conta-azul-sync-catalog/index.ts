@@ -91,6 +91,28 @@ async function fetchPages(accessToken: string, path: string, itemKey = 'items') 
   return rows;
 }
 
+async function fetchCategorias(accessToken: string, tipo: 'RECEITA' | 'DESPESA') {
+  const paths = [
+    `/v1/categorias?tipo=${tipo}&permite_apenas_filhos=false`,
+    `/v1/categorias?tipo=${tipo}&permite_apenas_filhos=true`,
+    `/v1/categorias?tipo=${tipo}&apenas_filhos=true&permite_apenas_filhos=true`,
+  ];
+  const results = await Promise.allSettled(paths.map((path) => fetchPages(accessToken, path, 'itens')));
+  if (!results.some((result) => result.status === 'fulfilled')) {
+    const firstError = results.find((result) => result.status === 'rejected') as PromiseRejectedResult | undefined;
+    throw new Error(firstError?.reason?.message || `Falha ao buscar categorias ${tipo}.`);
+  }
+  const byId = new Map<string, any>();
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue;
+    for (const item of result.value) {
+      const id = clean(item.id || item.uuid);
+      if (id) byId.set(id, item);
+    }
+  }
+  return Array.from(byId.values());
+}
+
 function catalogRow(companyId: string, kind: string, item: any) {
   const externalId = clean(item.id || item.uuid);
   const name = clean(item.nome || item.nome_fantasia || item.razao_social);
@@ -150,8 +172,8 @@ Deno.serve(async (req) => {
   const batches = await Promise.all([
     fetchPages(accessToken, '/v1/pessoas?tipo_perfil=Cliente', 'items').then((rows) => rows.map((i) => catalogRow(companyId, 'cliente', i))),
     fetchPages(accessToken, '/v1/pessoas?tipo_perfil=Fornecedor', 'items').then((rows) => rows.map((i) => catalogRow(companyId, 'fornecedor', i))),
-    fetchPages(accessToken, '/v1/categorias?tipo=RECEITA&permite_apenas_filhos=true', 'itens').then((rows) => rows.map((i) => catalogRow(companyId, 'categoria_entrada', i))),
-    fetchPages(accessToken, '/v1/categorias?tipo=DESPESA&permite_apenas_filhos=true', 'itens').then((rows) => rows.map((i) => catalogRow(companyId, 'categoria_saida', i))),
+    fetchCategorias(accessToken, 'RECEITA').then((rows) => rows.map((i) => catalogRow(companyId, 'categoria_entrada', i))),
+    fetchCategorias(accessToken, 'DESPESA').then((rows) => rows.map((i) => catalogRow(companyId, 'categoria_saida', i))),
     fetchPages(accessToken, '/v1/conta-financeira?apenas_ativo=true', 'itens').then((rows) => rows.map((i) => catalogRow(companyId, 'conta_financeira', i))),
     fetchPages(accessToken, '/v1/centro-de-custo?filtro_rapido=ATIVO', 'items').then((rows) => rows.map((i) => catalogRow(companyId, 'centro_custo', i))),
   ]);

@@ -195,18 +195,17 @@ async function findCatalogExternalId(admin: any, companyId: string, name: string
   return '';
 }
 
-async function findFirstCatalogExternalId(admin: any, companyId: string, kind: string) {
+async function findSyncedFinancialAccount(admin: any, companyId: string, externalId: string) {
+  if (!externalId) return null;
   const { data, error } = await admin.from('conta_azul_catalog_items')
-    .select('external_id')
+    .select('external_id, name')
     .eq('company_id', companyId)
-    .eq('kind', kind)
+    .eq('kind', 'conta_financeira')
     .eq('active', true)
-    .order('allowed_for_operator', { ascending: false })
-    .order('name', { ascending: true })
-    .limit(1)
+    .eq('external_id', externalId)
     .maybeSingle();
-  if (error || !data?.external_id) return '';
-  return data.external_id;
+  if (error || !data?.external_id) return null;
+  return data;
 }
 
 function buildPayload(row: Record<string, unknown>, ids: { pessoa: string; categoria: string; conta: string; centro?: string }, direction: string) {
@@ -300,11 +299,12 @@ Deno.serve(async (req) => {
     return error(req, 'Empresa sem conexao Conta Azul ativa.', 400);
   }
 
+  const accountIdInput = clean(payload.account_id);
+  if (!accountIdInput) return error(req, 'Selecione a Conta Financeira sincronizada antes de enviar.', 400);
+  const syncedAccount = await findSyncedFinancialAccount(admin, companyId, accountIdInput);
+  if (!syncedAccount) return error(req, 'Conta Financeira nao encontrada nos cadastros sincronizados desta empresa. Sincronize o Conta Azul e selecione a conta novamente.', 400);
   const accessToken = await ensureAccessToken(admin, connection);
-  const accountName = clean(payload.account_name || Deno.env.get('CONTA_AZUL_DEFAULT_ACCOUNT_NAME'));
-  const accountId = accountName
-    ? (await findCatalogExternalId(admin, companyId, accountName, 'conta_financeira') || await findContaFinanceira(accessToken, accountName))
-    : (await findFirstCatalogExternalId(admin, companyId, 'conta_financeira') || await findContaFinanceira(accessToken, accountName));
+  const accountId = syncedAccount.external_id;
   const results = [];
 
   for (const item of rows) {

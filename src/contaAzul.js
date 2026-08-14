@@ -9,6 +9,7 @@ let contaAzulCatalogRows = [];
 let contaAzulCompanyStatusCache = {};
 let contaAzulCompanyStatusLoading = false;
 let contaAzulCompanyStatusLoadedAt = 0;
+let contaAzulFinancialAccountRows = [];
 
 function currentContaAzulCompanyId() {
   if (role === 'admin') return currentUser?.companyId || '';
@@ -286,6 +287,32 @@ async function syncContaAzulCatalog(companyIdOverride = '') {
   }
 }
 
+async function loadContaAzulFinancialAccounts(companyId) {
+  const select = $('contaAzulAccountSelect');
+  if (!select) return;
+  select.innerHTML = '<option value="">Selecione a conta sincronizada</option>';
+  contaAzulFinancialAccountRows = [];
+  if (!companyId || !sb || USE_LOCAL_FALLBACK) return;
+  const { data, error } = await sb
+    .from('conta_azul_catalog_items')
+    .select('external_id, name')
+    .eq('company_id', companyId)
+    .eq('kind', 'conta_financeira')
+    .eq('active', true)
+    .order('name', { ascending: true });
+  if (error) {
+    console.warn('Nao foi possivel carregar contas financeiras Conta Azul.', error);
+    return;
+  }
+  contaAzulFinancialAccountRows = data || [];
+  contaAzulFinancialAccountRows.forEach((account) => {
+    const option = document.createElement('option');
+    option.value = account.external_id || '';
+    option.textContent = account.name || account.external_id || '';
+    select.appendChild(option);
+  });
+}
+
 function renderContaAzulCatalogTables() {
   const groups = [
     ['fornecedor', 'caCatalogFornecedorBody', 'caCatalogFornecedorCount', 'caCatalogFornecedorSearch', 'Nenhum fornecedor sincronizado.'],
@@ -337,7 +364,7 @@ async function toggleContaAzulCatalogAllowed(id, allowed) {
   }
 }
 
-function contaAzulApprovalRows(includeCostCenter) {
+function contaAzulApprovalRows() {
   return allMovementRows(reportFilteredClosings())
     .filter((r) => r.Tipo === 'Entrada' || r.Tipo === 'Saída')
     .map((r, idx) => ({
@@ -349,7 +376,7 @@ function contaAzulApprovalRows(includeCostCenter) {
       sent: false,
       protocolId: '',
       error: '',
-      row: contaAzulRow(r, 'Importado Central de Caixa 5X', includeCostCenter),
+      row: contaAzulRow(r, 'Importado Central de Caixa 5X'),
       source: r,
       type: r.Tipo,
     }));
@@ -411,9 +438,9 @@ function renderContaAzulApprovalPreview() {
   }).join('') || emptyRow(9));
 }
 
-function buildContaAzulApprovalPreview() {
-  const includeCostCenter = shouldFillContaAzulCostCenter();
-  contaAzulPreviewRows = contaAzulApprovalRows(includeCostCenter);
+async function buildContaAzulApprovalPreview() {
+  contaAzulPreviewRows = contaAzulApprovalRows();
+  await loadContaAzulFinancialAccounts(currentContaAzulCompanyId());
   renderContaAzulApprovalPreview();
   if (!contaAzulPreviewRows.length) toast('Nenhum lançamento de entrada ou saída no período selecionado.', 'warning');
 }
@@ -455,6 +482,10 @@ function approveContaAzulPreview() {
 async function sendApprovedContaAzulPreview() {
   const companyId = currentContaAzulCompanyId();
   if (!companyId) return alert('Selecione a empresa conectada ao Conta Azul.');
+  const accountSelect = $('contaAzulAccountSelect');
+  const accountId = val('contaAzulAccountSelect');
+  const accountName = accountId ? (accountSelect?.selectedOptions?.[0]?.textContent || '').trim() : '';
+  if (!accountId) return alert('Selecione a Conta Financeira sincronizada onde os lancamentos devem ser feitos.');
   const approved = contaAzulPreviewRows.filter((r) => r.selected && r.approved && !r.sent);
   if (!approved.length) return alert('Selecione ao menos um lancamento aprovado ainda nao enviado.');
   const invalid = approved.filter((r) => contaAzulPreviewMissingFields(r).length);
@@ -462,7 +493,7 @@ async function sendApprovedContaAzulPreview() {
     renderContaAzulApprovalPreview();
     return alert('Preencha Descricao, Categoria e Cliente/Fornecedor antes de enviar ao Conta Azul.');
   }
-  const confirmed = confirm(`Enviar ${approved.length} lancamento(s) aprovado(s) para o Conta Azul de ${currentContaAzulCompanyName()}?`);
+  const confirmed = confirm(`Enviar ${approved.length} lancamento(s) aprovado(s) para o Conta Azul de ${currentContaAzulCompanyName()}?\n\nConta financeira: ${accountName}`);
   if (!confirmed) return;
 
   approved.forEach((item) => {
@@ -474,6 +505,8 @@ async function sendApprovedContaAzulPreview() {
   try {
     const data = await invokeContaAzulFunction('conta-azul-send-approved', {
       company_id: companyId,
+      account_id: accountId,
+      account_name: accountName,
       rows: approved.map((item) => ({
         id: item.id,
         source_key: item.sourceKey,

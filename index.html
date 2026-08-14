@@ -269,6 +269,28 @@
             <tbody id="companiesBody"></tbody></table>
           </div>
         </div>
+        <div id="companyEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeCompanyEditModal()">
+          <div class="card" style="width:min(760px,96vw);max-height:90vh;overflow-y:auto;padding:24px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px">
+              <h3 class="section-title" style="margin:0">Editar cliente</h3>
+              <button class="btn btn-sm" onclick="closeCompanyEditModal()">Fechar</button>
+            </div>
+            <input type="hidden" id="editCompanyId"/>
+            <div class="form-grid">
+              <div class="field"><label>Nome fantasia</label><input id="editCompanyName"/></div>
+              <div class="field"><label>Razão social</label><input id="editCompanyLegal"/></div>
+              <div class="field"><label>CNPJ</label><input id="editCompanyCnpj"/></div>
+              <div class="field"><label>Segmento</label><select id="editCompanySegment"><option>Restaurante / Hamburgueria</option><option>Padaria</option><option>Varejo</option><option>Serviços</option><option>Indústria</option><option>Outro</option></select></div>
+              <div class="field"><label>Plano</label><select id="editCompanyPlan"><option>Operacional</option><option>Controladoria</option><option>Premium 5X</option></select></div>
+              <div class="field"><label>Status</label><select id="editCompanyStatus"><option>Implantação</option><option>Ativa</option><option>Inativa</option></select></div>
+              <div class="field full"><label>Observações</label><textarea id="editCompanyNotes"></textarea></div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-brand" onclick="saveCompanyEdit()">Salvar alteração</button>
+              <button class="btn" onclick="closeCompanyEditModal()">Cancelar</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Lojas -->
@@ -303,11 +325,12 @@
               <h3 class="section-title">Editar loja</h3>
               <input type="hidden" id="editStoreId"/>
               <div class="form-grid">
-                <div class="field"><label>Empresa</label><select id="editStoreCompany"></select></div>
+                <div class="field"><label>Empresa</label><select id="editStoreCompany" onchange="loadContaAzulCostCenterOptionsForStore(this.value,'')"></select></div>
                 <div class="field"><label>Nome</label><input id="editStoreName"/></div>
                 <div class="field"><label>Código</label><input id="editStoreCode"/></div>
                 <div class="field"><label>Tipo de caixa</label><select id="editStoreCashType"><option>Caixa diário</option><option>Caixa por turno</option><option>Caixa central</option><option>Caixa delivery</option></select></div>
                 <div class="field"><label>Fundo padrão (R$)</label><input id="editStoreStandardFund" type="number" step="0.01"/></div>
+                <div class="field"><label>Centro de Custo Conta Azul</label><select id="editStoreContaAzulCostCenter"><option value="">Sem centro de custo</option></select></div>
                 <div class="field"><label>Status</label><select id="editStoreStatus"><option>Ativa</option><option>Implantação</option><option>Inativa</option></select></div>
               </div>
               <div class="btn-row" style="margin-top:16px">
@@ -714,8 +737,8 @@
           <h4>Exportação modelo Conta Azul</h4>
           <p class="subtle">Gera os lançamentos (entradas e saídas) no modelo de planilha Excel para importação no Conta Azul. Repasses não entram aqui — use o relatório de Repasses.</p>
           <label style="display:flex;align-items:flex-start;gap:8px;margin:10px 0 12px;font-size:13px;color:#374151;line-height:1.5">
-            <input type="checkbox" data-conta-azul-cost-center checked style="width:16px;height:16px;margin-top:2px"/>
-            <span>Preencher <strong>Centro de Custo</strong> com o nome da loja. Se desmarcar, a coluna será exportada vazia.</span>
+            <span aria-hidden="true" style="display:none"></span>
+            <span>Centro de Custo preenchido automaticamente pelo vínculo cadastrado em cada loja. Se não houver vínculo, a coluna fica vazia.</span>
           </label>
           <div id="contaAzulStatusMaster" class="subtle" style="margin:8px 0">Conta Azul: não verificado.</div>
           <div class="btn-row">
@@ -729,6 +752,10 @@
         <div class="card" id="contaAzulApprovalCard" style="margin-top:16px;display:none">
           <h3 class="section-title">Aprovação de lançamentos Conta Azul</h3>
           <p class="subtle" style="margin-bottom:12px">Revise antes de enviar. O envio via API só deve acontecer depois que os lançamentos estiverem aprovados e os IDs de categoria, conta financeira e cliente/fornecedor estiverem mapeados.</p>
+          <div class="field" style="max-width:420px;margin-bottom:12px">
+            <label>Conta Financeira Conta Azul</label>
+            <select id="contaAzulAccountSelect"><option value="">Selecione a conta sincronizada</option></select>
+          </div>
           <div class="btn-row" style="margin-bottom:12px">
             <button class="btn btn-primary" onclick="approveContaAzulPreview()">Aprovar selecionados</button>
             <button class="btn btn-brand" onclick="sendApprovedContaAzulPreview()">Enviar aprovados para Conta Azul</button>
@@ -1755,7 +1782,7 @@
                 <tr>
                   <td><strong>Relatório Conta Azul</strong></td>
                   <td>Relatórios → Conta Azul</td>
-                  <td>Exporta entradas e saídas com Data, Valor, Categoria, Descrição e Cliente/Fornecedor. Antes de exportar, escolha se a coluna "Centro de Custo" deve receber o nome da Loja ou ficar vazia.</td>
+                  <td>Exporta entradas e saídas com Data, Valor, Categoria, Descrição, Cliente/Fornecedor e Centro de Custo. O Centro de Custo vem do vínculo cadastrado na loja; se não houver vínculo, o campo fica vazio.</td>
                 </tr>
               </tbody>
             </table>
@@ -2267,8 +2294,8 @@
             <h4>Exportação Conta Azul</h4>
             <p class="subtle">Lançamentos (entradas e saídas) no modelo de planilha Excel para importação no Conta Azul. Repasses não entram aqui — use o relatório de Repasses.</p>
             <label style="display:flex;align-items:flex-start;gap:8px;margin:10px 0 12px;font-size:13px;color:#374151;line-height:1.5">
-              <input type="checkbox" data-conta-azul-cost-center checked style="width:16px;height:16px;margin-top:2px"/>
-              <span>Preencher <strong>Centro de Custo</strong> com o nome da loja. Se desmarcar, a coluna será exportada vazia.</span>
+              <span aria-hidden="true" style="display:none"></span>
+              <span>Centro de Custo preenchido automaticamente pelo vínculo cadastrado em cada loja. Se não houver vínculo, a coluna fica vazia.</span>
             </label>
             <div class="btn-row"><button class="btn" onclick="exportContaAzulXLSX()">Exportar Excel (.xlsx)</button></div>
           </div>
