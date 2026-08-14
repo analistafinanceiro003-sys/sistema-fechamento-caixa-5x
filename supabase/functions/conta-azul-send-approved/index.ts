@@ -54,6 +54,34 @@ function toISODate(value: unknown) {
   return raw;
 }
 
+function rowDate(row: Record<string, unknown>) {
+  const direct = rowValue(
+    row,
+    'Data de Competência',
+    'Data de CompetÃªncia',
+    'Data de CompetÃƒÂªncia',
+    'Data de Vencimento',
+    'Data de Pagamento',
+    'Data',
+  );
+  if (direct) return toISODate(direct);
+  for (const [key, value] of Object.entries(row)) {
+    const k = normalize(key);
+    if (k.includes('data') && (k.includes('competencia') || k.includes('vencimento') || k.includes('pagamento'))) {
+      return toISODate(value);
+    }
+  }
+  return '';
+}
+
+function requireISODate(row: Record<string, unknown>) {
+  const date = rowDate(row);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error(`Data de vencimento invalida para o Conta Azul. Informe no formato YYYY-MM-DD. Valor recebido: ${date || 'vazio'}.`);
+  }
+  return date;
+}
+
 function moneyNumber(value: unknown) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.abs(n) : 0;
@@ -251,7 +279,7 @@ async function findCentroCusto(accessToken: string, name: string) {
 }
 
 async function searchCreatedEvent(accessToken: string, row: Record<string, unknown>, direction: string) {
-  const date = toISODate(rowValue(row, 'Data de CompetÃªncia', 'Data de CompetÃƒÂªncia'));
+  const date = requireISODate(row);
   const description = clean(rowValue(row, 'DescriÃ§Ã£o', 'DescriÃƒÂ§ÃƒÂ£o'));
   const value = moneyNumber(row.Valor);
   const params = new URLSearchParams({
@@ -305,7 +333,7 @@ async function findParcelas(accessToken: string, eventId: string) {
 }
 
 async function createBaixa(accessToken: string, parcelaIdValue: string, row: Record<string, unknown>, direction: string, accountId: string, observation: string) {
-  const date = toISODate(rowValue(row, 'Data de CompetÃªncia', 'Data de CompetÃƒÂªncia'));
+  const date = requireISODate(row);
   const value = moneyNumber(row.Valor);
   if (!parcelaIdValue) throw new Error('Lancamento criado, mas o ID da parcela para baixa nao foi retornado pelo Conta Azul.');
   return await caFetch(accessToken, `/v1/financeiro/eventos-financeiros/parcelas/${parcelaIdValue}/baixa`, {
@@ -366,7 +394,7 @@ async function findSyncedFinancialAccount(admin: any, companyId: string, externa
 
 function buildPayload(row: Record<string, unknown>, ids: { pessoa: string; categoria: string; conta: string; centro?: string }, direction: string) {
   const value = moneyNumber(row.Valor);
-  const date = toISODate(rowValue(row, 'Data de Competência', 'Data de CompetÃªncia'));
+  const date = requireISODate(row);
   const description = clean(rowValue(row, 'Descrição', 'DescriÃ§Ã£o'));
   const observation = clean(rowValue(row, 'Observações', 'ObservaÃ§Ãµes')) || `Importado Central de Caixa 5X - ${description}`;
   const rateio: Record<string, unknown> = {
