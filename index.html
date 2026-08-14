@@ -815,8 +815,9 @@
                 <p class="subtle">Configura listas globais e opções por empresa usadas nos formulários operacionais.</p>
               </div>
             </div>
+            <div class="inner-tabs compact-tabs-5x" id="optionCategoryTabs"></div>
             <div class="option-manager">
-              <div class="field">
+              <div class="field hidden">
                 <label>Campo de seleção</label>
                 <select id="optionCategory" onchange="toggleOptionCompanyField();renderSistema()">
                   <option value="segments">Segmentos de empresa</option>
@@ -844,12 +845,16 @@
         <div class="inner-tab-panel hidden" id="sisconf-exclusoes">
           <div class="management-block">
             <div class="card"><div class="section-head-5x"><div><h3 class="section-title">Exclusões e manutenção de cadastros</h3><p class="subtle">Use com cuidado: a exclusão remove registros da base.</p></div></div></div>
-            <div class="management-grid">
-              <div class="management-card"><h4>Empresas</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Status</th><th>Ação</th></tr></thead><tbody id="settingsCompaniesBody"></tbody></table></div></div>
-              <div class="management-card"><h4>Lojas / caixas</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Loja</th><th>Ação</th></tr></thead><tbody id="settingsStoresBody"></tbody></table></div></div>
-              <div class="management-card"><h4>Usuários</h4><div class="table-wrap compact-table"><table><thead><tr><th>Usuário</th><th>Perfil</th><th>Ação</th></tr></thead><tbody id="settingsUsersBody"></tbody></table></div></div>
-              <div class="management-card"><h4>Regras operacionais</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Tipo</th><th>Ação</th></tr></thead><tbody id="settingsRulesBody"></tbody></table></div></div>
+            <div class="inner-tabs compact-tabs-5x">
+              <button class="inner-tab-btn active" onclick="showSubTab('sisconf-exclusoes','sisdel-empresas',this)">Empresas</button>
+              <button class="inner-tab-btn" onclick="showSubTab('sisconf-exclusoes','sisdel-lojas',this)">Lojas / caixas</button>
+              <button class="inner-tab-btn" onclick="showSubTab('sisconf-exclusoes','sisdel-usuarios',this)">Usuários</button>
+              <button class="inner-tab-btn" onclick="showSubTab('sisconf-exclusoes','sisdel-regras',this)">Regras operacionais</button>
             </div>
+            <div class="inner-tab-panel active" id="sisdel-empresas"><div class="management-card"><h4>Empresas</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Status</th><th>Ação</th></tr></thead><tbody id="settingsCompaniesBody"></tbody></table></div></div></div>
+            <div class="inner-tab-panel hidden" id="sisdel-lojas"><div class="management-card"><h4>Lojas / caixas</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Loja</th><th>Ação</th></tr></thead><tbody id="settingsStoresBody"></tbody></table></div></div></div>
+            <div class="inner-tab-panel hidden" id="sisdel-usuarios"><div class="management-card"><h4>Usuários</h4><div class="table-wrap compact-table"><table><thead><tr><th>Usuário</th><th>Perfil</th><th>Ação</th></tr></thead><tbody id="settingsUsersBody"></tbody></table></div></div></div>
+            <div class="inner-tab-panel hidden" id="sisdel-regras"><div class="management-card"><h4>Regras operacionais</h4><div class="table-wrap compact-table"><table><thead><tr><th>Empresa</th><th>Tipo</th><th>Ação</th></tr></thead><tbody id="settingsRulesBody"></tbody></table></div></div></div>
           </div>
         </div>
       </div>

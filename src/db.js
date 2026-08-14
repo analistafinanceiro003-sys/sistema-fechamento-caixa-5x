@@ -3149,6 +3149,107 @@ async function clearStoreDocumentsByStore(storeId) {
   }
 }
 
+const ZIP_CRC_TABLE = (() => {
+  const table = [];
+  for (let n = 0; n < 256; n += 1) {
+    let c = n;
+    for (let k = 0; k < 8; k += 1) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function zipCrc32(bytes) {
+  let crc = 0xffffffff;
+  for (let i = 0; i < bytes.length; i += 1) crc = ZIP_CRC_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function zipU16(value) {
+  return new Uint8Array([value & 0xff, (value >>> 8) & 0xff]);
+}
+
+function zipU32(value) {
+  return new Uint8Array([value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff]);
+}
+
+function safeZipName(value, fallback = 'arquivo') {
+  return String(value || fallback).replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, ' ').trim() || fallback;
+}
+
+function makeZip(files) {
+  const encoder = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  files.forEach((file) => {
+    const nameBytes = encoder.encode(file.name);
+    const data = file.bytes;
+    const crc = zipCrc32(data);
+    const local = [
+      zipU32(0x04034b50), zipU16(20), zipU16(0x0800), zipU16(0), zipU16(0), zipU16(0),
+      zipU32(crc), zipU32(data.length), zipU32(data.length), zipU16(nameBytes.length), zipU16(0), nameBytes, data,
+    ];
+    localParts.push(...local);
+    centralParts.push(
+      zipU32(0x02014b50), zipU16(20), zipU16(20), zipU16(0x0800), zipU16(0), zipU16(0), zipU16(0),
+      zipU32(crc), zipU32(data.length), zipU32(data.length), zipU16(nameBytes.length), zipU16(0), zipU16(0),
+      zipU16(0), zipU16(0), zipU32(0), zipU32(offset), nameBytes
+    );
+    offset += local.reduce((sum, part) => sum + part.length, 0);
+  });
+  const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+  const end = [
+    zipU32(0x06054b50), zipU16(0), zipU16(0), zipU16(files.length), zipU16(files.length),
+    zipU32(centralSize), zipU32(offset), zipU16(0),
+  ];
+  return new Blob([...localParts, ...centralParts, ...end], { type: 'application/zip' });
+}
+
+function downloadBlob(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function downloadStoreDocumentsZip(storeId) {
+  try {
+    const store = state.stores.find((s) => s.id === storeId);
+    if (!store) return alert('Loja não encontrada.');
+    const docs = (state.storeDocuments || []).filter((d) => d.storeId === storeId && d.path);
+    if (!docs.length) return toast('Não há documentos enviados nesta pasta.');
+    if (!sb || USE_LOCAL_FALLBACK || !hasSupabaseSession()) return alert('Login necessário para baixar documentos.');
+    const files = [];
+    const usedNames = new Set();
+    for (const doc of docs) {
+      const { data, error } = await sb.storage.from('store-documents').download(doc.path);
+      if (error || !data) throw new Error(`Falha ao baixar "${doc.name}": ${error?.message || 'arquivo indisponível'}`);
+      const baseName = safeZipName(doc.name || doc.path.split('/').pop());
+      const dot = baseName.lastIndexOf('.');
+      const stem = dot > 0 ? baseName.slice(0, dot) : baseName;
+      const ext = dot > 0 ? baseName.slice(dot) : '';
+      let name = baseName;
+      let seq = 2;
+      while (usedNames.has(name.toLowerCase())) {
+        name = `${stem}_${seq}${ext}`;
+        seq += 1;
+      }
+      usedNames.add(name.toLowerCase());
+      files.push({ name, bytes: new Uint8Array(await data.arrayBuffer()) });
+    }
+    downloadBlob(`documentos_${safeZipName(companyName(store.companyId))}_${safeZipName(store.name)}.zip`, makeZip(files));
+    addAudit('Download ZIP documentos', `${store.name} — ${files.length} arquivo(s)`);
+    save();
+  } catch (e) {
+    alert('Erro ao baixar ZIP: ' + (e.message || 'tente novamente.'));
+  }
+}
+
 /* --- Handlers de UI --- */
 const ALLOWED_DOC_MIME = ['image/jpeg', 'image/png', 'application/pdf'];
 const ALLOWED_DOC_EXT  = /\.(jpe?g|png|pdf)$/i;
@@ -3292,7 +3393,7 @@ Object.assign(window, {
   fillReportStore, fillReportOperator, fillClientReportStore, fillClientReportOperator, fillMasterExtractStore,
   fillMasterMovementStore, fillMasterDivergenceStore, fillMasterResumoStore, fillMasterRepasseStore,
   fillUserManageSelect, fillEditUserStore, toggleUserStore,
-  mapStoreDocument, uploadStoreDocument, deleteStoreDocument, clearStoreDocumentsByStore,
+  mapStoreDocument, uploadStoreDocument, deleteStoreDocument, clearStoreDocumentsByStore, downloadStoreDocumentsZip,
   previewDocUpload, handleDocUpload, handleDeleteDoc, handleClearStoreDocuments,
   viewStorageFile, openFileViewer, closeFileViewer, reloadStoreDocuments,
   saveRectificationRequest,

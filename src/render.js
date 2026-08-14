@@ -1061,21 +1061,33 @@ function toggleOptionCompanyField() {
   field.classList.toggle('hidden', !isCompanyScoped);
 }
 
+const SISTEMA_OPTION_LABELS = {
+  segments:'Segmentos', plans:'Planos', companyStatus:'Status da empresa',
+  cashTypes:'Tipos de caixa', operationModes:'Modos de fechamento',
+  ruleTypes:'Tipos de regra', shifts:'Turnos',
+  implantSteps:'Etapas de implantação', implantStatus:'Status de implantação',
+};
+
+function selectSistemaOptionCategory(key) {
+  setVal('optionCategory', key);
+  toggleOptionCompanyField();
+  renderSistema();
+}
+
 /* --- SISTEMA (sub-abas: config, backup, logs) --- */
 function renderSistema() {
   toggleOptionCompanyField();
   if (window.renderAnalysts) renderAnalysts();
   if (window.renderCoordinators) renderCoordinators();
   /* Config / opções de seleção */
-  const labels = {
-    segments:'Segmentos', plans:'Planos', companyStatus:'Status da empresa',
-    cashTypes:'Tipos de caixa', operationModes:'Modos de fechamento',
-    ruleTypes:'Tipos de regra', shifts:'Turnos',
-    implantSteps:'Etapas de implantação', implantStatus:'Status de implantação',
-  };
+  const labels = SISTEMA_OPTION_LABELS;
   setOptions('optionCompany', visibleCompanies().map((c) => [c.id, c.name]), 'Selecione a empresa');
   const optionCompanyId = val('optionCompany');
-  html('optionGroups', Object.keys(labels).map((key) => {
+  const selectedOptionKey = val('optionCategory') || Object.keys(labels)[0];
+  html('optionCategoryTabs', Object.entries(labels).map(([key, label]) =>
+    `<button class="inner-tab-btn ${key === selectedOptionKey ? 'active' : ''}" onclick="selectSistemaOptionCategory('${esc(key)}')">${esc(label)}</button>`
+  ).join(''));
+  html('optionGroups', [selectedOptionKey].map((key) => {
     const isCompanyScoped = COMPANY_SCOPED_OPTION_CATEGORIES.includes(key);
     if (isCompanyScoped && !optionCompanyId) {
       return `<div class="option-group">
@@ -1636,7 +1648,7 @@ function renderDocumentos() {
       <div class="rule-company-card" style="margin-bottom:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
           <h4 style="margin:0">${header} <span class="subtle">(${storeDocs.length} arquivo${storeDocs.length!==1?'s':''})</span></h4>
-          ${uploadedCount ? `<button class="btn btn-danger btn-sm" onclick="handleClearStoreDocuments('${s.id}','${esc(s.name)}')">Limpar pasta</button>` : ''}
+          ${uploadedCount ? `<div class="btn-row" style="margin:0"><button class="btn btn-sm" onclick="downloadStoreDocumentsZip('${s.id}')">Baixar ZIP</button><button class="btn btn-danger btn-sm" onclick="handleClearStoreDocuments('${s.id}','${esc(s.name)}')">Limpar pasta</button></div>` : ''}
         </div>
         ${storeDocs.length
           ? storeDocs.map(docItem).join('')
@@ -1674,6 +1686,6 @@ Object.assign(window, {
   renderAll, renderMetrics, renderMasterDashboard, renderCadastros,
   renderUsersByCompany, renderOperacao, renderFechamentos, renderSistema, renderFornecedoresCategorias,
   renderAdminViews, renderOperatorViews, renderModuleManager, switchCentral,
-  renderDocumentos, sortResumo, sortExtrato, sortRepasses, toggleOptionCompanyField,
+  renderDocumentos, sortResumo, sortExtrato, sortRepasses, toggleOptionCompanyField, selectSistemaOptionCategory,
   implantProgress, goToImplantacao,
 });

@@ -217,6 +217,8 @@ tr:hover td{background:#fafbfc}
 .inner-tab-btn.active{background:#101820;color:#fff;border-color:#101820}
 .inner-tab-btn:hover:not(.active){background:#f3f4f6}
 .inner-tab-panel{animation:fadeIn .18s ease}
+.compact-tabs-5x{margin:10px 0 14px;padding-bottom:10px}
+.compact-tabs-5x .inner-tab-btn{padding:7px 12px;font-size:12px}
 @keyframes fadeIn{from{opacity:.5;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
 
 /* ============================================================
